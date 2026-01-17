@@ -84,7 +84,11 @@ const ArtistLogin = () => {
           </form>
           
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Don't have an account? Contact support to register your shop.</p>
+            <p>Don't have an account?{' '}
+              <Link to="/artist/register" className="text-primary hover:text-primary/80 font-bold">
+                Register here
+              </Link>
+            </p>
           </div>
         </div>
       </div>
