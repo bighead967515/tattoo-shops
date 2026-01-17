@@ -98,14 +98,24 @@ const Home = () => {
       {/* Featured Shops */}
       <section className="py-16 px-4 md:px-8">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-4xl font-bold mb-12 glow-text-purple" data-testid="featured-title">
-            FEATURED SHOPS
-          </h2>
+          <div className="mb-12">
+            <h2 className="text-4xl font-bold mb-4 glow-text-purple" data-testid="featured-title">
+              FEATURED ARTISTS
+            </h2>
+            <p className="text-muted-foreground text-lg">
+              Top-rated tattoo shops and artists recommended by the community
+            </p>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featuredShops.map((shop) => (
               <Link key={shop.id} to={`/shop/${shop.id}`} data-testid={`shop-card-${shop.id}`}>
-                <div className="glass rounded hover:border-primary/50 transition-all duration-300 overflow-hidden group">
+                <div className="glass rounded hover:border-primary/50 transition-all duration-300 overflow-hidden group relative">
+                  {shop.avg_rating >= 4.0 && shop.review_count > 0 && (
+                    <div className="absolute top-4 right-4 z-10 bg-primary text-black px-3 py-1 rounded-sm font-bold text-xs uppercase tracking-wider">
+                      TOP RATED
+                    </div>
+                  )}
                   <div className="aspect-video bg-accent relative overflow-hidden">
                     <img
                       src="https://images.unsplash.com/photo-1655948433975-ef1d50f4f82c?crop=entropy&cs=srgb&fm=jpg&q=85"
@@ -135,7 +145,7 @@ const Home = () => {
                         ))}
                       </div>
                       <span className="font-mono text-sm text-muted-foreground">
-                        ({shop.review_count} reviews)
+                        {shop.avg_rating > 0 ? `${shop.avg_rating.toFixed(1)} (${shop.review_count})` : 'New'}
                       </span>
                     </div>
                     <div className="flex gap-2 mt-4">
