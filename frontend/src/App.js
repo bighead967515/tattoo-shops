@@ -19,6 +19,7 @@ function App() {
           <Route path="/directory" element={<Directory />} />
           <Route path="/shop/:id" element={<ShopDetail />} />
           <Route path="/artist/login" element={<ArtistLogin />} />
+          <Route path="/artist/register" element={<ArtistRegister />} />
           <Route path="/artist/dashboard" element={<ArtistDashboard />} />
           <Route path="/favorites" element={<Favorites />} />
         </Routes>
