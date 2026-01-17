@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO artists (userId, shopName, bio, specialties, styles, experience, address, city, phone, website, instagram, facebook, averageRating, totalReviews, isApproved, createdAt, updatedAt) VALUES (LAST_INSERT_ID(), 'Justin Olivier', 'Specializing in Black, Traditional, Old School, Whipshading, Neo Traditional', 'Black, Traditional, Old School, Whipshading, Neo Traditional', 'Blackwork,Traditional,Neo-Traditional', 6, 'New Orleans, Louisiana', 'New Orleans', NULL, NULL, NULL, NULL, '4.9', 22, 1, NOW(), NOW())",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute INSERT INTO artists (userId, shopName, bio, specialties, styles, experience, address, city, phone, website, instagram, facebook, averageRating, totalReviews, isApproved, createdAt, updatedAt) VALUES (LAST_INSERT_ID(), 'Justin Olivier', 'Specializing in Black, Traditional, Old School, Whipshading, Neo Traditional', 'Black, Traditional, Old School, Whipshading, Neo Traditional', 'Blackwork,Traditional,Neo-Traditional', 6, 'New Orleans, Louisiana', 'New Orleans', NULL, NULL, NULL, NULL, '4.9', 22, 1, NOW(), NOW())",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 62
+}

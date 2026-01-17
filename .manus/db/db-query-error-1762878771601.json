@@ -1,0 +1,8 @@
+{
+  "query": "SELECT a.id, a.shopName, a.email, a.location FROM artists a WHERE a.email IS NOT NULL AND a.email != '' ORDER BY a.shopName;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute SELECT a.id, a.shopName, a.email, a.location FROM artists a WHERE a.email IS NOT NULL AND a.email != '' ORDER BY a.shopName;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'a.email' in 'where clause'"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO users (openId, name, email, role, createdAt, updatedAt, lastSignedIn) VALUES ('00cc2f4eba10c629f5f6a8034f4646a4', 'Justin Olivier', NULL, 'artist', NOW(), NOW(), NOW())",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute INSERT INTO users (openId, name, email, role, createdAt, updatedAt, lastSignedIn) VALUES ('00cc2f4eba10c629f5f6a8034f4646a4', 'Justin Olivier', NULL, 'artist', NOW(), NOW(), NOW())",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 53
+}

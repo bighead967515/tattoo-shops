@@ -1,0 +1,15 @@
+{
+  "query": "SELECT \n  (SELECT COUNT(*) FROM reviews) as total_reviews,\n  (SELECT COUNT(*) FROM bookings) as total_bookings,\n  (SELECT COUNT(*) FROM users) as total_users;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute SELECT \n  (SELECT COUNT(*) FROM reviews) as total_reviews,\n  (SELECT COUNT(*) FROM bookings) as total_bookings,\n  (SELECT COUNT(*) FROM users) as total_users;",
+  "rows": [
+    {
+      "total_reviews": "8",
+      "total_bookings": "11",
+      "total_users": "48"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_reviews\ttotal_bookings\ttotal_users\n8\t11\t48\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}

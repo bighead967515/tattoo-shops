@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE reviews \nADD COLUMN helpfulVotes INT DEFAULT 0,\nADD COLUMN verifiedBooking INT DEFAULT 0,\nADD COLUMN photos TEXT,\nADD COLUMN artistResponse TEXT,\nADD COLUMN artistResponseDate TIMESTAMP NULL",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute ALTER TABLE reviews \nADD COLUMN helpfulVotes INT DEFAULT 0,\nADD COLUMN verifiedBooking INT DEFAULT 0,\nADD COLUMN photos TEXT,\nADD COLUMN artistResponse TEXT,\nADD COLUMN artistResponseDate TIMESTAMP NULL",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1444
+}

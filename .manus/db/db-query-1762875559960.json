@@ -1,0 +1,58 @@
+{
+  "query": "SELECT id, name, email, role FROM users WHERE role = 'user' LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute SELECT id, name, email, role FROM users WHERE role = 'user' LIMIT 10",
+  "rows": [
+    {
+      "id": "240053",
+      "name": "Sarah Johnson",
+      "email": "sarah.j@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240054",
+      "name": "Michael Chen",
+      "email": "michael.c@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240055",
+      "name": "Emily Rodriguez",
+      "email": "emily.r@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240056",
+      "name": "David Thompson",
+      "email": "david.t@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240057",
+      "name": "Jessica Williams",
+      "email": "jessica.w@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240058",
+      "name": "Robert Martinez",
+      "email": "robert.m@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240059",
+      "name": "Amanda Brown",
+      "email": "amanda.b@example.com",
+      "role": "user"
+    },
+    {
+      "id": "240060",
+      "name": "Christopher Lee",
+      "email": "chris.l@example.com",
+      "role": "user"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\trole\n240053\tSarah Johnson\tsarah.j@example.com\tuser\n240054\tMichael Chen\tmichael.c@example.com\tuser\n240055\tEmily Rodriguez\temily.r@example.com\tuser\n240056\tDavid Thompson\tdavid.t@example.com\tuser\n240057\tJessica Williams\tjessica.w@example.com\tuser\n240058\tRobert Martinez\trobert.m@example.com\tuser\n240059\tAmanda Brown\tamanda.b@example.com\tuser\n240060\tChristopher Lee\tchris.l@example.com\tuser\n",
+  "stderr": "",
+  "execution_time_ms": 47
+}

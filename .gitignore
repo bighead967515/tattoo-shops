@@ -3,10 +3,14 @@
 # IDE and editors
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # Dependencies
 node_modules/
 /node_modules
+**/node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -15,25 +19,38 @@ node_modules/
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.pnpm-store/
+jspm_packages/
 
 # Testing
 /coverage
+coverage/
+*.lcov
+.nyc_output
 
 # Next.js
 /.next/
 /out/
 next-env.d.ts
-*.tsbuildinfo
+.next
 
-# Production builds
+# Build outputs
+*.tsbuildinfo
 /build
 dist/
 dist
+*.dist
+build/
 
-# Environment files (comprehensive coverage)
-
+# Environment files
 *token.json*
 *credentials.json*
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs and debug files
 npm-debug.log*
@@ -41,9 +58,18 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 dump.rdb
+logs
+*.log
+lerna-debug.log*
 
 # System files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.pem
 
 # Python
@@ -63,21 +89,63 @@ chainlit.md
 
 # Data and databases
 agenthub/agents/youtube/db
+*.db
+*.sqlite
+*.sqlite3
 
 # Archive files and large assets
 **/*.zip
 **/*.tar.gz
 **/*.tar
 **/*.tgz
+*.tgz
 *.pack
 *.deb
 *.dylib
 
 # Build caches
 .cache/
+.cache
+.parcel-cache
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+*.bak
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
 
 # Mobile development
-android-sdk/ -e 
-# Environment files
-*.env
-*.env.*
+android-sdk/

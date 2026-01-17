@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS artists (\n  id INT AUTO_INCREMENT NOT NULL,\n  userId INT NOT NULL,\n  shopName VARCHAR(255) NOT NULL,\n  bio TEXT,\n  specialties TEXT,\n  experience INT,\n  address TEXT,\n  city VARCHAR(100),\n  state VARCHAR(50),\n  zipCode VARCHAR(20),\n  phone VARCHAR(50),\n  website VARCHAR(500),\n  instagram VARCHAR(255),\n  facebook VARCHAR(500),\n  lat TEXT,\n  lng TEXT,\n  averageRating TEXT,\n  totalReviews INT DEFAULT 0,\n  isApproved INT DEFAULT 0,\n  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT artists_id PRIMARY KEY(id)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RpArMXnzwY9eTp.77e866325a47 --database HTQB7VnPbnNHZKbko3Kn2K --execute CREATE TABLE IF NOT EXISTS artists (\n  id INT AUTO_INCREMENT NOT NULL,\n  userId INT NOT NULL,\n  shopName VARCHAR(255) NOT NULL,\n  bio TEXT,\n  specialties TEXT,\n  experience INT,\n  address TEXT,\n  city VARCHAR(100),\n  state VARCHAR(50),\n  zipCode VARCHAR(20),\n  phone VARCHAR(50),\n  website VARCHAR(500),\n  instagram VARCHAR(255),\n  facebook VARCHAR(500),\n  lat TEXT,\n  lng TEXT,\n  averageRating TEXT,\n  totalReviews INT DEFAULT 0,\n  isApproved INT DEFAULT 0,\n  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT artists_id PRIMARY KEY(id)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 47
+}
