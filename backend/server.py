@@ -273,6 +273,25 @@ async def get_states():
     states = await db.shops.distinct('state')
     return sorted([s for s in states if s])
 
+@api_router.get("/featured-shops", response_model=List[Shop])
+async def get_featured_shops(limit: int = 6):
+    # Get shops with highest ratings and most reviews
+    shops = await db.shops.find(
+        {'review_count': {'$gte': 1}},
+        {"_id": 0}
+    ).sort([('avg_rating', -1), ('review_count', -1)]).limit(limit).to_list(limit)
+    
+    # If not enough reviewed shops, fill with random shops
+    if len(shops) < limit:
+        remaining = limit - len(shops)
+        random_shops = await db.shops.find({}, {"_id": 0}).limit(remaining).to_list(remaining)
+        shops.extend(random_shops)
+    
+    for shop in shops:
+        if isinstance(shop.get('created_at'), str):
+            shop['created_at'] = datetime.fromisoformat(shop['created_at'])
+    return shops
+
 app.include_router(api_router)
 
 app.add_middleware(
