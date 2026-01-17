@@ -20,7 +20,7 @@ const Home = () => {
 
   const fetchFeaturedShops = async () => {
     try {
-      const response = await axios.get(`${API}/shops?limit=6`);
+      const response = await axios.get(`${API}/featured-shops?limit=6`);
       setFeaturedShops(response.data);
     } catch (error) {
       console.error('Error fetching shops:', error);
