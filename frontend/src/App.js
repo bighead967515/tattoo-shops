@@ -5,6 +5,7 @@ import Home from "@/pages/Home";
 import Directory from "@/pages/Directory";
 import ShopDetail from "@/pages/ShopDetail";
 import ArtistLogin from "@/pages/ArtistLogin";
+import ArtistRegister from "@/pages/ArtistRegister";
 import ArtistDashboard from "@/pages/ArtistDashboard";
 import Favorites from "@/pages/Favorites";
 
