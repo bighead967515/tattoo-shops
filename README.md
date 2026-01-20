@@ -18,7 +18,7 @@ Universal Inc is a comprehensive platform for tattoo artists and clients, featur
 ## Project Structure
 
 ```
-universal-inc/
+tattoo-shops/ (root)
 ├── client/              # React frontend
 │   ├── src/
 │   │   ├── components/  # UI components
@@ -43,12 +43,7 @@ universal-inc/
 
 ### Installation
 
-1. Navigate to this directory:
-```bash
-cd universal-inc
-```
-
-2. Install dependencies:
+1. Install dependencies:
 ```bash
 pnpm install
 ```
@@ -106,10 +101,6 @@ pnpm test
 - `pnpm test` - Run tests
 - `pnpm db:push` - Push database schema changes
 - `pnpm db:studio` - Open Drizzle Studio
-
-## Development
-
-This project is part of a monorepo. See the root README.md for more information about the overall repository structure.
 
 ## Additional Documentation
 
