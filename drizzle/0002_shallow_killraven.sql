@@ -1,1 +1,0 @@
-ALTER TABLE `artists` MODIFY COLUMN `averageRating` text;
