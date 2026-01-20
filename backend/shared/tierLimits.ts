@@ -13,7 +13,7 @@ export const TIER_LIMITS = {
     isFeatured: false,
   },
   premium: {
-    portfolioPhotos: Infinity,
+    portfolioPhotos: Number.MAX_SAFE_INTEGER, // Use safe integer instead of Infinity for JSON serialization
     canAcceptBookings: true,
     canShowDirectContact: true,
     canRespondToReviews: true,

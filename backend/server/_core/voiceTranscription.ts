@@ -26,6 +26,77 @@
  * ```
  */
 import { ENV } from "./env";
+import { URL as NodeURL } from "url";
+import * as dns from "dns/promises";
+import { isIP } from "net";
+
+function isPrivateIP(ip: string): boolean {
+  if (!isIP(ip)) return false;
+  
+  // IPv6 localhost and private ranges
+  if (ip === '::1' || ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
+    return true;
+  }
+  
+  // IPv4 checks
+  const parts = ip.split('.');
+  if (parts.length !== 4) return false;
+  
+  const first = parseInt(parts[0], 10);
+  const second = parseInt(parts[1], 10);
+  
+  // 10.0.0.0/8
+  if (first === 10) return true;
+  // 172.16.0.0/12
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  // 192.168.0.0/16
+  if (first === 192 && second === 168) return true;
+  // 127.0.0.0/8 (localhost)
+  if (first === 127) return true;
+  // 169.254.0.0/16 (link-local)
+  if (first === 169 && second === 254) return true;
+  
+  return false;
+}
+
+async function isUrlAllowed(urlString: string): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    const url = new NodeURL(urlString);
+    
+    // Require HTTPS
+    if (url.protocol !== 'https:') {
+      return { allowed: false, reason: 'Only HTTPS URLs are allowed' };
+    }
+    
+    // Check for obvious localhost/private hostnames
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return { allowed: false, reason: 'Localhost URLs are not allowed' };
+    }
+    
+    // Resolve hostname to IP and check if it's private
+    try {
+      const addresses = await dns.resolve4(hostname).catch(() => [] as string[]);
+      const addresses6 = await dns.resolve6(hostname).catch(() => [] as string[]);
+      const allAddresses = [...addresses, ...addresses6];
+      
+      for (const ip of allAddresses) {
+        if (isPrivateIP(ip)) {
+          return { allowed: false, reason: 'URL resolves to a private IP address' };
+        }
+      }
+    } catch (dnsError) {
+      // DNS resolution failed - block it
+      return { allowed: false, reason: 'Unable to resolve hostname' };
+    }
+    
+    // Optionally add allowlist check here if you want to restrict to specific domains
+    // For now, if it passed all checks above, allow it
+    return { allowed: true };
+  } catch (error) {
+    return { allowed: false, reason: 'Invalid URL format' };
+  }
+}
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -87,6 +158,16 @@ export async function transcribeAudio(
         error: "Voice transcription service authentication is missing",
         code: "SERVICE_ERROR",
         details: "BUILT_IN_FORGE_API_KEY is not set"
+      };
+    }
+
+    // Step 1.5: Validate URL for SSRF protection
+    const urlCheck = await isUrlAllowed(options.audioUrl);
+    if (!urlCheck.allowed) {
+      return {
+        error: "Invalid or disallowed audio URL",
+        code: "INVALID_FORMAT",
+        details: urlCheck.reason
       };
     }
 
@@ -152,37 +233,56 @@ export async function transcribeAudio(
       baseUrl
     ).toString();
 
-    const response = await fetch(fullUrl, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${ENV.forgeApiKey}`,
-        "Accept-Encoding": "identity",
-      },
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      return {
-        error: "Transcription service request failed",
-        code: "TRANSCRIPTION_FAILED",
-        details: `${response.status} ${response.statusText}${errorText ? `: ${errorText}` : ""}`
-      };
-    }
+    try {
+      const response = await fetch(fullUrl, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ENV.forgeApiKey}`,
+          "Accept-Encoding": "identity",
+        },
+        body: formData,
+        signal: controller.signal,
+      });
 
-    // Step 5: Parse and return the transcription result
-    const whisperResponse = await response.json() as WhisperResponse;
-    
-    // Validate response structure
-    if (!whisperResponse.text || typeof whisperResponse.text !== 'string') {
-      return {
-        error: "Invalid transcription response",
-        code: "SERVICE_ERROR",
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        return {
+          error: "Transcription service request failed",
+          code: "TRANSCRIPTION_FAILED",
+          details: `${response.status} ${response.statusText}${errorText ? `: ${errorText}` : ""}`
+        };
+      }
+
+      // Step 5: Parse and return the transcription result
+      const whisperResponse = await response.json() as WhisperResponse;
+      
+      // Validate response structure
+      if (!whisperResponse.text || typeof whisperResponse.text !== 'string') {
+        return {
+          error: "Invalid transcription response",
+          code: "SERVICE_ERROR",
         details: "Transcription service returned an invalid response format"
       };
     }
 
     return whisperResponse; // Return native Whisper API response directly
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return {
+          error: "Transcription request timed out",
+          code: "SERVICE_ERROR",
+          details: "The transcription service did not respond within 30 seconds"
+        };
+      }
+      throw fetchError;
+    }
 
   } catch (error) {
     // Handle unexpected errors

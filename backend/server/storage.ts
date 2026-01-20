@@ -38,6 +38,14 @@ async function buildDownloadUrl(
     method: "GET",
     headers: buildAuthHeaders(apiKey),
   });
+  
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => 'Unable to read error response');
+    throw new Error(
+      `Failed to build download URL (${response.status} ${response.statusText}): ${errorBody}`
+    );
+  }
+  
   return (await response.json()).url;
 }
 

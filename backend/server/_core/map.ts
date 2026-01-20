@@ -34,6 +34,39 @@ function getMapsConfig(): MapsConfig {
   };
 }
 
+/**
+ * Build an authenticated Static Maps URL for <img> tags or emails
+ * @param params - Static map parameters (center, zoom, size, markers, etc.)
+ * @returns URL string for the static map image
+ * @example
+ * const mapUrl = buildStaticMapUrl({
+ *   center: "40.714728,-73.998672",
+ *   zoom: 12,
+ *   size: "400x400",
+ *   markers: "color:red|40.714728,-73.998672"
+ * });
+ */
+export function buildStaticMapUrl(params: {
+  center?: string;
+  zoom?: number;
+  size?: string;
+  markers?: string;
+  maptype?: 'roadmap' | 'satellite' | 'terrain' | 'hybrid';
+  [key: string]: any;
+}): string {
+  const { baseUrl, apiKey } = getMapsConfig();
+  const url = new URL(`${baseUrl}/v1/maps/proxy/maps/api/staticmap`);
+  
+  url.searchParams.append("key", apiKey);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.append(key, String(value));
+    }
+  });
+  
+  return url.toString();
+}
+
 // ============================================================================
 // Core Request Handler
 // ============================================================================
@@ -71,22 +104,36 @@ export async function makeRequest<T = unknown>(
     }
   });
 
-  const response = await fetch(url.toString(), {
-    method: options.method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Google Maps API request failed (${response.status} ${response.statusText}): ${errorText}`
-    );
+  try {
+    const response = await fetch(url.toString(), {
+      method: options.method || \"GET\",
+      headers: {
+        \"Content-Type\": \"application/json\",
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Google Maps API request failed (${response.status} ${response.statusText}): ${errorText}`
+      );
+    }
+
+    return (await response.json()) as T;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Google Maps API request timed out after 10 seconds');
+    }
+    throw error;
   }
-
-  return (await response.json()) as T;
 }
 
 // ============================================================================
@@ -311,7 +358,7 @@ export type RoadsResult = {
  * Endpoint: /maps/api/staticmap
  * Input: URL params - center: string, zoom: number, size: string, markers?: string, maptype?: MapType
  * Output: Image URL (not JSON) - use directly in <img src={url} />
- * Note: Construct URL manually with getMapsConfig() for auth
+ * Note: Use the exported buildStaticMapUrl() function to construct authenticated URLs
  */
 
 

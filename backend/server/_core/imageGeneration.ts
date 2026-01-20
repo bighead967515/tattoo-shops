@@ -77,12 +77,31 @@ export async function generateImage(
       mimeType: string;
     };
   };
+  
+  // Validate result shape
+  if (!result || typeof result !== 'object' || !result.image || 
+      typeof result.image !== 'object' || !result.image.b64Json || 
+      typeof result.image.b64Json !== 'string' || result.image.b64Json.length === 0 ||
+      !result.image.mimeType || typeof result.image.mimeType !== 'string') {
+    throw new Error('Invalid response from image generation service: missing or invalid image data');
+  }
+  
   const base64Data = result.image.b64Json;
   const buffer = Buffer.from(base64Data, "base64");
 
+  // Determine file extension from mime type
+  const mimeToExtension: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/webp': 'webp',
+    'image/gif': 'gif'
+  };
+  const ext = mimeToExtension[result.image.mimeType.toLowerCase()] || 'png';
+
   // Save to S3
   const { url } = await storagePut(
-    `generated/${Date.now()}.png`,
+    `generated/${Date.now()}.${ext}`,
     buffer,
     result.image.mimeType
   );

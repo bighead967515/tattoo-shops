@@ -10,6 +10,34 @@ export interface EmailOptions {
   from?: string;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeErrorForLogging(error: any): any {
+  if (!error) return error;
+  
+  const sanitized = { ...error };
+  const sensitiveKeys = ['to', 'from', 'email', 'recipient', 'address'];
+  
+  for (const key of sensitiveKeys) {
+    if (key in sanitized && typeof sanitized[key] === 'string') {
+      sanitized[key] = sanitized[key].replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[REDACTED]');
+    }
+  }
+  
+  if (error.message) {
+    sanitized.message = error.message.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[REDACTED]');
+  }
+  
+  return sanitized;
+}
+
 /**
  * Send an email using Resend
  */
@@ -25,14 +53,14 @@ export async function sendEmail(options: EmailOptions) {
     });
 
     if (error) {
-      console.error("Email send error:", error);
+      console.error("Email send error:", sanitizeErrorForLogging(error));
       throw new Error(`Failed to send email: ${error.message}`);
     }
 
     console.log("Email sent successfully:", data?.id);
     return { success: true, id: data?.id };
   } catch (error) {
-    console.error("Email send exception:", error);
+    console.error("Email send exception:", sanitizeErrorForLogging(error));
     throw error;
   }
 }
@@ -41,6 +69,7 @@ export async function sendEmail(options: EmailOptions) {
  * Send artist invitation email
  */
 export async function sendArtistInvitation(to: string, shopName: string) {
+  const escapedShopName = escapeHtml(shopName);
   const html = `
 <!DOCTYPE html>
 <html>
@@ -68,7 +97,7 @@ export async function sendArtistInvitation(to: string, shopName: string) {
     </div>
     
     <div class="content">
-      <h2>Hello ${shopName}!</h2>
+      <h2>Hello ${escapedShopName}!</h2>
       
       <p>We're excited to invite you to join <strong>Universal Inc</strong>, Louisiana's premier online platform connecting tattoo artists with clients looking for their perfect artist.</p>
       
@@ -139,6 +168,17 @@ export async function sendBookingConfirmation(
   }
 ) {
   const { customerName, artistName, shopName, appointmentDate, depositAmount } = bookingDetails;
+  
+  // Escape all user-provided inputs
+  const escapedCustomerName = escapeHtml(customerName);
+  const escapedArtistName = escapeHtml(artistName);
+  const escapedShopName = escapeHtml(shopName);
+  const escapedAppointmentDate = escapeHtml(appointmentDate);
+  
+  // Validate and sanitize depositAmount
+  const safeDepositAmount = (typeof depositAmount === 'number' && !isNaN(depositAmount)) 
+    ? depositAmount 
+    : 0;
 
   const html = `
 <!DOCTYPE html>
@@ -161,16 +201,16 @@ export async function sendBookingConfirmation(
       <h1>✅ Booking Confirmed!</h1>
     </div>
     <div class="content">
-      <p>Hi ${customerName},</p>
+      <p>Hi ${escapedCustomerName},</p>
       
       <p>Your tattoo appointment has been confirmed! We're excited for you to get your new ink.</p>
       
       <div class="booking-details">
         <h3>Appointment Details:</h3>
-        <p><strong>Artist:</strong> ${artistName}</p>
-        <p><strong>Shop:</strong> ${shopName}</p>
-        <p><strong>Date & Time:</strong> ${appointmentDate}</p>
-        <p><strong>Deposit Paid:</strong> $${depositAmount.toFixed(2)}</p>
+        <p><strong>Artist:</strong> ${escapedArtistName}</p>
+        <p><strong>Shop:</strong> ${escapedShopName}</p>
+        <p><strong>Date & Time:</strong> ${escapedAppointmentDate}</p>
+        <p><strong>Deposit Paid:</strong> $${safeDepositAmount.toFixed(2)}</p>
       </div>
       
       <p><strong>What's Next:</strong></p>
@@ -196,7 +236,7 @@ export async function sendBookingConfirmation(
 
   return sendEmail({
     to,
-    subject: `Booking Confirmed with ${artistName} at ${shopName}`,
+    subject: `Booking Confirmed with ${escapedArtistName} at ${escapedShopName}`,
     html,
   });
 }

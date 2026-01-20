@@ -84,6 +84,9 @@ export async function notifyOwner(
 
   const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -94,7 +97,10 @@ export async function notifyOwner(
         "connect-protocol-version": "1",
       },
       body: JSON.stringify({ title, content }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
@@ -108,6 +114,11 @@ export async function notifyOwner(
 
     return true;
   } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('[Notification] Request timed out after 5 seconds');
+      return false;
+    }
     console.warn("[Notification] Error calling notification service:", error);
     return false;
   }

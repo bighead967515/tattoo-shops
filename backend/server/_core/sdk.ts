@@ -39,8 +39,12 @@ class OAuthService {
   }
 
   private decodeState(state: string): string {
-    const redirectUri = atob(state);
-    return redirectUri;
+    try {
+      const redirectUri = atob(state);
+      return redirectUri;
+    } catch (error) {
+      throw new Error("Invalid state parameter: unable to decode base64");
+    }
   }
 
   async getTokenByCode(
@@ -155,7 +159,7 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.jwtSecret;
     return new TextEncoder().encode(secret);
   }
 
@@ -215,7 +219,7 @@ class SDKServer {
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        typeof name !== 'string'
       ) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
