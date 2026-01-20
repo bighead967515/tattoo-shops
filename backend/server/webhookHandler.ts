@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import Stripe from "stripe";
 import { constructWebhookEvent } from "./stripe";
 import * as db from "./db";
 
@@ -26,22 +27,41 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     // Handle real events
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as any;
-        const bookingId = parseInt(session.metadata?.bookingId || "0");
+        const session = event.data.object as Stripe.Checkout.Session;
+        const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
-        if (bookingId) {
-          console.log(`[Webhook] Payment successful for booking ${bookingId}`);
-          
-          // Update booking with payment information
-          await db.updateBooking(bookingId, {
-            stripePaymentIntentId: session.payment_intent as string,
-            depositAmount: session.amount_total,
-            depositPaid: 1,
-            status: "confirmed",
-          });
-
-          console.log(`[Webhook] Booking ${bookingId} updated successfully`);
+        if (!bookingId || isNaN(bookingId) || bookingId <= 0) {
+          console.warn(
+            `[Webhook] Missing or invalid bookingId in checkout.session.completed`,
+            {
+              sessionId: session.id,
+              paymentIntent: session.payment_intent,
+              amountTotal: session.amount_total,
+              metadata: session.metadata
+            }
+          );
+          // Don't fail the webhook - return success so Stripe doesn't retry
+          return res.json({ received: true, warning: "Invalid bookingId" });
         }
+        
+        // Check if already processed (idempotency)
+        const existingBooking = await db.getBookingById(bookingId);
+        if (existingBooking && (existingBooking.depositPaid === 1 || existingBooking.status === "confirmed")) {
+          console.log(`[Webhook] Booking ${bookingId} already processed, skipping duplicate event ${event.id}`);
+          return res.json({ received: true, duplicate: true });
+        }
+
+        console.log(`[Webhook] Payment successful for booking ${bookingId}`);
+        
+        // Update booking with payment information
+        await db.updateBooking(bookingId, {
+          stripePaymentIntentId: session.payment_intent as string,
+          depositAmount: session.amount_total,
+          depositPaid: 1,
+          status: "confirmed",
+        });
+
+        console.log(`[Webhook] Booking ${bookingId} updated successfully`);
         break;
       }
 
@@ -52,8 +72,31 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       }
 
       case "payment_intent.payment_failed": {
-        const paymentIntent = event.data.object as any;
-        console.error(`[Webhook] Payment failed: ${paymentIntent.id}`);
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        console.error(`[Webhook] Payment failed: ${paymentIntent.id}`, {
+          failureReason: paymentIntent.last_payment_error?.message || paymentIntent.cancellation_reason,
+          amount: paymentIntent.amount,
+          metadata: paymentIntent.metadata
+        });
+        
+        // Try to find and update the booking
+        const bookingId = paymentIntent.metadata?.bookingId 
+          ? parseInt(paymentIntent.metadata.bookingId, 10) 
+          : null;
+        
+        if (bookingId && !isNaN(bookingId) && bookingId > 0) {
+          await db.updateBooking(bookingId, {
+            status: "cancelled",
+            stripePaymentIntentId: paymentIntent.id,
+          }).catch(err => {
+            console.error(`[Webhook] Failed to update booking ${bookingId} on payment failure:`, err);
+          });
+        } else {
+          console.warn(
+            `[Webhook] Cannot update booking for failed payment - missing or invalid bookingId`,
+            { paymentIntentId: paymentIntent.id, metadata: paymentIntent.metadata }
+          );
+        }
         break;
       }
 

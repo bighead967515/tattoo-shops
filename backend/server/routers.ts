@@ -89,8 +89,18 @@ export const appRouter = router({
         lat: z.string().optional(),
         lng: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
+        
+        // Verify ownership
+        const artist = await db.getArtistById(id);
+        if (!artist) {
+          throw new Error("Artist not found");
+        }
+        if (artist.userId !== ctx.user.id) {
+          throw new Error("Forbidden: You can only update your own artist profile");
+        }
+        
         return await db.updateArtist(id, data);
       }),
   }),
@@ -110,13 +120,36 @@ export const appRouter = router({
         caption: z.string().optional(),
         style: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // Verify the user owns the artist profile
+        const artist = await db.getArtistById(input.artistId);
+        if (!artist) {
+          throw new Error("Artist not found");
+        }
+        if (artist.userId !== ctx.user.id) {
+          throw new Error("Forbidden: You can only add images to your own portfolio");
+        }
+        
         return await db.addPortfolioImage(input);
       }),
     
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // Get the portfolio image to check ownership
+        const portfolio = await db.getPortfolioByArtistId(input.id);
+        const image = portfolio.find(p => p.id === input.id);
+        
+        if (!image) {
+          throw new Error("Portfolio image not found");
+        }
+        
+        // Get artist to verify ownership
+        const artist = await db.getArtistById(image.artistId);
+        if (!artist || artist.userId !== ctx.user.id) {
+          throw new Error("Forbidden: You can only delete your own portfolio images");
+        }
+        
         return await db.deletePortfolioImage(input.id);
       }),
   }),
@@ -169,7 +202,16 @@ export const appRouter = router({
     
     getByArtistId: protectedProcedure
       .input(z.object({ artistId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        // Verify the user owns the artist profile
+        const artist = await db.getArtistById(input.artistId);
+        if (!artist) {
+          throw new Error("Artist not found");
+        }
+        if (artist.userId !== ctx.user.id) {
+          throw new Error("Forbidden: You can only view bookings for your own artist profile");
+        }
+        
         return await db.getBookingsByArtistId(input.artistId);
       }),
     
@@ -178,7 +220,26 @@ export const appRouter = router({
         id: z.number(),
         status: z.enum(["pending", "confirmed", "cancelled", "completed"]),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // Get booking and verify ownership
+        const booking = await db.getBookingById(input.id);
+        if (!booking) {
+          throw new Error("Booking not found");
+        }
+        
+        // Check if user is either the customer or owns the artist profile
+        const isCustomer = booking.userId === ctx.user.id;
+        let isArtist = false;
+        
+        if (!isCustomer) {
+          const artist = await db.getArtistById(booking.artistId);
+          isArtist = artist && artist.userId === ctx.user.id;
+        }
+        
+        if (!isCustomer && !isArtist) {
+          throw new Error("Forbidden: You can only update your own bookings or bookings for your artist profile");
+        }
+        
         return await db.updateBooking(input.id, { status: input.status });
       }),
   }),
@@ -220,6 +281,11 @@ export const appRouter = router({
         if (!booking) {
           throw new Error("Booking not found");
         }
+        
+        // Verify the user owns this booking
+        if (booking.userId !== ctx.user.id) {
+          throw new Error("Forbidden: You can only create checkout sessions for your own bookings");
+        }
 
         const product = PRODUCTS.BOOKING_DEPOSIT;
         const origin = ctx.req.headers.origin || "http://localhost:3000";
@@ -238,6 +304,10 @@ export const appRouter = router({
           successUrl: `${origin}/payment/success`,
           cancelUrl: `${origin}/payment/cancelled`,
         });
+        
+        if (!session.url) {
+          throw new Error("Failed to create checkout session: No URL returned from Stripe");
+        }
 
         return { url: session.url };
       }),
