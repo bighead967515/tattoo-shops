@@ -183,6 +183,14 @@ export async function getPortfolioByArtistId(artistId: number) {
   return await db.select().from(portfolioImages).where(eq(portfolioImages.artistId, artistId)).orderBy(desc(portfolioImages.createdAt));
 }
 
+export async function getPortfolioImageById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(portfolioImages).where(eq(portfolioImages.id, id)).limit(1);
+  return result[0] || null;
+}
+
 export async function deletePortfolioImage(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

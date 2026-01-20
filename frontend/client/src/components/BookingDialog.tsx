@@ -53,6 +53,9 @@ export default function BookingDialog({
         if (checkoutResult.url) {
           // Redirect to Stripe checkout
           window.location.href = checkoutResult.url;
+        } else {
+          // No checkout URL returned
+          toast.error("Unable to start checkout, please try again");
         }
       } catch (error) {
         // Error already handled by createCheckoutMutation.onError

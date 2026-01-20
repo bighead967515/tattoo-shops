@@ -2,6 +2,9 @@ import Header from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { CheckCircle, XCircle, Clock, DollarSign } from "lucide-react";
 
+// Update this date when policy changes
+const POLICY_LAST_UPDATED = new Date('2024-01-01');
+
 export default function CancellationPolicy() {
   return (
     <div className="min-h-screen bg-background">
@@ -10,7 +13,7 @@ export default function CancellationPolicy() {
       <div className="container py-16 max-w-4xl">
         <h1 className="text-4xl font-bold mb-4">Cancellation Policy</h1>
         <p className="text-lg text-muted-foreground mb-12">
-          Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+          Last updated: {POLICY_LAST_UPDATED.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
         </p>
 
         {/* Policy Overview */}

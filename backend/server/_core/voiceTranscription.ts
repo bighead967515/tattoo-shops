@@ -33,9 +33,26 @@ import { isIP } from "net";
 function isPrivateIP(ip: string): boolean {
   if (!isIP(ip)) return false;
   
-  // IPv6 localhost and private ranges
-  if (ip === '::1' || ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
-    return true;
+  const normalized = ip.toLowerCase();
+  
+  // IPv6 checks
+  if (isIP(ip) === 6) {
+    // IPv6 localhost
+    if (normalized === '::1') return true;
+    
+    // IPv6 private ranges fc00::/7 (ULA)
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+    
+    // IPv6 link-local fe80::/10
+    if (normalized.startsWith('fe8') || normalized.startsWith('fe9') || 
+        normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+    
+    // IPv4-mapped IPv6 addresses (::ffff:x.x.x.x)
+    const mappedMatch = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+    if (mappedMatch) {
+      // Extract and check the IPv4 portion
+      return isPrivateIP(mappedMatch[1]);
+    }
   }
   
   // IPv4 checks
@@ -45,6 +62,8 @@ function isPrivateIP(ip: string): boolean {
   const first = parseInt(parts[0], 10);
   const second = parseInt(parts[1], 10);
   
+  // 0.0.0.0/8 (broadcast/unspecified)
+  if (first === 0) return true;
   // 10.0.0.0/8
   if (first === 10) return true;
   // 172.16.0.0/12
@@ -59,7 +78,7 @@ function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-async function isUrlAllowed(urlString: string): Promise<{ allowed: boolean; reason?: string }> {
+async function isUrlAllowed(urlString: string): Promise<{ allowed: boolean; reason?: string; resolvedIp?: string }> {
   try {
     const url = new NodeURL(urlString);
     
@@ -75,24 +94,37 @@ async function isUrlAllowed(urlString: string): Promise<{ allowed: boolean; reas
     }
     
     // Resolve hostname to IP and check if it's private
+    // Remove .catch() to surface DNS errors
+    let addresses: string[] = [];
+    let addresses6: string[] = [];
+    
     try {
-      const addresses = await dns.resolve4(hostname).catch(() => [] as string[]);
-      const addresses6 = await dns.resolve6(hostname).catch(() => [] as string[]);
-      const allAddresses = [...addresses, ...addresses6];
-      
-      for (const ip of allAddresses) {
-        if (isPrivateIP(ip)) {
-          return { allowed: false, reason: 'URL resolves to a private IP address' };
-        }
-      }
-    } catch (dnsError) {
-      // DNS resolution failed - block it
+      addresses = await dns.resolve4(hostname);
+    } catch {
+      // IPv4 resolution failed, try IPv6
+    }
+    
+    try {
+      addresses6 = await dns.resolve6(hostname);
+    } catch {
+      // IPv6 resolution failed
+    }
+    
+    const allAddresses = [...addresses, ...addresses6];
+    
+    if (allAddresses.length === 0) {
       return { allowed: false, reason: 'Unable to resolve hostname' };
     }
     
-    // Optionally add allowlist check here if you want to restrict to specific domains
-    // For now, if it passed all checks above, allow it
-    return { allowed: true };
+    // Check all resolved IPs
+    for (const ip of allAddresses) {
+      if (isPrivateIP(ip)) {
+        return { allowed: false, reason: 'URL resolves to a private IP address' };
+      }
+    }
+    
+    // Return first resolved IP for binding the request
+    return { allowed: true, resolvedIp: allAddresses[0] };
   } catch (error) {
     return { allowed: false, reason: 'Invalid URL format' };
   }

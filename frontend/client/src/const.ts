@@ -25,10 +25,19 @@ export const getLoginUrl = () => {
   // Generate crypto-secure state nonce
   const stateArray = new Uint8Array(16);
   crypto.getRandomValues(stateArray);
-  const state = btoa(String.fromCharCode(...stateArray));
+  const state = btoa(String.fromCharCode(...Array.from(stateArray)));
   
-  // Store state in sessionStorage for verification
-  sessionStorage.setItem("oauth_state", state);
+  // Store state in sessionStorage for verification (handle multiple concurrent states)
+  try {
+    const stateKey = `oauth_state_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const existingStates = sessionStorage.getItem("oauth_states");
+    const statesMap = existingStates ? JSON.parse(existingStates) : {};
+    statesMap[state] = { timestamp: Date.now(), key: stateKey };
+    sessionStorage.setItem("oauth_states", JSON.stringify(statesMap));
+  } catch (storageError) {
+    // Fall back to in-memory storage if sessionStorage is restricted
+    console.warn("SessionStorage unavailable, OAuth state verification may fail");
+  }
 
   const url = new URL(`${oauthPortalUrl}/app-auth`);
   url.searchParams.set("appId", appId);

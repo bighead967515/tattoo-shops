@@ -236,7 +236,7 @@ export async function sendBookingConfirmation(
 
   return sendEmail({
     to,
-    subject: `Booking Confirmed with ${escapedArtistName} at ${escapedShopName}`,
+    subject: `Booking Confirmed with ${artistName} at ${shopName}`,
     html,
   });
 }

@@ -136,9 +136,8 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        // Get the portfolio image to check ownership
-        const portfolio = await db.getPortfolioByArtistId(input.id);
-        const image = portfolio.find(p => p.id === input.id);
+        // Get the portfolio image by ID to check ownership
+        const image = await db.getPortfolioImageById(input.id);
         
         if (!image) {
           throw new Error("Portfolio image not found");

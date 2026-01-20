@@ -53,10 +53,13 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
         console.log(`[Webhook] Payment successful for booking ${bookingId}`);
         
+        // Guard against null amount_total
+        const depositAmount = session.amount_total ? Number(session.amount_total) : 0;
+        
         // Update booking with payment information
         await db.updateBooking(bookingId, {
           stripePaymentIntentId: session.payment_intent as string,
-          depositAmount: session.amount_total,
+          depositAmount,
           depositPaid: 1,
           status: "confirmed",
         });
