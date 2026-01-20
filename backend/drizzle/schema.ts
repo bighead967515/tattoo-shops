@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, unique } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -127,10 +127,12 @@ export type InsertBooking = typeof bookings.$inferInsert;
  */
 export const favorites = mysqlTable("favorites", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(), // References users.id
-  artistId: int("artistId").notNull(), // References artists.id
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  artistId: int("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueUserArtist: unique().on(table.userId, table.artistId),
+}));
 
 export type Favorite = typeof favorites.$inferSelect;
 export type InsertFavorite = typeof favorites.$inferInsert;
