@@ -159,6 +159,7 @@ export default function ArtistFilters({
                 <button
                   onClick={() => handleStyleToggle(style)}
                   className="hover:bg-primary/20 rounded-full p-0.5"
+                  aria-label={`Remove ${style} filter`}
                 >
                   <X className="w-3 h-3" />
                 </button>

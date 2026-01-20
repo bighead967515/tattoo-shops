@@ -173,12 +173,14 @@ export function AIChatBox({
     onSendMessage(trimmedInput);
     setInput("");
 
-    // Scroll immediately after sending
-    scrollToBottom();
-
     // Keep focus on input
     textareaRef.current?.focus();
   };
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
+  }, [displayMessages]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

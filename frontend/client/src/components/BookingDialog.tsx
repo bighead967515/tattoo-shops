@@ -44,14 +44,19 @@ export default function BookingDialog({
 
   const createBookingMutation = trpc.bookings.create.useMutation({
     onSuccess: async (data) => {
-      // Create Stripe checkout session
-      const checkoutResult = await createCheckoutMutation.mutateAsync({
-        bookingId: data.insertId,
-      });
+      try {
+        // Create Stripe checkout session
+        const checkoutResult = await createCheckoutMutation.mutateAsync({
+          bookingId: data.insertId,
+        });
 
-      if (checkoutResult.url) {
-        // Redirect to Stripe checkout
-        window.location.href = checkoutResult.url;
+        if (checkoutResult.url) {
+          // Redirect to Stripe checkout
+          window.location.href = checkoutResult.url;
+        }
+      } catch (error) {
+        // Error already handled by createCheckoutMutation.onError
+        // Dialog remains open for user to retry or cancel
       }
     },
     onError: (error) => {
@@ -75,6 +80,12 @@ export default function BookingDialog({
 
     if (!formData.preferredDate) {
       toast.error("Please select a preferred date");
+      return;
+    }
+
+    const selectedDate = new Date(formData.preferredDate);
+    if (selectedDate < new Date()) {
+      toast.error("Please select a future date");
       return;
     }
 
@@ -288,7 +299,7 @@ export default function BookingDialog({
           </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            By booking, you agree to our <button type="button" className="text-primary hover:underline">cancellation policy</button>
+            By booking, you agree to our <button type="button" className="text-primary hover:underline" onClick={() => toast.info("Cancellation Policy: Full refund if cancelled 48+ hours before appointment. Deposits are non-refundable within 48 hours of appointment time.")}>cancellation policy</button>
           </p>
         </form>
       </DialogContent>

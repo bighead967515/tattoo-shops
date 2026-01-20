@@ -42,10 +42,6 @@ export function useAuth(options?: UseAuthOptions) {
   }, [logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
@@ -59,13 +55,39 @@ export function useAuth(options?: UseAuthOptions) {
     logoutMutation.error,
     logoutMutation.isPending,
   ]);
+  
+  // Persist user info to localStorage when it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (meQuery.data) {
+      localStorage.setItem(
+        "manus-runtime-user-info",
+        JSON.stringify(meQuery.data)
+      );
+    } else {
+      localStorage.removeItem("manus-runtime-user-info");
+    }
+  }, [meQuery.data]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading || logoutMutation.isPending) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
+    
+    // Normalize paths for comparison - extract pathname from redirectPath
+    const currentPath = window.location.pathname;
+    let targetPath: string;
+    try {
+      // Try to parse as full URL
+      const url = new URL(redirectPath, window.location.origin);
+      targetPath = url.pathname;
+    } catch {
+      // If not a full URL, use as-is
+      targetPath = redirectPath.split('?')[0];
+    }
+    
+    if (currentPath === targetPath) return;
 
     window.location.href = redirectPath
   }, [
