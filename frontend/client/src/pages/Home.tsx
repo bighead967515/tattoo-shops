@@ -284,24 +284,24 @@ export default function Home() {
             <div>
               <h3 className="font-semibold mb-4">About</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><button onClick={() => setLocation("/about")} className="hover:text-primary">About Us</button></li>
-                <li><button onClick={() => setLocation("/for-artists")} className="hover:text-primary">For Artists</button></li>
-                <li><button onClick={() => setLocation("/contact")} className="hover:text-primary">Contact</button></li>
+                <li><Link href="/about" className="hover:text-primary">About Us</Link></li>
+                <li><Link href="/for-artists" className="hover:text-primary">For Artists</Link></li>
+                <li><Link href="/contact" className="hover:text-primary">Contact</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Support</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><button onClick={() => setLocation("/help")} className="hover:text-primary">Help Center</button></li>
-                <li><button onClick={() => setLocation("/faq")} className="hover:text-primary">FAQ</button></li>
-                <li><button onClick={() => setLocation("/cancellation-policy")} className="hover:text-primary">Cancellation Policy</button></li>
+                <li><Link href="/help" className="hover:text-primary">Help Center</Link></li>
+                <li><Link href="/faq" className="hover:text-primary">FAQ</Link></li>
+                <li><Link href="/cancellation-policy" className="hover:text-primary">Cancellation Policy</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Legal</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><button onClick={() => setLocation("/terms")} className="hover:text-primary">Terms of Service</button></li>
-                <li><button onClick={() => setLocation("/privacy")} className="hover:text-primary">Privacy Policy</button></li>
+                <li><Link href="/terms" className="hover:text-primary">Terms of Service</Link></li>
+                <li><Link href="/privacy" className="hover:text-primary">Privacy Policy</Link></li>
               </ul>
             </div>
             <div>
@@ -317,7 +317,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 Universal Inc. All rights reserved.
+            © {new Date().getFullYear()} Universal Inc. All rights reserved.
           </div>
         </div>
       </footer>

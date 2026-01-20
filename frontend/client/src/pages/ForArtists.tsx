@@ -405,8 +405,8 @@ export default function ForArtists() {
                   </div>
                 </div>
 
-                <Button type="submit" size="lg" className="w-full">
-                  Submit Application
+                <Button type="submit" size="lg" className="w-full" disabled={createArtistMutation.isLoading}>
+                  {createArtistMutation.isLoading ? "Submitting..." : "Submit Application"}
                 </Button>
               </form>
             </Card>

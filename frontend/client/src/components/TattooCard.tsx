@@ -31,6 +31,7 @@ export default function TattooCard({
           variant="ghost"
           size="icon"
           className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Favorite tattoo"
         >
           <Heart className="h-4 w-4" />
         </Button>

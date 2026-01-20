@@ -10,7 +10,7 @@ export default function CancellationPolicy() {
       <div className="container py-16 max-w-4xl">
         <h1 className="text-4xl font-bold mb-4">Cancellation Policy</h1>
         <p className="text-lg text-muted-foreground mb-12">
-          Last updated: January 2024
+          Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
         </p>
 
         {/* Policy Overview */}

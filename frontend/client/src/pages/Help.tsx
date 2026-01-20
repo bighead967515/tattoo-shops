@@ -244,8 +244,9 @@ export default function Help() {
             <Card className="p-8">
               <form onSubmit={handleContactSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Name</label>
+                  <label htmlFor="contact-name" className="block text-sm font-medium mb-2">Name</label>
                   <Input
+                    id="contact-name"
                     type="text"
                     value={contactForm.name}
                     onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
@@ -255,8 +256,9 @@ export default function Help() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Email</label>
+                  <label htmlFor="contact-email" className="block text-sm font-medium mb-2">Email</label>
                   <Input
+                    id="contact-email"
                     type="email"
                     value={contactForm.email}
                     onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
@@ -266,8 +268,9 @@ export default function Help() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Message</label>
+                  <label htmlFor="contact-message" className="block text-sm font-medium mb-2">Message</label>
                   <Textarea
+                    id="contact-message"
                     value={contactForm.message}
                     onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
                     placeholder="Describe your issue or question..."
@@ -289,7 +292,7 @@ export default function Help() {
       <footer className="border-t bg-muted/30">
         <div className="container py-8">
           <div className="text-center text-sm text-muted-foreground">
-            <p>© 2024 Universal Inc. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Universal Inc. All rights reserved.</p>
           </div>
         </div>
       </footer>

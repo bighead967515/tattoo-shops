@@ -14,13 +14,14 @@ export default function UpgradePrompt({ feature, description, inline = false }: 
     return (
       <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-lg">
         <Crown className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium text-foreground">{feature}:</span>
         <span className="text-sm text-muted-foreground">{description}</span>
-        <Link href="/pricing">
-          <Button size="sm" variant="default" className="ml-2">
+        <Button size="sm" variant="default" className="ml-2" asChild>
+          <Link href="/pricing">
             <Zap className="h-3 w-3 mr-1" />
             Upgrade
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
     );
   }

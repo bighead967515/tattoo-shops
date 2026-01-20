@@ -38,7 +38,7 @@ export default function ReviewFilters({
           >
             <Star className="w-3 h-3 fill-current" />
             {rating}
-            {ratingCounts[rating] && (
+            {typeof ratingCounts[rating] === 'number' && (
               <span className="text-xs opacity-70">({ratingCounts[rating]})</span>
             )}
           </Button>

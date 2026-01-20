@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useRef } from "react";
 import { usePersistFn } from "./usePersistFn";
 
@@ -71,6 +72,18 @@ export function useComposition<
   const isComposing = usePersistFn(() => {
     return c.current;
   });
+
+  // Cleanup timers on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
+      if (timer2.current) {
+        clearTimeout(timer2.current);
+      }
+    };
+  }, []);
 
   return {
     onCompositionStart,

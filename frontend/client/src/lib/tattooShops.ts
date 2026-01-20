@@ -16,6 +16,11 @@ export interface TattooShop {
 export async function loadTattooShops(): Promise<TattooShop[]> {
   try {
     const response = await fetch('/tattoo-shops.csv');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load tattoo shops: ${response.statusText}`);
+    }
+    
     const text = await response.text();
     const lines = text.split('\n').slice(1); // Skip header
     

@@ -15,7 +15,7 @@ export default function ArtistBrowse() {
     minExperience: 0,
   });
 
-  const { data: artists, isLoading } = trpc.artists.search.useQuery({
+  const { data: artists, isLoading, isError, error } = trpc.artists.search.useQuery({
     styles: filters.styles.length > 0 ? filters.styles : undefined,
     minRating: filters.minRating > 0 ? filters.minRating : undefined,
     minExperience: filters.minExperience > 0 ? filters.minExperience : undefined,
@@ -57,6 +57,10 @@ export default function ArtistBrowse() {
               <div className="text-center py-12">
                 <p className="text-muted-foreground">Loading artists...</p>
               </div>
+            ) : isError ? (
+              <div className="text-center py-12">
+                <p className="text-destructive">Error loading artists: {error?.message || "Unknown error"}</p>
+              </div>
             ) : artists && artists.length > 0 ? (
               <>
                 <div className="mb-6 text-sm text-muted-foreground">
@@ -69,7 +73,7 @@ export default function ArtistBrowse() {
                       : 0;
                     
                     const artistStyles = artist.styles
-                      ? artist.styles.split(",").map((s) => s.trim())
+                      ? artist.styles.split(",").map((s) => s.trim()).filter((s) => s)
                       : [];
 
                     return (
@@ -83,7 +87,7 @@ export default function ArtistBrowse() {
                             {artist.shopName}
                           </h3>
 
-                          {artist.city && (
+                          {artist.city && artist.state && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
                               <MapPin className="w-3 h-3" />
                               {artist.city}, {artist.state}

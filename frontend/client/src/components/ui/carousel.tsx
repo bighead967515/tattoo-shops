@@ -81,9 +81,15 @@ function Carousel({
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         scrollNext();
+      } else if (event.key === "ArrowUp" && orientation === "vertical") {
+        event.preventDefault();
+        scrollPrev();
+      } else if (event.key === "ArrowDown" && orientation === "vertical") {
+        event.preventDefault();
+        scrollNext();
       }
     },
-    [scrollPrev, scrollNext]
+    [scrollPrev, scrollNext, orientation]
   );
 
   React.useEffect(() => {
@@ -98,6 +104,7 @@ function Carousel({
     api.on("select", onSelect);
 
     return () => {
+      api?.off("reInit", onSelect);
       api?.off("select", onSelect);
     };
   }, [api, onSelect]);

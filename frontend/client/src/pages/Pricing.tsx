@@ -120,9 +120,11 @@ export default function Pricing() {
                 </p>
               </div>
 
-              <Button className="w-full mb-8 group">
-                <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                Upgrade to Premium
+              <Button className="w-full mb-8 group" asChild>
+                <Link href="/for-artists">
+                  <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
+                  Upgrade to Premium
+                </Link>
               </Button>
 
               <div className="space-y-4">
@@ -181,9 +183,11 @@ export default function Pricing() {
                   Start Free
                 </Button>
               </Link>
-              <Button size="lg" className="group">
-                <Crown className="h-5 w-5 mr-2 group-hover:animate-pulse" />
-                Upgrade to Premium
+              <Button size="lg" className="group" asChild>
+                <Link href="/for-artists">
+                  <Crown className="h-5 w-5 mr-2 group-hover:animate-pulse" />
+                  Upgrade to Premium
+                </Link>
               </Button>
             </div>
           </div>

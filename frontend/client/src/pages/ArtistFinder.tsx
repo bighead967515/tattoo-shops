@@ -8,6 +8,13 @@ import { MapView } from "@/components/Map";
 import { loadTattooShops, geocodeAddress, parseRating, getInitials, type TattooShop } from "@/lib/tattooShops";
 import BookingDialog from "@/components/BookingDialog";
 
+// Helper to escape HTML for InfoWindow content
+const escapeHtml = (str: string): string => {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+};
+
 interface ShopWithLocation extends TattooShop {
   distance?: string;
 }
@@ -29,11 +36,12 @@ export default function ArtistFinder() {
     const geocoderInstance = new google.maps.Geocoder();
     setGeocoder(geocoderInstance);
 
-    // Load shops from CSV
-    const loadedShops = await loadTattooShops();
-    
-    // Geocode addresses with delay to avoid rate limiting
-    const shopsWithCoords: ShopWithLocation[] = [];
+    try {
+      // Load shops from CSV
+      const loadedShops = await loadTattooShops();
+      
+      // Geocode addresses with delay to avoid rate limiting
+      const shopsWithCoords: ShopWithLocation[] = [];
     
     for (const shop of loadedShops) {
       if (shop.address) {
@@ -90,10 +98,10 @@ export default function ArtistFinder() {
         const infoWindow = new google.maps.InfoWindow({
           content: `
             <div style="padding: 8px; color: #000; max-width: 250px;">
-              <h3 style="margin: 0 0 4px 0; font-weight: bold; font-size: 16px;">${shop.name}</h3>
-              <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">${shop.city}</p>
-              ${shop.address ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #888;">${shop.address}</p>` : ''}
-              <p style="margin: 0; font-size: 12px; color: #ff8c42;">${ratingStars}</p>
+              <h3 style="margin: 0 0 4px 0; font-weight: bold; font-size: 16px;">${escapeHtml(shop.name)}</h3>
+              <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">${escapeHtml(shop.city)}</p>
+              ${shop.address ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #888;">${escapeHtml(shop.address)}</p>` : ''}
+              <p style="margin: 0; font-size: 12px; color: #ff8c42;">${escapeHtml(ratingStars)}</p>
             </div>
           `,
         });
@@ -117,6 +125,10 @@ export default function ArtistFinder() {
       });
       mapInstance.fitBounds(bounds);
     }
+    } catch (error) {
+      console.error('Error loading tattoo shops:', error);
+      setLoading(false);
+    }
   }, []);
 
   const handleSearch = () => {
@@ -133,6 +145,8 @@ export default function ArtistFinder() {
     setFilteredShops(filtered);
 
     // Update map to show only filtered markers
+    if (!map) return;
+    
     markers.forEach(marker => marker.setMap(null));
     
     const newMarkers = filtered
@@ -158,10 +172,10 @@ export default function ArtistFinder() {
         const infoWindow = new google.maps.InfoWindow({
           content: `
             <div style="padding: 8px; color: #000; max-width: 250px;">
-              <h3 style="margin: 0 0 4px 0; font-weight: bold; font-size: 16px;">${shop.name}</h3>
-              <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">${shop.city}</p>
-              ${shop.address ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #888;">${shop.address}</p>` : ''}
-              <p style="margin: 0; font-size: 12px; color: #ff8c42;">${ratingStars}</p>
+              <h3 style="margin: 0 0 4px 0; font-weight: bold; font-size: 16px;">${escapeHtml(shop.name)}</h3>
+              <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">${escapeHtml(shop.city)}</p>
+              ${shop.address ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #888;">${escapeHtml(shop.address)}</p>` : ''}
+              <p style="margin: 0; font-size: 12px; color: #ff8c42;">${escapeHtml(ratingStars)}</p>
             </div>
           `,
         });

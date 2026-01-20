@@ -206,9 +206,11 @@ export default function Dashboard() {
                 {favorites.map((item) => {
                   if (!item.artist) return null;
                   
-                  const avgRating = item.artist.averageRating
-                    ? parseFloat(item.artist.averageRating)
-                    : 0;
+                  let avgRating = 0;
+                  if (item.artist.averageRating) {
+                    const parsed = parseFloat(item.artist.averageRating);
+                    avgRating = Number.isNaN(parsed) || !isFinite(parsed) ? 0 : parsed;
+                  }
 
                   return (
                     <Card key={item.favorite.id} className="p-6">

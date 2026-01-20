@@ -56,6 +56,7 @@ export default function ArtistProfile() {
       setShowReviewDialog(false);
       setReviewComment("");
       setReviewRating(5);
+      setReviewPhotos([]);
       refetchReviews();
     },
   });
@@ -185,7 +186,7 @@ export default function ArtistProfile() {
                     <span className="text-muted-foreground">Extra Large (10"+)</span>
                     <span className="font-medium">$1,200+</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">*Prices vary based on complexity and detail</p>
+                  <p className="text-xs text-muted-foreground mt-2">*Typical industry pricing. Actual prices vary based on complexity and detail. Contact artist for quote.</p>
                 </div>
               </div>
 
