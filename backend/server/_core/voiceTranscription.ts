@@ -28,54 +28,33 @@
 import { ENV } from "./env";
 import { URL as NodeURL } from "url";
 import * as dns from "dns/promises";
-import { isIP } from "net";
+import * as ipaddr from "ipaddr.js";
 
 function isPrivateIP(ip: string): boolean {
-  if (!isIP(ip)) return false;
-  
-  const normalized = ip.toLowerCase();
-  
-  // IPv6 checks
-  if (isIP(ip) === 6) {
-    // IPv6 localhost
-    if (normalized === '::1') return true;
+  try {
+    // Parse the IP address using ipaddr.js for robust handling
+    const addr = ipaddr.process(ip);
     
-    // IPv6 private ranges fc00::/7 (ULA)
-    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+    // Get the address range/type
+    const range = addr.range();
     
-    // IPv6 link-local fe80::/10
-    if (normalized.startsWith('fe8') || normalized.startsWith('fe9') || 
-        normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+    // Block private, loopback, link-local, unique-local, and unspecified ranges
+    const blockedRanges = [
+      'private',           // IPv4 private (10.x, 172.16-31.x, 192.168.x)
+      'loopback',          // 127.x.x.x, ::1
+      'linkLocal',         // 169.254.x.x, fe80::/10
+      'uniqueLocal',       // fc00::/7 (IPv6 ULA)
+      'unspecified',       // 0.0.0.0, ::
+      'broadcast',         // 255.255.255.255
+      'carrierGradeNat',   // 100.64.0.0/10 (CGN)
+      'reserved',          // Reserved ranges
+    ];
     
-    // IPv4-mapped IPv6 addresses (::ffff:x.x.x.x)
-    const mappedMatch = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-    if (mappedMatch) {
-      // Extract and check the IPv4 portion
-      return isPrivateIP(mappedMatch[1]);
-    }
+    return blockedRanges.includes(range);
+  } catch (error) {
+    // If parsing fails, treat as suspicious and block it
+    return true;
   }
-  
-  // IPv4 checks
-  const parts = ip.split('.');
-  if (parts.length !== 4) return false;
-  
-  const first = parseInt(parts[0], 10);
-  const second = parseInt(parts[1], 10);
-  
-  // 0.0.0.0/8 (broadcast/unspecified)
-  if (first === 0) return true;
-  // 10.0.0.0/8
-  if (first === 10) return true;
-  // 172.16.0.0/12
-  if (first === 172 && second >= 16 && second <= 31) return true;
-  // 192.168.0.0/16
-  if (first === 192 && second === 168) return true;
-  // 127.0.0.0/8 (localhost)
-  if (first === 127) return true;
-  // 169.254.0.0/16 (link-local)
-  if (first === 169 && second === 254) return true;
-  
-  return false;
 }
 
 async function isUrlAllowed(urlString: string): Promise<{ allowed: boolean; reason?: string; resolvedIp?: string }> {
