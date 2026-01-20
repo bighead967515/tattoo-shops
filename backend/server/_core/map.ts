@@ -109,9 +109,9 @@ export async function makeRequest<T = unknown>(
 
   try {
     const response = await fetch(url.toString(), {
-      method: options.method || \"GET\",
+      method: options.method || "GET",
       headers: {
-        \"Content-Type\": \"application/json\",
+        "Content-Type": "application/json",
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
