@@ -36,7 +36,7 @@ export type InsertUser = typeof users.$inferInsert;
 export const artists = pgTable("artists", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(), // References users.id
-  shopName: varchar("shopName", { length: 255 }).notNull(),
+  shopName: varchar("shop_name", { length: 255 }).notNull(),
   bio: text("bio"),
   specialties: text("specialties"), // Comma-separated list
   styles: text("styles"), // Comma-separated list of tattoo styles (Realism, Traditional, Watercolor, etc.)
@@ -44,7 +44,7 @@ export const artists = pgTable("artists", {
   address: text("address"),
   city: varchar("city", { length: 100 }),
   state: varchar("state", { length: 50 }),
-  zipCode: varchar("zipCode", { length: 20 }),
+  zipCode: varchar("zip", { length: 20 }),
   phone: varchar("phone", { length: 50 }),
   website: varchar("website", { length: 500 }),
   instagram: varchar("instagram", { length: 255 }),

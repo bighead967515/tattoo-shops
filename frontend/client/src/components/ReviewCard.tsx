@@ -11,7 +11,7 @@ interface ReviewCardProps {
     comment: string | null;
     createdAt: Date;
     helpfulVotes?: number | null;
-    verifiedBooking?: number | null;
+    verifiedBooking?: boolean | null;
     photos?: string | null;
     artistResponse?: string | null;
     artistResponseDate?: Date | null;
@@ -36,7 +36,7 @@ export default function ReviewCard({ review, onHelpfulClick }: ReviewCardProps) 
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <p className="font-semibold">{review.userName || "Anonymous"}</p>
-            {review.verifiedBooking === 1 && (
+            {review.verifiedBooking && (
               <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950 px-2 py-0.5 rounded-full">
                 <CheckCircle className="w-3 h-3" />
                 Verified Booking

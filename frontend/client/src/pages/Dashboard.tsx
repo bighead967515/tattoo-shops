@@ -157,7 +157,7 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {item.booking.depositPaid === 1 && (
+                          {item.booking.depositPaid && (
                             <div className="flex items-center gap-2 text-green-600 mt-2">
                               <CreditCard className="w-4 h-4" />
                               <span className="font-medium">Deposit Paid: ${(item.booking.depositAmount || 0) / 100}</span>
