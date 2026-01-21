@@ -109,6 +109,16 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
       
+      - name: Build application
+        run: pnpm build
+      
+      - name: Start server in background
+        run: |
+          pnpm start &
+          npx wait-on http://localhost:3001 --timeout 60000
+        env:
+          NODE_ENV: production
+      
       - name: Run performance tests
         run: npx playwright test tests/e2e/performance.spec.ts
         env:
@@ -137,9 +147,11 @@ For production monitoring, integrate services like:
 Add Lighthouse CI for automated performance audits:
 
 ```bash
-npm install -g @lhci/cli
+# Using pnpm (matches project convention)
+pnpm dlx @lhci/cli autorun
 
-# Run audit
+# Or install globally
+pnpm add -g @lhci/cli
 lhci autorun
 ```
 

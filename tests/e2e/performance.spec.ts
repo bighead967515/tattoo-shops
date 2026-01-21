@@ -57,7 +57,7 @@ test.describe('Real Performance Tests', () => {
           tcp: nav.connectEnd - nav.connectStart,
           request: nav.responseStart - nav.requestStart,
           response: nav.responseEnd - nav.responseStart,
-          dom: nav.domComplete - nav.domLoading,
+          dom: nav.domComplete - nav.domInteractive,
           load: nav.loadEventEnd - nav.loadEventStart,
           total: nav.loadEventEnd - nav.fetchStart,
         };
@@ -79,11 +79,12 @@ test.describe('Real Performance Tests', () => {
       const fcp = await page.evaluate(() => {
         const fcpEntry = performance.getEntriesByType('paint')
           .find(entry => entry.name === 'first-contentful-paint');
-        return fcpEntry ? fcpEntry.startTime : 0;
+        return fcpEntry ? fcpEntry.startTime : null;
       });
       
+      expect(fcp).not.toBeNull();
       console.log(`FCP: ${fcp}ms`);
-      expect(fcp).toBeLessThan(1800);
+      expect(fcp!).toBeLessThan(1800);
     });
   });
 
@@ -92,15 +93,27 @@ test.describe('Real Performance Tests', () => {
       await page.goto(BASE_URL + '/');
       
       const lcp = await page.evaluate(() => {
-        return new Promise((resolve) => {
-          new PerformanceObserver((list) => {
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          const observer = new PerformanceObserver((list) => {
+            if (settled) return;
             const entries = list.getEntries();
             const lastEntry = entries[entries.length - 1];
+            settled = true;
+            observer.disconnect();
+            clearTimeout(timeoutId);
             resolve(lastEntry.startTime);
-          }).observe({ type: 'largest-contentful-paint', buffered: true });
+          });
+          observer.observe({ type: 'largest-contentful-paint', buffered: true });
           
-          // Fallback timeout
-          setTimeout(() => resolve(0), 5000);
+          // Fallback timeout - reject instead of resolving with 0
+          const timeoutId = setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              observer.disconnect();
+              reject(new Error('LCP measurement timed out after 5 seconds'));
+            }
+          }, 5000);
         });
       });
       
@@ -110,7 +123,7 @@ test.describe('Real Performance Tests', () => {
   });
 
   test.describe('Bundle Size', () => {
-    test('main bundle is under 300KB (gzipped)', async ({ page, request }) => {
+    test('main bundle is under 300KB (gzipped)', async ({ page }) => {
       await page.goto(BASE_URL + '/');
       
       const resourceSizes = await page.evaluate(() => {
@@ -127,9 +140,11 @@ test.describe('Real Performance Tests', () => {
       const mainBundle = resourceSizes.find(r => r.name.includes('index'));
       console.log('Bundle sizes:', resourceSizes);
       
-      if (mainBundle) {
-        expect(mainBundle.size).toBeLessThan(300 * 1024);
+      if (!mainBundle) {
+        throw new Error('Main bundle not found in resource timings');
       }
+      
+      expect(mainBundle.encoded).toBeLessThan(300 * 1024);
     });
   });
 
@@ -148,7 +163,7 @@ test.describe('Real Performance Tests', () => {
   test.describe('Mobile Performance', () => {
     test.use({ 
       viewport: { width: 375, height: 667 },
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
     });
 
     test('loads on mobile viewport in under 5 seconds', async ({ page }) => {
