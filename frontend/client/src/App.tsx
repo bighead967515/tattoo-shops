@@ -11,6 +11,7 @@ import ArtistProfile from "./pages/ArtistProfile";
 import ForArtists from "./pages/ForArtists";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import AuthCallback from "./pages/AuthCallback";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import Help from "./pages/Help";
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/for-artists" component={ForArtists} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/login" component={Login} />
+      <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancelled" component={PaymentCancelled} />
       <Route path="/help" component={Help} />

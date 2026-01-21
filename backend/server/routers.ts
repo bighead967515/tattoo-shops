@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { createCheckoutSession } from "./stripe";
 import { PRODUCTS } from "./products";
+import { uploadFile, getPublicUrl, deleteFile } from "./_core/supabaseStorage";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -112,6 +113,32 @@ export const appRouter = router({
         return await db.getPortfolioByArtistId(input.artistId);
       }),
     
+    getUploadUrl: protectedProcedure
+      .input(z.object({
+        artistId: z.number(),
+        fileName: z.string(),
+        contentType: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verify the user owns the artist profile
+        const artist = await db.getArtistById(input.artistId);
+        if (!artist) {
+          throw new Error("Artist not found");
+        }
+        if (artist.userId !== ctx.user.id) {
+          throw new Error("Forbidden: You can only upload to your own portfolio");
+        }
+        
+        // Generate unique file key
+        const fileKey = `${input.artistId}/${Date.now()}-${input.fileName}`;
+        
+        // Return the file key for client to upload
+        return {
+          fileKey,
+          bucket: 'portfolio-images',
+        };
+      }),
+    
     add: protectedProcedure
       .input(z.object({
         artistId: z.number(),
@@ -147,6 +174,14 @@ export const appRouter = router({
         const artist = await db.getArtistById(image.artistId);
         if (!artist || artist.userId !== ctx.user.id) {
           throw new Error("Forbidden: You can only delete your own portfolio images");
+        }
+        
+        // Delete from Supabase storage
+        try {
+          await deleteFile(image.imageKey);
+        } catch (error) {
+          console.error("Failed to delete file from storage:", error);
+          // Continue with DB deletion even if storage deletion fails
         }
         
         return await db.deletePortfolioImage(input.id);
