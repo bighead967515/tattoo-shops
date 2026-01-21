@@ -46,7 +46,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         
         // Check if already processed (idempotency)
         const existingBooking = await db.getBookingById(bookingId);
-        if (existingBooking && (existingBooking.depositPaid === true || existingBooking.status === "confirmed")) {
+        if (existingBooking && (Boolean(existingBooking.depositPaid) || existingBooking.status === "confirmed")) {
           console.log(`[Webhook] Booking ${bookingId} already processed, skipping duplicate event ${event.id}`);
           return res.json({ received: true, duplicate: true });
         }

@@ -3,7 +3,7 @@
 ## Issues Fixed (2025-01-21)
 
 ### 1. CI Workflow Missing Server Startup
-**File:** `tests/PERFORMANCE_TESTING.md`  
+**File:** `.github/workflows/ci.yml`  
 **Issue:** CI tests would fail because no server is running  
 **Fix:** Added build and server startup steps with health check:
 ```yaml
@@ -13,11 +13,11 @@
 - name: Start server in background
   run: |
     pnpm start &
-    npx wait-on http://localhost:3001 --timeout 60000
+    pnpm dlx wait-on http://localhost:3001 --timeout 60000
 ```
 
 ### 2. Package Manager Inconsistency
-**File:** `tests/PERFORMANCE_TESTING.md`  
+**File:** `.github/workflows/lighthouse-ci.yml`  
 **Issue:** Lighthouse CI documentation used `npm` instead of `pnpm`  
 **Fix:** Changed to `pnpm dlx @lhci/cli autorun`
 

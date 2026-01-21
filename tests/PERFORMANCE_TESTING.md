@@ -106,6 +106,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
       
+      - name: Install wait-on
+        run: pnpm add -D wait-on
+      
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
       
@@ -115,7 +118,7 @@ jobs:
       - name: Start server in background
         run: |
           pnpm start &
-          npx wait-on http://localhost:3001 --timeout 60000
+          pnpm dlx wait-on http://localhost:3001 --timeout 60000
         env:
           NODE_ENV: production
       

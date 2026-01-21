@@ -100,7 +100,7 @@ export async function generateImage(
   const ext = mimeToExtension[result.image.mimeType.toLowerCase()] || 'png';
 
   // Save to Supabase Storage
-  const fileKey = `generated/${Date.now()}.${ext}`;
+  const fileKey = `generated/${Date.now()}-${crypto.randomUUID()}.${ext}`;
   await uploadFile(fileKey, buffer, result.image.mimeType);
   const url = getPublicUrl(fileKey);
   return {
