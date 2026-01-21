@@ -28,8 +28,10 @@ export async function createContext(
       if (!error && supabaseUser) {
         // Fetch user from database
         const db = await getDb();
-        const [dbUser] = await db.select().from(users).where(eq(users.openId, supabaseUser.id)).limit(1);
-        user = dbUser || null;
+        if (db) {
+          const [dbUser] = await db.select().from(users).where(eq(users.openId, supabaseUser.id)).limit(1);
+          user = dbUser || null;
+        }
       }
     }
   } catch (error) {

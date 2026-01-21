@@ -71,7 +71,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -121,7 +122,7 @@ export async function getAllArtists() {
   const db = await getDb();
   if (!db) return [];
   
-  return await db.select().from(artists).where(eq(artists.isApproved, 1));
+  return await db.select().from(artists).where(eq(artists.isApproved, true));
 }
 
 export async function searchArtists(filters: {
@@ -133,7 +134,7 @@ export async function searchArtists(filters: {
   const db = await getDb();
   if (!db) return [];
   
-  const conditions: any[] = [eq(artists.isApproved, 1)];
+  const conditions: any[] = [eq(artists.isApproved, true)];
   
   // Filter by styles
   if (filters.styles && filters.styles.length > 0) {

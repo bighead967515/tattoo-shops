@@ -267,7 +267,7 @@ export const appRouter = router({
         
         if (!isCustomer) {
           const artist = await db.getArtistById(booking.artistId);
-          isArtist = artist && artist.userId === ctx.user.id;
+          isArtist = !!(artist && artist.userId === ctx.user.id);
         }
         
         if (!isCustomer && !isArtist) {

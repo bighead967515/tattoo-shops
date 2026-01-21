@@ -15,7 +15,7 @@
  *     }]
  *   });
  */
-import { storagePut } from "server/storage";
+import { uploadFile, getPublicUrl } from "./supabaseStorage";
 import { ENV } from "./env";
 
 export type GenerateImageOptions = {
@@ -99,12 +99,10 @@ export async function generateImage(
   };
   const ext = mimeToExtension[result.image.mimeType.toLowerCase()] || 'png';
 
-  // Save to S3
-  const { url } = await storagePut(
-    `generated/${Date.now()}.${ext}`,
-    buffer,
-    result.image.mimeType
-  );
+  // Save to Supabase Storage
+  const fileKey = `generated/${Date.now()}.${ext}`;
+  await uploadFile(fileKey, buffer, result.image.mimeType);
+  const url = getPublicUrl(fileKey);
   return {
     url,
   };
