@@ -1,26 +1,51 @@
 import { describe, it, expect } from 'vitest';
 
 /**
- * Performance Tests
- * Tests load times, bundle sizes, and optimization strategies
+ * Performance Requirements Specification
+ * 
+ * NOTE: These are performance requirements and benchmarks, not executable tests.
+ * They use mock/hardcoded values to document performance targets and serve as
+ * a reference for optimization goals.
+ * 
+ * To implement real performance testing:
+ * 1. Install Playwright: pnpm add -D @playwright/test
+ * 2. Create tests/e2e/performance.spec.ts with real browser automation
+ * 3. Use performance.getEntriesByType('navigation') for actual measurements
+ * 4. Run against deployed or local dev server
+ * 
+ * Example real test:
+ * ```typescript
+ * import { test, expect } from '@playwright/test';
+ * 
+ * test('homepage loads in under 3 seconds', async ({ page }) => {
+ *   const start = Date.now();
+ *   await page.goto('http://localhost:3001/');
+ *   await page.waitForLoadState('networkidle');
+ *   const loadTime = Date.now() - start;
+ *   expect(loadTime).toBeLessThan(3000);
+ * });
+ * ```
  */
 
-describe('Performance Tests', () => {
-  describe('Page Load Times', () => {
-    it('should load homepage in under 3 seconds', async () => {
-      // Mock: Measure load time
-      const loadTime = 2500; // milliseconds
+describe('Performance Requirements', () => {
+  describe('Page Load Times (Requirements)', () => {
+    it('should load homepage in under 3 seconds (target)', async () => {
+      // Target requirement: Homepage should load in under 3 seconds
+      // TODO: Implement with Playwright/Puppeteer for real measurements
+      const loadTime = 2500; // milliseconds (mock value)
       
       expect(loadTime).toBeLessThan(3000);
     });
 
-    it('should load artist browse page in under 3 seconds', async () => {
-      const loadTime = 2800;
+    it('should load artist browse page in under 3 seconds (target)', async () => {
+      // Target requirement: Artist browse page should load in under 3 seconds
+      const loadTime = 2800; // mock value
       expect(loadTime).toBeLessThan(3000);
     });
 
-    it('should load artist profile in under 2 seconds', async () => {
-      const loadTime = 1900;
+    it('should load artist profile in under 2 seconds (target)', async () => {
+      // Target requirement: Artist profile should load in under 2 seconds
+      const loadTime = 1900; // mock value
       expect(loadTime).toBeLessThan(2000);
     });
   });
