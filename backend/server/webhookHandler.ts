@@ -2,23 +2,24 @@ import { Request, Response } from "express";
 import Stripe from "stripe";
 import { constructWebhookEvent } from "./stripe";
 import * as db from "./db";
+import { logger } from "./_core/logger";
 
 export async function handleStripeWebhook(req: Request, res: Response) {
   const signature = req.headers["stripe-signature"];
 
   if (!signature || typeof signature !== "string") {
-    console.error("[Webhook] Missing or invalid stripe-signature header");
+    logger.warn("Webhook request missing stripe-signature header");
     return res.status(400).send("Missing signature");
   }
 
   try {
     const event = await constructWebhookEvent(req.body, signature);
 
-    console.log(`[Webhook] Received event: ${event.type} (${event.id})`);
+    logger.debug("Processing webhook event", { eventType: event.type, eventId: event.id });
 
     // Handle test events
     if (event.id.startsWith("evt_test_")) {
-      console.log("[Webhook] Test event detected, returning verification response");
+      logger.info("Test event received and verified");
       return res.json({
         verified: true,
       });
@@ -31,15 +32,10 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
         if (!bookingId || isNaN(bookingId) || bookingId <= 0) {
-          console.warn(
-            `[Webhook] Missing or invalid bookingId in checkout.session.completed`,
-            {
-              sessionId: session.id,
-              paymentIntent: session.payment_intent,
-              amountTotal: session.amount_total,
-              metadata: session.metadata
-            }
-          );
+          logger.warn("Webhook received checkout.session.completed with invalid bookingId", {
+            sessionId: session.id,
+            hasPaymentIntent: !!session.payment_intent,
+          });
           // Don't fail the webhook - return success so Stripe doesn't retry
           return res.json({ received: true, warning: "Invalid bookingId" });
         }
@@ -47,39 +43,46 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         // Check if already processed (idempotency)
         const existingBooking = await db.getBookingById(bookingId);
         if (existingBooking && (Boolean(existingBooking.depositPaid) || existingBooking.status === "confirmed")) {
-          console.log(`[Webhook] Booking ${bookingId} already processed, skipping duplicate event ${event.id}`);
+          logger.debug("Webhook duplicate detected - booking already processed", { bookingId });
           return res.json({ received: true, duplicate: true });
         }
 
-        console.log(`[Webhook] Payment successful for booking ${bookingId}`);
-        
         // Guard against null amount_total
         const depositAmount = session.amount_total ? Number(session.amount_total) : 0;
         
-        // Update booking with payment information
-        await db.updateBooking(bookingId, {
-          stripePaymentIntentId: session.payment_intent as string,
-          depositAmount,
-          depositPaid: true,
-          status: "confirmed",
-        });
+        // Update booking with payment information - use transaction for atomicity
+        try {
+          await db.withTransaction(async (tx) => {
+            await db.updateBooking(bookingId, {
+              stripePaymentIntentId: session.payment_intent as string,
+              depositAmount,
+              depositPaid: true,
+              status: "confirmed",
+            });
+          });
 
-        console.log(`[Webhook] Booking ${bookingId} updated successfully`);
+          logger.info("Payment confirmed for booking", { bookingId });
+        } catch (error) {
+          logger.error("Failed to update booking in transaction", {
+            bookingId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
+        }
         break;
       }
 
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as any;
-        console.log(`[Webhook] Payment intent succeeded: ${paymentIntent.id}`);
+        logger.debug("Payment intent succeeded", { stripeId: paymentIntent.id });
         break;
       }
 
       case "payment_intent.payment_failed": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        console.error(`[Webhook] Payment failed: ${paymentIntent.id}`, {
-          failureReason: paymentIntent.last_payment_error?.message || paymentIntent.cancellation_reason,
+        logger.warn("Payment intent failed", {
+          stripeId: paymentIntent.id,
           amount: paymentIntent.amount,
-          metadata: paymentIntent.metadata
         });
         
         // Try to find and update the booking
@@ -92,24 +95,26 @@ export async function handleStripeWebhook(req: Request, res: Response) {
             status: "cancelled",
             stripePaymentIntentId: paymentIntent.id,
           }).catch(err => {
-            console.error(`[Webhook] Failed to update booking ${bookingId} on payment failure:`, err);
+            logger.error("Failed to update booking status on payment failure", { 
+              bookingId, 
+              error: err instanceof Error ? err.message : String(err) 
+            });
           });
         } else {
-          console.warn(
-            `[Webhook] Cannot update booking for failed payment - missing or invalid bookingId`,
-            { paymentIntentId: paymentIntent.id, metadata: paymentIntent.metadata }
-          );
+          logger.warn("Could not update booking for failed payment - missing or invalid bookingId");
         }
         break;
       }
 
       default:
-        console.log(`[Webhook] Unhandled event type: ${event.type}`);
+        logger.debug("Received unhandled webhook event type", { eventType: event.type });
     }
 
     res.json({ received: true });
   } catch (error) {
-    console.error("[Webhook] Error processing webhook:", error);
+    logger.error("Webhook processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(400).send(`Webhook Error: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }

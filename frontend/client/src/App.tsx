@@ -10,6 +10,7 @@ import ArtistBrowse from "./pages/ArtistBrowse";
 import ArtistProfile from "./pages/ArtistProfile";
 import ForArtists from "./pages/ForArtists";
 import Dashboard from "./pages/Dashboard";
+import ArtistDashboard from "./pages/ArtistDashboard";
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import PaymentSuccess from "./pages/PaymentSuccess";
@@ -17,6 +18,7 @@ import PaymentCancelled from "./pages/PaymentCancelled";
 import Help from "./pages/Help";
 import CancellationPolicy from "./pages/CancellationPolicy";
 import Pricing from "./pages/Pricing";
+import LicenseUpload from "./pages/LicenseUpload";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -28,6 +30,7 @@ function Router() {
       <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/for-artists" component={ForArtists} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/artist-dashboard" component={ArtistDashboard} />
       <Route path="/login" component={Login} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/payment/success" component={PaymentSuccess} />
@@ -35,6 +38,7 @@ function Router() {
       <Route path="/help" component={Help} />
       <Route path="/cancellation-policy" component={CancellationPolicy} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/license-upload" component={LicenseUpload} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

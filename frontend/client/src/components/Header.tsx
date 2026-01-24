@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -7,12 +8,19 @@ import { Search, Menu, Moon, Sun } from "lucide-react";
 
 export default function Header() {
   const [location] = useLocation();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
-    await logout();
-    window.location.href = "/";
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -64,8 +72,9 @@ export default function Header() {
                 variant="outline"
                 className="hidden md:inline-flex hover:scale-105 transition-all duration-300 hover:shadow-[0_0_15px_rgba(255,112,255,0.5)]"
                 onClick={handleLogout}
+                disabled={isLoggingOut}
               >
-                Sign Out
+                {isLoggingOut ? "Signing Out..." : "Sign Out"}
               </Button>
             </>
           ) : (

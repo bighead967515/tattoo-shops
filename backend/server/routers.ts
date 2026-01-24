@@ -1,11 +1,11 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, artistProcedure, artistOwnerProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { createCheckoutSession } from "./stripe";
 import { PRODUCTS } from "./products";
-import { uploadFile, getPublicUrl, deleteFile } from "./_core/supabaseStorage";
+import { uploadFile, getPublicUrl, deleteFile, createSignedUploadUrl } from "./_core/supabaseStorage";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -70,7 +70,7 @@ export const appRouter = router({
         });
       }),
     
-    update: protectedProcedure
+    update: artistOwnerProcedure
       .input(z.object({
         id: z.number(),
         shopName: z.string().optional(),
@@ -88,18 +88,8 @@ export const appRouter = router({
         lat: z.string().optional(),
         lng: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
+      .mutation(async ({ input }) => {
         const { id, ...data } = input;
-        
-        // Verify ownership
-        const artist = await db.getArtistById(id);
-        if (!artist) {
-          throw new Error("Artist not found");
-        }
-        if (artist.userId !== ctx.user.id) {
-          throw new Error("Forbidden: You can only update your own artist profile");
-        }
-        
         return await db.updateArtist(id, data);
       }),
   }),
@@ -111,33 +101,21 @@ export const appRouter = router({
         return await db.getPortfolioByArtistId(input.artistId);
       }),
     
-    getUploadUrl: protectedProcedure
+    getUploadUrl: artistOwnerProcedure
       .input(z.object({
         artistId: z.number(),
         fileName: z.string(),
         contentType: z.string(),
       }))
-      .mutation(async ({ ctx, input }) => {
-        // Verify the user owns the artist profile
-        const artist = await db.getArtistById(input.artistId);
-        if (!artist) {
-          throw new Error("Artist not found");
-        }
-        if (artist.userId !== ctx.user.id) {
-          throw new Error("Forbidden: You can only upload to your own portfolio");
-        }
-        
+      .mutation(async ({ input }) => {
         // Generate unique file key
         const fileKey = `${input.artistId}/${Date.now()}-${input.fileName}`;
         
-        // Return the file key for client to upload
-        return {
-          fileKey,
-          bucket: 'portfolio-images',
-        };
+        // Return the signed upload URL for client to upload
+        return await createSignedUploadUrl(fileKey);
       }),
     
-    add: protectedProcedure
+    add: artistOwnerProcedure
       .input(z.object({
         artistId: z.number(),
         imageUrl: z.string(),
@@ -145,16 +123,7 @@ export const appRouter = router({
         caption: z.string().optional(),
         style: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
-        // Verify the user owns the artist profile
-        const artist = await db.getArtistById(input.artistId);
-        if (!artist) {
-          throw new Error("Artist not found");
-        }
-        if (artist.userId !== ctx.user.id) {
-          throw new Error("Forbidden: You can only add images to your own portfolio");
-        }
-        
+      .mutation(async ({ input }) => {
         return await db.addPortfolioImage(input);
       }),
     
@@ -232,18 +201,9 @@ export const appRouter = router({
       return await db.getBookingsByUserId(ctx.user.id);
     }),
     
-    getByArtistId: protectedProcedure
+    getByArtistId: artistOwnerProcedure
       .input(z.object({ artistId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        // Verify the user owns the artist profile
-        const artist = await db.getArtistById(input.artistId);
-        if (!artist) {
-          throw new Error("Artist not found");
-        }
-        if (artist.userId !== ctx.user.id) {
-          throw new Error("Forbidden: You can only view bookings for your own artist profile");
-        }
-        
+      .query(async ({ input }) => {
         return await db.getBookingsByArtistId(input.artistId);
       }),
     

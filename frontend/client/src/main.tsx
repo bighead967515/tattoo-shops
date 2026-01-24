@@ -21,7 +21,8 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   window.location.href = getLoginUrl();
 };
 
-queryClient.getQueryCache().subscribe(event => {
+// Subscribe to query cache errors with proper cleanup
+const unsubscribeQuery = queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
@@ -29,13 +30,22 @@ queryClient.getQueryCache().subscribe(event => {
   }
 });
 
-queryClient.getMutationCache().subscribe(event => {
+// Subscribe to mutation cache errors with proper cleanup
+const unsubscribeMutation = queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
     console.error("[API Mutation Error]", error);
   }
 });
+
+// Cleanup subscriptions if module is reloaded (HMR)
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    unsubscribeQuery?.();
+    unsubscribeMutation?.();
+  });
+}
 
 const trpcClient = trpc.createClient({
   links: [

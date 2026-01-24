@@ -105,6 +105,24 @@ export async function createSignedUrl(
 }
 
 /**
+ * Create a signed upload URL for client-side uploads
+ * @param path - Relative path in bucket
+ * @returns Object containing signed URL and path
+ */
+export async function createSignedUploadUrl(path: string): Promise<{ signedUrl: string, path: string }> {
+  const { data, error } = await supabaseAdmin.storage
+    .from(BUCKET_NAME)
+    .createSignedUploadUrl(path);
+
+  if (error) {
+    console.error('[Storage] Create signed upload URL failed:', error);
+    throw new Error(`Failed to create signed upload URL: ${error.message}`);
+  }
+
+  return { signedUrl: data.signedUrl, path };
+}
+
+/**
  * List files in a directory
  * @param path - Directory path (e.g., "artists/123")
  * @returns Array of file objects

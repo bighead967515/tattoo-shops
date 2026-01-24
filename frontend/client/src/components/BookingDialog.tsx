@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
@@ -50,15 +50,21 @@ export default function BookingDialog({
           bookingId: data.id,
         });
 
-        if (checkoutResult.url) {
+        if (checkoutResult?.url) {
           // Redirect to Stripe checkout
           window.location.href = checkoutResult.url;
         } else {
           // No checkout URL returned
+          console.error("[Booking] No checkout URL received");
           toast.error("Unable to start checkout, please try again");
         }
       } catch (error) {
-        // Error already handled by createCheckoutMutation.onError
+        console.error("[Booking] Checkout failed:", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to create payment session. Please try again."
+        );
         // Dialog remains open for user to retry or cancel
       }
     },
@@ -72,6 +78,16 @@ export default function BookingDialog({
       toast.error("Failed to create payment session: " + error.message);
     },
   });
+
+  // Sync user data when user changes or dialog opens
+  useEffect(() => {
+    if (!open || !user) return;
+    setFormData((prev) => ({
+      ...prev,
+      customerName: user.name || prev.customerName,
+      customerEmail: user.email || prev.customerEmail,
+    }));
+  }, [user, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

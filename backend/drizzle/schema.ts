@@ -9,6 +9,14 @@ import { serial, text, timestamp, varchar, boolean, integer, pgTable, pgEnum, un
 // Define role enum for PostgreSQL
 export const roleEnum = pgEnum("role", ["user", "admin", "artist"]);
 
+// Define verification status enum
+export const verificationStatusEnum = pgEnum("verification_status", [
+  "unverified",  // Default: Just signed up, can browse but not interact
+  "pending",     // Uploaded license, waiting for admin review
+  "verified",    // Admin approved, can accept payments/messages
+  "rejected"     // License was rejected, needs to re-upload
+]);
+
 export const users = pgTable("users", {
   /**
    * Surrogate primary key. Auto-incremented numeric value managed by the database.
@@ -21,6 +29,12 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
+  verificationStatus: verificationStatusEnum("verification_status").default("unverified").notNull(),
+  licenseDocumentKey: varchar("licenseDocumentKey", { length: 500 }), // Supabase Storage key for private license document
+  licenseDocumentUrl: varchar("licenseDocumentUrl", { length: 1000 }), // Signed URL for license document
+  verificationSubmittedAt: timestamp("verificationSubmittedAt"), // When they uploaded license
+  verificationReviewedAt: timestamp("verificationReviewedAt"), // When admin reviewed
+  verificationNotes: text("verificationNotes"), // Admin notes about verification
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -35,7 +49,7 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const artists = pgTable("artists", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(), // References users.id
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   shopName: varchar("shop_name", { length: 255 }).notNull(),
   bio: text("bio"),
   specialties: text("specialties"), // Comma-separated list
@@ -67,7 +81,7 @@ export type InsertArtist = typeof artists.$inferInsert;
  */
 export const portfolioImages = pgTable("portfolioImages", {
   id: serial("id").primaryKey(),
-  artistId: integer("artistId").notNull(), // References artists.id
+  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
   imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
   imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
   caption: text("caption"),
@@ -83,8 +97,8 @@ export type InsertPortfolioImage = typeof portfolioImages.$inferInsert;
  */
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
-  artistId: integer("artistId").notNull(), // References artists.id
-  userId: integer("userId").notNull(), // References users.id
+  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   rating: integer("rating").notNull(), // 1-5 stars
   comment: text("comment"),
   helpfulVotes: integer("helpfulVotes").default(0), // Number of helpful votes
@@ -104,8 +118,8 @@ export type InsertReview = typeof reviews.$inferInsert;
  */
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
-  artistId: integer("artistId").notNull(), // References artists.id
-  userId: integer("userId"), // References users.id (nullable for guest bookings)
+  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
+  userId: integer("userId").references(() => users.id, { onDelete: "set null" }), // nullable for guest bookings
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerEmail: varchar("customerEmail", { length: 320 }).notNull(),
   customerPhone: varchar("customerPhone", { length: 50 }).notNull(),
@@ -140,3 +154,48 @@ export const favorites = pgTable("favorites", {
 
 export type Favorite = typeof favorites.$inferSelect;
 export type InsertFavorite = typeof favorites.$inferInsert;
+
+/**
+ * Webhook event retry queue for reliability
+ * Stores failed webhook events for retry with exponential backoff
+ */
+export const webhookQueue = pgTable("webhookQueue", {
+  id: serial("id").primaryKey(),
+  eventId: varchar("eventId", { length: 255 }).notNull().unique(),
+  eventType: varchar("eventType", { length: 100 }).notNull(),
+  payload: text("payload").notNull(), // JSON stringified
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // pending, processing, completed, failed
+  retryCount: integer("retryCount").notNull().default(0),
+  maxRetries: integer("maxRetries").notNull().default(5),
+  nextRetryAt: timestamp("nextRetryAt").notNull(),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type WebhookQueueItem = typeof webhookQueue.$inferSelect;
+export type InsertWebhookQueueItem = typeof webhookQueue.$inferInsert;
+
+/**
+ * Verification documents for artists/users
+ * Stores sensitive legal documents (licenses, permits) separately with enhanced security
+ */
+export const verificationDocuments = pgTable("verificationDocuments", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentType: varchar("documentType", { length: 100 }).notNull(), // "state_license", "business_permit", etc.
+  documentKey: varchar("documentKey", { length: 500 }).notNull(), // Supabase Storage key (private bucket)
+  originalFileName: varchar("originalFileName", { length: 255 }).notNull(),
+  fileSize: integer("fileSize"), // In bytes
+  mimeType: varchar("mimeType", { length: 100 }),
+  status: verificationStatusEnum("status").default("pending").notNull(),
+  reviewedBy: integer("reviewedBy").references(() => users.id, { onDelete: "set null" }), // Admin who reviewed
+  reviewNotes: text("reviewNotes"), // Admin review notes
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type VerificationDocument = typeof verificationDocuments.$inferSelect;
+export type InsertVerificationDocument = typeof verificationDocuments.$inferInsert;

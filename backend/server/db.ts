@@ -5,26 +5,45 @@ import { InsertUser, users, artists, portfolioImages, reviews, bookings, favorit
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sqlClient: ReturnType<typeof postgres> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // Create PostgreSQL connection
-      const client = postgres(process.env.DATABASE_URL);
-      _db = drizzle(client);
+      // Create PostgreSQL connection with connection pooling
+      _sqlClient = postgres(process.env.DATABASE_URL, {
+        max: 20, // Max connections in pool
+        idle_timeout: 30, // Close idle connections after 30 seconds
+        connect_timeout: 5, // 5 second connection timeout
+      });
+      _db = drizzle(_sqlClient);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
     }
   }
-  return _db;
-}
-
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
+        return _db;
+      }
+      
+      // Run async function within a database transaction for atomicity
+      export async function withTransaction<T>(
+        callback: (tx: Awaited<ReturnType<typeof _db!.transaction>>) => Promise<T>
+      ): Promise<T> {
+        const db = await getDb();
+        if (!db || !_sqlClient) {
+          throw new Error("Database not available for transactions");
+        }
+        
+        return _sqlClient.begin(async (sql) => {
+          const txDb = drizzle(sql);
+          return callback(txDb as any);
+        }) as Promise<T>;
+      }
+      
+      export async function upsertUser(user: InsertUser): Promise<void> {
+        if (!user.openId) {
+          throw new Error("User openId is required for upsert");  }
 
   const db = await getDb();
   if (!db) {

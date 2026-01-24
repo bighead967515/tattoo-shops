@@ -2,6 +2,7 @@ import { supabaseAdmin } from './supabase';
 import type { Express, Request, Response } from 'express';
 import { COOKIE_NAME } from '@shared/const';
 import { getSessionCookieOptions } from './cookies';
+import { upsertUser } from '../db';
 
 /**
  * Supabase Authentication Routes
@@ -30,6 +31,14 @@ export function registerSupabaseAuthRoutes(app: Express) {
         res.status(401).json({ error: 'Invalid token' });
         return;
       }
+
+      // Sync user to our database
+      await upsertUser({
+        openId: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || user.email?.split('@')[0],
+        lastSignedIn: new Date(),
+      });
 
       // Set session cookie with access token
       const cookieOptions = getSessionCookieOptions(req);
