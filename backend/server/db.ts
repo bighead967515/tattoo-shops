@@ -1,30 +1,49 @@
 import { eq, desc, and, sql, or, gte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users, artists, portfolioImages, reviews, bookings, favorites, InsertArtist, InsertPortfolioImage, InsertReview, InsertBooking, InsertFavorite } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sqlClient: ReturnType<typeof postgres> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // The mysql2 adapter needs a pool object, not a connection string.
-      const pool = mysql.createPool(process.env.DATABASE_URL);
-      _db = drizzle(pool);
+      // Create PostgreSQL connection with connection pooling
+      _sqlClient = postgres(process.env.DATABASE_URL, {
+        max: 20, // Max connections in pool
+        idle_timeout: 30, // Close idle connections after 30 seconds
+        connect_timeout: 5, // 5 second connection timeout
+      });
+      _db = drizzle(_sqlClient);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
     }
   }
-  return _db;
-}
-
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
+        return _db;
+      }
+      
+      // Run async function within a database transaction for atomicity
+      export async function withTransaction<T>(
+        callback: (tx: Awaited<ReturnType<typeof _db!.transaction>>) => Promise<T>
+      ): Promise<T> {
+        const db = await getDb();
+        if (!db || !_sqlClient) {
+          throw new Error("Database not available for transactions");
+        }
+        
+        return _sqlClient.begin(async (sql) => {
+          const txDb = drizzle(sql);
+          return callback(txDb as any);
+        }) as Promise<T>;
+      }
+      
+      export async function upsertUser(user: InsertUser): Promise<void> {
+        if (!user.openId) {
+          throw new Error("User openId is required for upsert");  }
 
   const db = await getDb();
   if (!db) {
@@ -71,7 +90,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -121,7 +141,7 @@ export async function getAllArtists() {
   const db = await getDb();
   if (!db) return [];
   
-  return await db.select().from(artists).where(eq(artists.isApproved, 1));
+  return await db.select().from(artists).where(eq(artists.isApproved, true));
 }
 
 export async function searchArtists(filters: {
@@ -133,7 +153,7 @@ export async function searchArtists(filters: {
   const db = await getDb();
   if (!db) return [];
   
-  const conditions: any[] = [eq(artists.isApproved, 1)];
+  const conditions: any[] = [eq(artists.isApproved, true)];
   
   // Filter by styles
   if (filters.styles && filters.styles.length > 0) {
@@ -260,7 +280,8 @@ export async function createBooking(booking: InsertBooking) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  return await db.insert(bookings).values(booking);
+  const result = await db.insert(bookings).values(booking).returning();
+  return result[0];
 }
 
 export async function getBookingById(id: number) {

@@ -1,18 +1,23 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import Header from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Heart, User, CreditCard, MapPin, Clock } from "lucide-react";
+import { Calendar, Heart, User, CreditCard, MapPin, Clock, LayoutDashboard, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, loading } = useAuth();
+
+  const { data: artist } = trpc.artists.getByUserId.useQuery(
+    undefined,
+    { enabled: isAuthenticated }
+  );
 
   const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.getByUserId.useQuery(
     undefined,
@@ -31,12 +36,6 @@ export default function Dashboard() {
     },
   });
 
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      setLocation("/");
-    }
-  }, [loading, isAuthenticated, setLocation]);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -48,7 +47,11 @@ export default function Dashboard() {
     );
   }
 
+  // Redirect if not authenticated after loading completes
   if (!isAuthenticated || !user) {
+    useEffect(() => {
+      setLocation("/");
+    }, [setLocation]);
     return null;
   }
 
@@ -73,11 +76,29 @@ export default function Dashboard() {
 
       <div className="container py-12">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">My Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {user.name || "User"}!
-          </p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">My Dashboard</h1>
+            <p className="text-muted-foreground">
+              Welcome back, {user.name || "User"}!
+            </p>
+          </div>
+          {artist && (
+            <Link href="/artist-dashboard">
+              <Button className="w-full md:w-auto bg-gradient-to-r from-primary to-purple-600 hover:shadow-[0_0_20px_rgba(112,255,112,0.4)]">
+                <LayoutDashboard className="w-4 h-4 mr-2" />
+                Artist Dashboard
+              </Button>
+            </Link>
+          )}
+          {!artist && (
+            <Link href="/for-artists">
+              <Button variant="outline" className="w-full md:w-auto border-dashed border-primary/50 text-primary hover:bg-primary/5">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Register as Tattoo Artist
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Tabs */}
@@ -157,7 +178,7 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {item.booking.depositPaid === 1 && (
+                          {item.booking.depositPaid && (
                             <div className="flex items-center gap-2 text-green-600 mt-2">
                               <CreditCard className="w-4 h-4" />
                               <span className="font-medium">Deposit Paid: ${(item.booking.depositAmount || 0) / 100}</span>

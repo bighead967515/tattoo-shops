@@ -1,17 +1,9 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
-
-function isAuthenticationError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    return message.includes("unauthorized") || 
-           message.includes("invalid token") || 
-           message.includes("expired") ||
-           message.includes("authentication failed");
-  }
-  return false;
-}
+import { supabaseAdmin } from "./supabase";
+import { getDb } from "../db";
+import { users } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -25,16 +17,26 @@ export async function createContext(
   let user: User | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    if (isAuthenticationError(error)) {
-      // Expected auth failure - user not logged in or invalid token
-      user = null;
-    } else {
-      // Unexpected system error
-      console.error("[Context] Unexpected error during authentication:", error);
-      throw error;
+    // Get session token from cookie
+    const authHeader = opts.req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '') || opts.req.cookies?.['sb-access-token'];
+
+    if (token) {
+      // Verify token with Supabase
+      const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+      
+      if (!error && supabaseUser) {
+        // Fetch user from database
+        const db = await getDb();
+        if (db) {
+          const [dbUser] = await db.select().from(users).where(eq(users.openId, supabaseUser.id)).limit(1);
+          user = dbUser || null;
+        }
+      }
     }
+  } catch (error) {
+    console.error("[Context] Authentication error:", error);
+    user = null;
   }
 
   return {

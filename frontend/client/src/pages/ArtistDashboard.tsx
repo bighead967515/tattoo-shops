@@ -1,0 +1,352 @@
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
+import Header from "@/components/Header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, User, Image as ImageIcon, Settings, Plus, Trash2, Loader2, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
+import { useState, useRef } from "react";
+import { format } from "date-fns";
+
+export default function ArtistDashboard() {
+  const [, setLocation] = useLocation();
+  const { user, isAuthenticated, loading } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { data: artist, isLoading: artistLoading, refetch: refetchArtist } = trpc.artists.getByUserId.useQuery(
+    undefined, 
+    { enabled: !!user }
+  );
+
+  const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.getByArtistId.useQuery(
+    { artistId: artist?.id || 0 },
+    { enabled: !!artist }
+  );
+
+  const { data: portfolio, isLoading: portfolioLoading, refetch: refetchPortfolio } = trpc.portfolio.get.useQuery(
+    { artistId: artist?.id || 0 },
+    { enabled: !!artist }
+  );
+
+  const updateArtistMutation = trpc.artists.update.useMutation({
+    onSuccess: () => {
+      toast.success("Profile updated successfully!");
+      refetchArtist();
+    },
+    onError: (err) => toast.error(`Error: ${err.message}`),
+  });
+
+  const getUploadUrlMutation = trpc.portfolio.getUploadUrl.useMutation();
+  const addPortfolioImageMutation = trpc.portfolio.add.useMutation({
+    onSuccess: () => {
+      refetchPortfolio();
+      setIsUploading(false);
+      toast.success("Image added to portfolio!");
+    },
+  });
+
+  const deletePortfolioImageMutation = trpc.portfolio.delete.useMutation({
+    onSuccess: () => {
+      refetchPortfolio();
+      toast.success("Image removed from portfolio");
+    },
+  });
+
+  const updateBookingStatusMutation = trpc.bookings.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Booking status updated");
+    },
+  });
+
+  if (loading || artistLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container py-20 text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading artist dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    setLocation("/login");
+    return null;
+  }
+
+  if (!artist) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container py-20 text-center">
+          <h1 className="text-3xl font-bold mb-4">No Artist Profile Found</h1>
+          <p className="text-muted-foreground mb-8">You need to register as an artist first.</p>
+          <Button onClick={() => setLocation("/for-artists")}>Register as Artist</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleUpdateProfile = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    updateArtistMutation.mutate({
+      id: artist.id,
+      shopName: formData.get("shopName") as string,
+      bio: formData.get("bio") as string,
+      specialties: formData.get("specialties") as string,
+      experience: parseInt(formData.get("experience") as string),
+      city: formData.get("city") as string,
+      state: formData.get("state") as string,
+      website: formData.get("website") as string,
+      instagram: formData.get("instagram") as string,
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !artist) return;
+
+    setIsUploading(true);
+    try {
+      // 1. Get signed upload URL
+      const { signedUrl, path } = await getUploadUrlMutation.mutateAsync({
+        artistId: artist.id,
+        fileName: file.name,
+        contentType: file.type,
+      });
+
+      // 2. Upload file directly to Supabase Storage
+      const response = await fetch(signedUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+
+      // 3. Add to portfolio database
+      // Generate public URL (assuming public bucket)
+      const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/portfolio-images/${path}`;
+
+      await addPortfolioImageMutation.mutateAsync({
+        artistId: artist.id,
+        imageUrl: publicUrl,
+        imageKey: path,
+        caption: file.name,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload image");
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+
+      <div className="container py-12">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Artist Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage your profile, portfolio, and bookings for <span className="font-semibold text-foreground">{artist.shopName}</span>
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => setLocation(`/artist/${artist.id}`)}>
+            <ExternalLink className="w-4 h-4 mr-2" />
+            View Public Profile
+          </Button>
+        </div>
+
+        <Tabs defaultValue="portfolio" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="portfolio">
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Portfolio
+            </TabsTrigger>
+            <TabsTrigger value="bookings">
+              <Calendar className="w-4 h-4 mr-2" />
+              Bookings
+            </TabsTrigger>
+            <TabsTrigger value="settings">
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Portfolio Tab */}
+          <TabsContent value="portfolio" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-semibold">Your Portfolio</h2>
+              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                Add Image
+              </Button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleFileUpload}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {portfolioLoading ? (
+                <p>Loading portfolio...</p>
+              ) : portfolio?.length === 0 ? (
+                <div className="col-span-full py-12 text-center bg-muted/30 border border-dashed rounded-lg">
+                  <p className="text-muted-foreground">Your portfolio is empty. Add your best work!</p>
+                </div>
+              ) : (
+                portfolio?.map((image) => (
+                  <Card key={image.id} className="overflow-hidden group relative">
+                    <img 
+                      src={image.imageUrl} 
+                      alt={image.caption || ""} 
+                      className="w-full aspect-square object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button 
+                        variant="destructive" 
+                        size="icon"
+                        onClick={() => deletePortfolioImageMutation.mutate({ id: image.id })}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Bookings Tab */}
+          <TabsContent value="bookings" className="space-y-4">
+            <h2 className="text-2xl font-semibold">Inquiries & Bookings</h2>
+            <div className="grid gap-4">
+              {bookingsLoading ? (
+                <p>Loading bookings...</p>
+              ) : bookings?.length === 0 ? (
+                <p className="text-muted-foreground py-8 text-center bg-muted/30 rounded-lg">No bookings yet.</p>
+              ) : (
+                bookings?.map((booking) => (
+                  <Card key={booking.id}>
+                    <CardHeader className="flex flex-row items-center justify-between py-4">
+                      <div>
+                        <CardTitle className="text-lg">{booking.customerName}</CardTitle>
+                        <CardDescription>{booking.customerEmail} • {booking.customerPhone}</CardDescription>
+                      </div>
+                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'outline'}>
+                        {booking.status}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="py-2">
+                      <div className="grid md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="font-semibold text-muted-foreground mb-1">Preferred Date</p>
+                          <p>{format(new Date(booking.preferredDate), "PPP")}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-muted-foreground mb-1">Tattoo Details</p>
+                          <p>{booking.size} • {booking.placement}</p>
+                        </div>
+                        <div className="md:col-span-2">
+                          <p className="font-semibold text-muted-foreground mb-1">Description</p>
+                          <p>{booking.tattooDescription}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4 pt-4 border-t">
+                        {booking.status === 'pending' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => updateBookingStatusMutation.mutate({ id: booking.id, status: 'confirmed' })}
+                          >
+                            Mark Confirmed
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => updateBookingStatusMutation.mutate({ id: booking.id, status: 'cancelled' })}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Artist Profile</CardTitle>
+                <CardDescription>Update your shop information and contact details.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="shopName">Shop Name</Label>
+                      <Input id="shopName" name="shopName" defaultValue={artist.shopName} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="experience">Years Experience</Label>
+                      <Input id="experience" name="experience" type="number" defaultValue={artist.experience || 0} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input id="city" name="city" defaultValue={artist.city || ""} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input id="state" name="state" defaultValue={artist.state || ""} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="website">Website</Label>
+                      <Input id="website" name="website" defaultValue={artist.website || ""} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="instagram">Instagram</Label>
+                      <Input id="instagram" name="instagram" defaultValue={artist.instagram || ""} />
+                    </div>
+                    <div className="md:col-span-2 space-y-2">
+                      <Label htmlFor="specialties">Specialties (comma separated)</Label>
+                      <Input id="specialties" name="specialties" defaultValue={artist.specialties || ""} />
+                    </div>
+                    <div className="md:col-span-2 space-y-2">
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea id="bio" name="bio" defaultValue={artist.bio || ""} className="h-32" />
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full md:w-auto" disabled={updateArtistMutation.isPending}>
+                    {updateArtistMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Save Changes
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}

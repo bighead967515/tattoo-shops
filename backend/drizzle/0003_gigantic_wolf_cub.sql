@@ -1,1 +1,0 @@
-ALTER TABLE `artists` ADD `subscriptionTier` varchar(20) DEFAULT 'free' NOT NULL;
