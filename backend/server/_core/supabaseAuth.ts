@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase';
-import type { Express, Request, Response } from 'express';
+import type { Express, Request, Response, NextFunction } from 'express';
 import { COOKIE_NAME } from '@shared/const';
 import { getSessionCookieOptions } from './cookies';
 import { upsertUser } from '../db';
@@ -107,7 +107,7 @@ export function registerSupabaseAuthRoutes(app: Express) {
  * Middleware to verify Supabase session
  * Use this to protect routes that require authentication
  */
-export async function requireAuth(req: Request, res: Response, next: Function) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const token = req.cookies[COOKIE_NAME];
 
@@ -124,11 +124,12 @@ export async function requireAuth(req: Request, res: Response, next: Function) {
       return;
     }
 
-    // Attach user to request
-    (req as any).user = {
+    // Attach user to request using type assertion
+    // In production, consider extending Express Request type
+    (req as Request & { user: { id: string; email?: string; name: string } }).user = {
       id: user.id,
       email: user.email,
-      name: user.user_metadata?.name || user.email?.split('@')[0],
+      name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
     };
 
     next();

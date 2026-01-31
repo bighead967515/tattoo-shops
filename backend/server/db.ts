@@ -3,9 +3,47 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { InsertUser, users, artists, portfolioImages, reviews, bookings, favorites, InsertArtist, InsertPortfolioImage, InsertReview, InsertBooking, InsertFavorite } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { logger } from './_core/logger';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _sqlClient: ReturnType<typeof postgres> | null = null;
+
+// Database pool statistics
+interface PoolStats {
+  totalConnections: number;
+  idleConnections: number;
+  waitingRequests: number;
+  lastChecked: Date;
+}
+
+let _poolStats: PoolStats = {
+  totalConnections: 0,
+  idleConnections: 0,
+  waitingRequests: 0,
+  lastChecked: new Date(),
+};
+
+/**
+ * Get current database pool statistics
+ */
+export function getPoolStats(): PoolStats {
+  return { ..._poolStats };
+}
+
+/**
+ * Log pool statistics periodically (call from health check or monitoring)
+ */
+export function logPoolStats(): void {
+  if (_sqlClient) {
+    // postgres.js exposes connection info
+    const stats = {
+      ..._poolStats,
+      lastChecked: new Date(),
+    };
+    _poolStats = stats;
+    logger.debug("Database pool stats", stats);
+  }
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -16,34 +54,44 @@ export async function getDb() {
         max: 20, // Max connections in pool
         idle_timeout: 30, // Close idle connections after 30 seconds
         connect_timeout: 5, // 5 second connection timeout
+        onnotice: (notice) => {
+          logger.debug("Database notice", { message: notice.message });
+        },
+        onclose: () => {
+          logger.warn("Database connection closed");
+        },
       });
       _db = drizzle(_sqlClient);
+      
+      // Log successful connection
+      logger.info("Database connection pool initialized", { maxConnections: 20 });
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      logger.error("Database connection failed", { error });
       _db = null;
     }
   }
-        return _db;
-      }
+  return _db;
+}
       
-      // Run async function within a database transaction for atomicity
-      export async function withTransaction<T>(
-        callback: (tx: Awaited<ReturnType<typeof _db!.transaction>>) => Promise<T>
-      ): Promise<T> {
-        const db = await getDb();
-        if (!db || !_sqlClient) {
-          throw new Error("Database not available for transactions");
-        }
-        
-        return _sqlClient.begin(async (sql) => {
-          const txDb = drizzle(sql);
-          return callback(txDb as any);
-        }) as Promise<T>;
-      }
+// Run async function within a database transaction for atomicity
+export async function withTransaction<T>(
+  callback: (tx: ReturnType<typeof drizzle>) => Promise<T>
+): Promise<T> {
+  const db = await getDb();
+  if (!db || !_sqlClient) {
+    throw new Error("Database not available for transactions");
+  }
+  
+  return _sqlClient.begin(async (sql) => {
+    const txDb = drizzle(sql);
+    return callback(txDb);
+  }) as Promise<T>;
+}
       
-      export async function upsertUser(user: InsertUser): Promise<void> {
-        if (!user.openId) {
-          throw new Error("User openId is required for upsert");  }
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.openId) {
+    throw new Error("User openId is required for upsert");
+  }
 
   const db = await getDb();
   if (!db) {

@@ -1,0 +1,95 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    # Lower volume for booking flow (more intensive)
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm-up"
+    
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 20
+      name: "Ramp-up"
+    
+    - duration: 120
+      arrivalRate: 20
+      name: "Sustained load"
+    
+    - duration: 30
+      arrivalRate: 20
+      rampTo: 5
+      name: "Cool-down"
+  
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  
+  plugins:
+    expect: {}
+  
+  # Performance thresholds
+  ensure:
+    p95: 800   # 95th percentile response time under 800ms
+    p99: 1500  # 99th percentile response time under 1500ms
+    maxErrorRate: 2  # Error rate under 2%
+
+scenarios:
+  # Full booking flow simulation
+  - name: "Complete booking flow"
+    weight: 100
+    flow:
+      # Step 1: Browse artists
+      - get:
+          url: "/api/trpc/artists.getAll"
+          capture:
+            - json: "$.result.data[0].id"
+              as: "artistId"
+          expect:
+            - statusCode: 200
+      
+      # User browses and selects an artist
+      - think: 3
+      
+      # Step 2: View artist profile
+      - get:
+          url: "/api/trpc/artists.getById?input={\"id\":{{ artistId }}}"
+          expect:
+            - statusCode: 200
+      
+      # User reviews portfolio
+      - think: 5
+      
+      # Step 3: View portfolio
+      - get:
+          url: "/api/trpc/artists.getPortfolio?input={\"artistId\":{{ artistId }}}"
+          expect:
+            - statusCode: 200
+      
+      # User decides to book
+      - think: 3
+      
+      # Step 4: Create booking (this tests the main booking endpoint)
+      # Note: In production, this would require authentication
+      # For load testing, we test the endpoint availability
+      - post:
+          url: "/api/trpc/bookings.create"
+          json:
+            artistId: "{{ artistId }}"
+            customerName: "Load Test User {{ $randomNumber(1, 9999) }}"
+            customerEmail: "loadtest{{ $randomNumber(1, 9999) }}@example.com"
+            customerPhone: "555-{{ $randomNumber(1000, 9999) }}"
+            preferredDate: "2025-02-15T10:00:00Z"
+            tattooDescription: "Load test booking - please ignore"
+            placement: "forearm"
+            size: "medium"
+            budget: "$300-500"
+            additionalNotes: "This is an automated load test"
+          expect:
+            # Expect either 200 (success) or 401 (auth required) - both valid
+            - statusCode:
+                - 200
+                - 401
+                - 400  # Validation error is also acceptable
+      
+      # User completes flow
+      - think: 2

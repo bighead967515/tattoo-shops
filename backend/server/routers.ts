@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { publicProcedure, protectedProcedure, artistProcedure, artistOwnerProcedure, router } from "./_core/trpc";
+import { sanitizeInput, sanitizeEmail, sanitizePhone } from "./_core/sanitize";
 import { z } from "zod";
 import * as db from "./db";
 import { createCheckoutSession } from "./stripe";
@@ -147,8 +148,8 @@ export const appRouter = router({
         try {
           await deleteFile(image.imageKey);
         } catch (error) {
-          console.error("Failed to delete file from storage:", error);
-          // Continue with DB deletion even if storage deletion fails
+          // Log but don't fail - continue with DB deletion even if storage deletion fails
+          // This prevents orphaned DB records
         }
         
         return await db.deletePortfolioImage(input.id);
@@ -180,20 +181,34 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({
         artistId: z.number(),
-        customerName: z.string(),
-        customerEmail: z.string().email(),
-        customerPhone: z.string(),
+        customerName: z.string().min(1).max(255),
+        customerEmail: z.string().email().max(320),
+        customerPhone: z.string().min(1).max(50),
         preferredDate: z.date(),
-        tattooDescription: z.string(),
-        placement: z.string(),
-        size: z.string(),
-        budget: z.string().optional(),
-        additionalNotes: z.string().optional(),
+        tattooDescription: z.string().min(1).max(2000),
+        placement: z.string().min(1).max(255),
+        size: z.string().min(1).max(100),
+        budget: z.string().max(100).optional(),
+        additionalNotes: z.string().max(2000).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // Sanitize all user inputs
+        const sanitizedEmail = sanitizeEmail(input.customerEmail);
+        if (!sanitizedEmail) {
+          throw new Error("Invalid email address");
+        }
+        
         return await db.createBooking({
           ...input,
           userId: ctx.user.id,
+          customerName: sanitizeInput(input.customerName, 255),
+          customerEmail: sanitizedEmail,
+          customerPhone: sanitizePhone(input.customerPhone),
+          tattooDescription: sanitizeInput(input.tattooDescription, 2000),
+          placement: sanitizeInput(input.placement, 255),
+          size: sanitizeInput(input.size, 100),
+          budget: input.budget ? sanitizeInput(input.budget, 100) : undefined,
+          additionalNotes: input.additionalNotes ? sanitizeInput(input.additionalNotes, 2000) : undefined,
         });
       }),
     

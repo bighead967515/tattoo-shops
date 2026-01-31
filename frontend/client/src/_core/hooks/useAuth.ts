@@ -94,7 +94,7 @@ export function useAuth(options?: UseAuthOptions) {
     
     if (currentPath === targetPath) return;
 
-    window.location.href = redirectPath
+    window.location.href = redirectPath;
   }, [
     redirectOnUnauthenticated,
     redirectPath,

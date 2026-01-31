@@ -1,7 +1,13 @@
 import { Resend } from "resend";
 import { ENV } from "./_core/env";
+import { emailCircuit } from "./_core/circuitBreaker";
+import { logger } from "./_core/logger";
 
 const resend = new Resend(ENV.resendApiKey);
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 export interface EmailOptions {
   to: string | string[];
@@ -39,30 +45,65 @@ function sanitizeErrorForLogging(error: any): any {
 }
 
 /**
- * Send an email using Resend
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Send an email using Resend with retry logic and circuit breaker
  */
 export async function sendEmail(options: EmailOptions) {
   const { to, subject, html, from = "Universal Inc <noreply@universalinc.com>" } = options;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from,
-      to: Array.isArray(to) ? to : [to],
-      subject,
-      html,
-    });
+  return emailCircuit.execute(async () => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { data, error } = await resend.emails.send({
+          from,
+          to: Array.isArray(to) ? to : [to],
+          subject,
+          html,
+        });
 
-    if (error) {
-      console.error("Email send error:", sanitizeErrorForLogging(error));
-      throw new Error(`Failed to send email: ${error.message}`);
+        if (error) {
+          throw new Error(`Resend API error: ${error.message}`);
+        }
+
+        logger.info("Email sent successfully", { id: data?.id, attempt });
+        return { success: true, id: data?.id };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Don't retry on certain errors (invalid email, auth issues)
+        const errorMessage = lastError.message.toLowerCase();
+        if (
+          errorMessage.includes("invalid") ||
+          errorMessage.includes("unauthorized") ||
+          errorMessage.includes("forbidden")
+        ) {
+          logger.error("Email send failed (non-retryable)", sanitizeErrorForLogging({ error: lastError.message }));
+          throw lastError;
+        }
+        
+        if (attempt < MAX_RETRIES) {
+          const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
+          logger.warn(`Email send failed, retrying in ${delay}ms`, { 
+            attempt, 
+            maxRetries: MAX_RETRIES,
+            error: sanitizeErrorForLogging({ message: lastError.message })
+          });
+          await sleep(delay);
+        }
+      }
     }
 
-    console.log("Email sent successfully:", data?.id);
-    return { success: true, id: data?.id };
-  } catch (error) {
-    console.error("Email send exception:", sanitizeErrorForLogging(error));
-    throw error;
-  }
+    logger.error("Email send failed after all retries", sanitizeErrorForLogging({ error: lastError?.message }));
+    throw lastError;
+  });
 }
 
 /**

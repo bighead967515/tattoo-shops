@@ -30,9 +30,11 @@ export const protectedProcedure = t.procedure.use(requireUser);
 
 export const artistProcedure = protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    const artist = await getArtistByUserId(ctx.user!.id);
+    // ctx.user is guaranteed non-null by protectedProcedure
+    const user = ctx.user;
+    const artist = await getArtistByUserId(user.id);
     
-    if (!artist && ctx.user!.role !== 'admin') {
+    if (!artist && user.role !== 'admin') {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You must have an artist profile to perform this action",
@@ -54,10 +56,12 @@ export const artistProcedure = protectedProcedure.use(
  */
 export const artistOwnerProcedure = artistProcedure.use(
   t.middleware(async ({ ctx, next, rawInput }) => {
-    if (ctx.user!.role === 'admin') return next({ ctx });
+    // ctx.user is guaranteed non-null by protectedProcedure chain
+    const user = ctx.user;
+    if (user.role === 'admin') return next({ ctx });
 
-    const input = rawInput as any;
-    const targetArtistId = input?.artistId || input?.id;
+    const input = rawInput as { artistId?: number; id?: number };
+    const targetArtistId = input?.artistId ?? input?.id;
 
     if (!ctx.artist || (targetArtistId && ctx.artist.id !== targetArtistId)) {
       throw new TRPCError({
@@ -72,12 +76,11 @@ export const artistOwnerProcedure = artistProcedure.use(
 
 export const adminProcedure = protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    if (ctx.user!.role !== 'admin') {
+    // ctx.user is guaranteed non-null by protectedProcedure
+    if (ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
-    return next({
-      ctx,
-    });
+    return next({ ctx });
   }),
 );

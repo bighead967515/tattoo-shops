@@ -1,9 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-<<<<<<< HEAD
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
-=======
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 
 @custom-variant dark (&:is(.dark *));
 

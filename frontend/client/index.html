@@ -3,12 +3,33 @@
 
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Find and book the best tattoo artists near you. Browse portfolios, read reviews, and schedule appointments with top-rated tattoo shops." />
+    <meta name="keywords" content="tattoo, tattoo artist, tattoo shop, tattoo booking, tattoo portfolio, find tattoo artist" />
+    <meta name="author" content="Universal Inc" />
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Universal Inc - Tattoo Artist Directory" />
+    <meta property="og:description" content="Find and book the best tattoo artists near you. Browse portfolios, read reviews, and schedule appointments." />
+    <meta property="og:image" content="/logo.png" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Universal Inc - Tattoo Artist Directory" />
+    <meta name="twitter:description" content="Find and book the best tattoo artists near you." />
+    
+    <!-- Favicon -->
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <title>Tattoo Shops Directory</title>
+    
+    <!-- Theme Color for Mobile Browsers -->
+    <meta name="theme-color" content="#1a1a2e" />
+    
+    <title>Universal Inc - Tattoo Artist Directory</title>
+    
     <!-- Cyberpunk Fonts: Orbitron (headings) + Rajdhani (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,28 +39,22 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-<<<<<<< HEAD
-    <!-- Analytics script - commented out until endpoint is configured
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
-    -->
-=======
     <!-- Analytics script - handled dynamically to avoid Vite bundling errors with undefined env vars -->
     <script>
-      const analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
-      const isEndpointConfigured = analyticsEndpoint && !analyticsEndpoint.startsWith("%");
-      
-      if (isEndpointConfigured) {
-        const script = document.createElement("script");
-        script.defer = true;
-        script.src = analyticsEndpoint + "/umami";
-        script.setAttribute("data-website-id", "%VITE_ANALYTICS_WEBSITE_ID%");
-        document.body.appendChild(script);
-      }
+      (function() {
+        var analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
+        var websiteId = "%VITE_ANALYTICS_WEBSITE_ID%";
+        var isEndpointConfigured = analyticsEndpoint && analyticsEndpoint.indexOf("%") !== 0;
+        
+        if (isEndpointConfigured) {
+          var script = document.createElement("script");
+          script.defer = true;
+          script.src = analyticsEndpoint + "/umami";
+          script.setAttribute("data-website-id", websiteId);
+          document.body.appendChild(script);
+        }
+      })();
     </script>
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
   </body>
 
 </html>

@@ -1,0 +1,101 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    # Warm-up phase: 10 users/sec for 30 seconds
+    - duration: 30
+      arrivalRate: 10
+      name: "Warm-up"
+    
+    # Ramp-up phase: 10 to 50 users/sec over 60 seconds
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp-up"
+    
+    # Sustained load: 50 users/sec for 120 seconds
+    - duration: 120
+      arrivalRate: 50
+      name: "Sustained load"
+    
+    # Cool-down: 50 to 10 users/sec over 30 seconds
+    - duration: 30
+      arrivalRate: 50
+      rampTo: 10
+      name: "Cool-down"
+  
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  
+  plugins:
+    expect: {}
+  
+  variables:
+    artistId: 1
+    
+  # Performance thresholds
+  ensure:
+    p95: 500   # 95th percentile response time under 500ms
+    p99: 1000  # 99th percentile response time under 1000ms
+    maxErrorRate: 1  # Error rate under 1%
+
+scenarios:
+  # Scenario 1: Browse artists (most common user flow)
+  - name: "Browse artists"
+    weight: 50
+    flow:
+      - get:
+          url: "/api/trpc/artists.getAll"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/api/trpc/artists.getById?input={{artistId}}"
+          expect:
+            - statusCode: 200
+
+  # Scenario 2: View artist profile with portfolio
+  - name: "View artist profile"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/trpc/artists.getAll"
+          capture:
+            - json: "$.result.data[0].id"
+              as: "artistId"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/api/trpc/artists.getById?input={\"id\":{{ artistId }}}"
+          expect:
+            - statusCode: 200
+      - think: 3
+      - get:
+          url: "/api/trpc/artists.getPortfolio?input={\"artistId\":{{ artistId }}}"
+          expect:
+            - statusCode: 200
+
+  # Scenario 3: Health check (monitoring/probe traffic)
+  - name: "Health check"
+    weight: 5
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+            - hasProperty: "status"
+
+  # Scenario 4: Search artists by city
+  - name: "Search artists"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/trpc/artists.search?input={\"city\":\"Los Angeles\"}"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/api/trpc/artists.search?input={\"styles\":\"Realism\"}"
+          expect:
+            - statusCode: 200
