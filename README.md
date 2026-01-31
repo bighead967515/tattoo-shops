@@ -12,7 +12,11 @@ Universal Inc is a comprehensive platform for tattoo artists and clients, featur
 - **Backend**: Express.js, tRPC
 - **Database**: PostgreSQL with Drizzle ORM
 - **Payments**: Stripe
+<<<<<<< HEAD
+- **Storage**: AWS S3 (for portfolio images)
+=======
 - **Storage**: Supabase Storage (S3-compatible)
+>>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 - **Styling**: Tailwind CSS + shadcn/ui components
 
 ## Project Structure
@@ -23,6 +27,16 @@ tattoo-shops/ (root)
 ├── client/              # React frontend
 │   ├── src/
 │   │   ├── components/  # UI components
+│   │   ├── pages/       # Page components
+│   │   └── lib/         # Utilities
+├── server/              # Express backend with tRPC
+│   ├── _core/           # Core server utilities
+│   ├── db.ts            # Database connection
+│   └── routers.ts       # API routers
+├── shared/              # Shared types and constants
+├── drizzle/             # Database schema and migrations
+└── scripts/             # Utility scripts
+=======
 ├── backend/             # Backend Application Code
 │   ├── drizzle/         # Database schema and migrations
 │   ├── server/          # Express backend with tRPC
@@ -30,6 +44,11 @@ tattoo-shops/ (root)
 ├── frontend/            # Frontend Application Code
 │   └── client/          # React frontend
 └── tests/               # Test files
+>>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
+```
+
+## Getting Started
+
 ### Prerequisites
 
 - Node.js 18 or higher
@@ -58,7 +77,6 @@ STRIPE_SECRET_KEY=...
 4. Run database migrations:
 =======
 2. Set up environment variables:
-2. Set up environment variables:
 Create a `.env` file with:
 ```
 DATABASE_URL=postgresql://...
@@ -73,6 +91,22 @@ OWNER_OPEN_ID=...
 ```
 
 3. Run database migrations:
+>>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
+```bash
+pnpm db:push
+```
+
+### Development
+
+Start the development server:
+```bash
+pnpm dev
+```
+
+<<<<<<< HEAD
+This will start both the frontend (Vite) and backend (Express) servers.
+=======
+This will start the backend server, which also serves the frontend in development mode.
 >>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 
 ### Building for Production
