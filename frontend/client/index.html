@@ -18,12 +18,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Analytics script - commented out until endpoint is configured
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
-    -->
+    <!-- Analytics script - handled dynamically to avoid Vite bundling errors with undefined env vars -->
+    <script>
+      const analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
+      const isEndpointConfigured = analyticsEndpoint && !analyticsEndpoint.startsWith("%");
+      
+      if (isEndpointConfigured) {
+        const script = document.createElement("script");
+        script.defer = true;
+        script.src = analyticsEndpoint + "/umami";
+        script.setAttribute("data-website-id", "%VITE_ANALYTICS_WEBSITE_ID%");
+        document.body.appendChild(script);
+      }
+    </script>
   </body>
 
 </html>

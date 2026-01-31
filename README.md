@@ -12,29 +12,24 @@ Universal Inc is a comprehensive platform for tattoo artists and clients, featur
 - **Backend**: Express.js, tRPC
 - **Database**: PostgreSQL with Drizzle ORM
 - **Payments**: Stripe
-- **Storage**: AWS S3 (for portfolio images)
+- **Storage**: Supabase Storage (S3-compatible)
 - **Styling**: Tailwind CSS + shadcn/ui components
 
 ## Project Structure
 
 ```
 tattoo-shops/ (root)
+<<<<<<< HEAD
 ├── client/              # React frontend
 │   ├── src/
 │   │   ├── components/  # UI components
-│   │   ├── pages/       # Page components
-│   │   └── lib/         # Utilities
-├── server/              # Express backend with tRPC
-│   ├── _core/           # Core server utilities
-│   ├── db.ts            # Database connection
-│   └── routers.ts       # API routers
-├── shared/              # Shared types and constants
-├── drizzle/             # Database schema and migrations
-└── scripts/             # Utility scripts
-```
-
-## Getting Started
-
+├── backend/             # Backend Application Code
+│   ├── drizzle/         # Database schema and migrations
+│   ├── server/          # Express backend with tRPC
+│   └── shared/          # Shared types and constants
+├── frontend/            # Frontend Application Code
+│   └── client/          # React frontend
+└── tests/               # Test files
 ### Prerequisites
 
 - Node.js 18 or higher
@@ -48,6 +43,7 @@ tattoo-shops/ (root)
 pnpm install
 ```
 
+<<<<<<< HEAD
 3. Set up environment variables:
 Create a `.env` file with:
 ```
@@ -60,18 +56,24 @@ STRIPE_SECRET_KEY=...
 ```
 
 4. Run database migrations:
-```bash
-pnpm db:push
+=======
+2. Set up environment variables:
+2. Set up environment variables:
+Create a `.env` file with:
+```
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://...
+SUPABASE_SERVICE_KEY=...
+SUPABASE_ANON_KEY=...
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+RESEND_API_KEY=...
+JWT_SECRET=...
+OWNER_OPEN_ID=...
 ```
 
-### Development
-
-Start the development server:
-```bash
-pnpm dev
-```
-
-This will start both the frontend (Vite) and backend (Express) servers.
+3. Run database migrations:
+>>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 
 ### Building for Production
 
@@ -99,8 +101,13 @@ pnpm test
 - `pnpm dev` - Start development server
 - `pnpm build` - Build for production
 - `pnpm test` - Run tests
+<<<<<<< HEAD
 - `pnpm db:push` - Push database schema changes
 - `pnpm db:studio` - Open Drizzle Studio
+=======
+- `pnpm db:push` - Generate and run database migrations
+
+>>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 
 ## Additional Documentation
 
