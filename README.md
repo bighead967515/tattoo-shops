@@ -12,31 +12,13 @@ Universal Inc is a comprehensive platform for tattoo artists and clients, featur
 - **Backend**: Express.js, tRPC
 - **Database**: PostgreSQL with Drizzle ORM
 - **Payments**: Stripe
-<<<<<<< HEAD
-- **Storage**: AWS S3 (for portfolio images)
-=======
 - **Storage**: Supabase Storage (S3-compatible)
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 - **Styling**: Tailwind CSS + shadcn/ui components
 
 ## Project Structure
 
 ```
 tattoo-shops/ (root)
-<<<<<<< HEAD
-├── client/              # React frontend
-│   ├── src/
-│   │   ├── components/  # UI components
-│   │   ├── pages/       # Page components
-│   │   └── lib/         # Utilities
-├── server/              # Express backend with tRPC
-│   ├── _core/           # Core server utilities
-│   ├── db.ts            # Database connection
-│   └── routers.ts       # API routers
-├── shared/              # Shared types and constants
-├── drizzle/             # Database schema and migrations
-└── scripts/             # Utility scripts
-=======
 ├── backend/             # Backend Application Code
 │   ├── drizzle/         # Database schema and migrations
 │   ├── server/          # Express backend with tRPC
@@ -44,7 +26,6 @@ tattoo-shops/ (root)
 ├── frontend/            # Frontend Application Code
 │   └── client/          # React frontend
 └── tests/               # Test files
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 ```
 
 ## Getting Started
@@ -62,20 +43,6 @@ tattoo-shops/ (root)
 pnpm install
 ```
 
-<<<<<<< HEAD
-3. Set up environment variables:
-Create a `.env` file with:
-```
-DATABASE_URL=postgresql://...
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=us-east-1
-S3_BUCKET_NAME=...
-STRIPE_SECRET_KEY=...
-```
-
-4. Run database migrations:
-=======
 2. Set up environment variables:
 Create a `.env` file with:
 ```
@@ -91,7 +58,6 @@ OWNER_OPEN_ID=...
 ```
 
 3. Run database migrations:
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 ```bash
 pnpm db:push
 ```
@@ -103,11 +69,7 @@ Start the development server:
 pnpm dev
 ```
 
-<<<<<<< HEAD
-This will start both the frontend (Vite) and backend (Express) servers.
-=======
 This will start the backend server, which also serves the frontend in development mode.
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 
 ### Building for Production
 
@@ -135,13 +97,8 @@ pnpm test
 - `pnpm dev` - Start development server
 - `pnpm build` - Build for production
 - `pnpm test` - Run tests
-<<<<<<< HEAD
-- `pnpm db:push` - Push database schema changes
-- `pnpm db:studio` - Open Drizzle Studio
-=======
 - `pnpm db:push` - Generate and run database migrations
 
->>>>>>> 9e39687 (Update README and project configuration: Fix bundler errors, update structure and environment variables)
 
 ## Additional Documentation
 
