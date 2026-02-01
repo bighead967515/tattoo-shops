@@ -205,9 +205,9 @@ app.use((err: Error & { statusCode?: number; status?: number }, _req: express.Re
   });
 });
 
-// This block handles local development and standalone server start.
+// This block handles local development.
 // Vercel will ignore this and use the exported `app` directly.
-if (process.env.NODE_ENV === "development" || !process.env.VERCEL) {
+if (process.env.NODE_ENV === "development") {
   const server = createServer(app);
 
   const startLocalServer = async () => {
