@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, Shield, CheckCircle } from "lucide-react";
+import { Calendar, CheckCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 
 interface BookingDialogProps {
@@ -30,7 +29,8 @@ export default function BookingDialog({
   artistName,
 }: BookingDialogProps) {
   const { user } = useAuth();
-  const [formData, setFormData] = useState({
+  
+  const initialFormData = {
     customerName: user?.name || "",
     customerEmail: user?.email || "",
     customerPhone: "",
@@ -40,42 +40,27 @@ export default function BookingDialog({
     size: "small",
     budget: "",
     additionalNotes: "",
-  });
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
 
   const createBookingMutation = trpc.bookings.create.useMutation({
-    onSuccess: async (data) => {
-      try {
-        // Create Stripe checkout session
-        const checkoutResult = await createCheckoutMutation.mutateAsync({
-          bookingId: data.id,
-        });
-
-        if (checkoutResult?.url) {
-          // Redirect to Stripe checkout
-          window.location.href = checkoutResult.url;
-        } else {
-          // No checkout URL returned
-          console.error("[Booking] No checkout URL received");
-          toast.error("Unable to start checkout, please try again");
-        }
-      } catch (error) {
-        console.error("[Booking] Checkout failed:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to create payment session. Please try again."
-        );
-        // Dialog remains open for user to retry or cancel
+    onSuccess: () => {
+      toast.success("Booking request sent!");
+      setFormData(initialFormData); // Reset form data
+      onOpenChange(false); // Close dialog on success
+    },
+    onError: (error) => {
+      const message = error.message;
+      if (message.includes("Invalid email address")) {
+        toast.error("Please provide a valid email address.");
+      } else if (message.includes("ZodError")) {
+        // Example of a more specific error, you might want to parse the ZodError for more details
+        toast.error("Please check your input fields for errors.");
+      } 
+      else {
+        toast.error("Failed to send booking request. Please try again later.");
       }
-    },
-    onError: (error) => {
-      toast.error("Failed to create booking: " + error.message);
-    },
-  });
-
-  const createCheckoutMutation = trpc.payments.createCheckout.useMutation({
-    onError: (error) => {
-      toast.error("Failed to create payment session: " + error.message);
     },
   });
 
@@ -131,7 +116,7 @@ export default function BookingDialog({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const isLoading = createBookingMutation.isPending || createCheckoutMutation.isPending;
+  const isLoading = createBookingMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -139,27 +124,11 @@ export default function BookingDialog({
         <DialogHeader>
           <DialogTitle>Book Appointment with {artistName}</DialogTitle>
           <DialogDescription>
-            Fill out the form below to request an appointment. A $50 deposit is required to secure your booking.
+            Fill out the form below to request an appointment. The artist will contact you to confirm details.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Trust Indicators */}
-        <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-          <div className="text-center">
-            <Shield className="w-6 h-6 mx-auto mb-2 text-primary" />
-            <p className="text-xs text-muted-foreground">Secure Payment</p>
-          </div>
-          <div className="text-center">
-            <CheckCircle className="w-6 h-6 mx-auto mb-2 text-primary" />
-            <p className="text-xs text-muted-foreground">Verified Artist</p>
-          </div>
-          <div className="text-center">
-            <CreditCard className="w-6 h-6 mx-auto mb-2 text-primary" />
-            <p className="text-xs text-muted-foreground">Easy Cancellation</p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 pt-4">
           {/* Contact Information */}
           <div className="space-y-4">
             <h3 className="font-semibold">Contact Information</h3>
@@ -278,24 +247,8 @@ export default function BookingDialog({
             </div>
           </div>
 
-          {/* Deposit Information */}
-          <Card className="p-4 bg-primary/5 border-primary/20">
-            <div className="flex items-start gap-3">
-              <CreditCard className="w-5 h-5 text-primary mt-0.5" />
-              <div>
-                <h4 className="font-semibold mb-2">Booking Deposit - $50.00</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Deducted from your final tattoo cost</li>
-                  <li>• Secure payment via Stripe (PCI compliant)</li>
-                  <li>• Full refund if cancelled 48+ hours in advance</li>
-                  <li>• Remaining balance paid directly to artist</li>
-                </ul>
-              </div>
-            </div>
-          </Card>
-
           {/* Submit Button */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
@@ -307,18 +260,18 @@ export default function BookingDialog({
             </Button>
             <Button type="submit" disabled={isLoading} className="flex-1 h-12 text-base">
               {isLoading ? (
-                "Processing..."
+                "Sending..."
               ) : (
                 <>
                   <Calendar className="w-4 h-4 mr-2" />
-                  Continue to Secure Payment ($50)
+                  Send Booking Request
                 </>
               )}
             </Button>
           </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            By booking, you agree to our <button type="button" className="text-primary hover:underline" onClick={() => toast.info("Cancellation Policy: Full refund if cancelled 48+ hours before appointment. Deposits are non-refundable within 48 hours of appointment time.")}>cancellation policy</button>
+            The artist will receive your request and contact you to confirm the appointment and discuss payment.
           </p>
         </form>
       </DialogContent>

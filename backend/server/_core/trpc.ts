@@ -12,15 +12,14 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 const requireUser = t.middleware(async opts => {
-  const { ctx, next } = opts;
-
+  const { ctx } = opts;
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
-
-  return next({
+  return opts.next({
     ctx: {
       ...ctx,
+      // user is now guaranteed non-null
       user: ctx.user,
     },
   });
@@ -30,11 +29,9 @@ export const protectedProcedure = t.procedure.use(requireUser);
 
 export const artistProcedure = protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    // ctx.user is guaranteed non-null by protectedProcedure
-    const user = ctx.user;
-    const artist = await getArtistByUserId(user.id);
+    const artist = await getArtistByUserId(ctx.user.id);
     
-    if (!artist && user.role !== 'admin') {
+    if (!artist && ctx.user.role !== 'admin') {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You must have an artist profile to perform this action",
@@ -56,13 +53,12 @@ export const artistProcedure = protectedProcedure.use(
  */
 export const artistOwnerProcedure = artistProcedure.use(
   t.middleware(async ({ ctx, next, rawInput }) => {
-    // ctx.user is guaranteed non-null by protectedProcedure chain
-    const user = ctx.user;
-    if (user.role === 'admin') return next({ ctx });
+    if (ctx.user.role === 'admin') return next({ ctx });
 
     const input = rawInput as { artistId?: number; id?: number };
     const targetArtistId = input?.artistId ?? input?.id;
 
+    // artist can be null if an admin is using the procedure but doesn't have an artist profile
     if (!ctx.artist || (targetArtistId && ctx.artist.id !== targetArtistId)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -76,7 +72,6 @@ export const artistOwnerProcedure = artistProcedure.use(
 
 export const adminProcedure = protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    // ctx.user is guaranteed non-null by protectedProcedure
     if (ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }

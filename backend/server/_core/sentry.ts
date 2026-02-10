@@ -29,13 +29,10 @@ export function initSentry(): void {
       // Performance monitoring
       tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
       
-      // Session tracking
-      autoSessionTracking: true,
-      
       // Integrations
       integrations: [
         // Express integration is automatically added
-        Sentry.httpIntegration({ tracing: true }),
+        Sentry.httpIntegration(),
         Sentry.expressIntegration(),
       ],
       

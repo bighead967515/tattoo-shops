@@ -4,12 +4,39 @@ import { publicProcedure, protectedProcedure, artistProcedure, artistOwnerProced
 import { sanitizeInput, sanitizeEmail, sanitizePhone } from "./_core/sanitize";
 import { z } from "zod";
 import * as db from "./db";
-import { createCheckoutSession } from "./stripe";
-import { PRODUCTS } from "./products";
-import { uploadFile, getPublicUrl, deleteFile, createSignedUploadUrl } from "./_core/supabaseStorage";
+import { createSignedUploadUrl, deleteFile, BUCKETS, getPublicUrl } from "./_core/supabaseStorage";
+import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
+import { verificationRouter } from "./verificationRouter";
+import { healthRouter } from "./healthRouter";
+import path from "path";
+
+/**
+ * Sanitize a filename to prevent path traversal attacks.
+ * Strips path separators, removes dangerous characters, and enforces max length.
+ */
+function sanitizeFileName(fileName: string, maxLength = 100): string {
+  // Get basename to strip any path
+  let sanitized = path.basename(fileName);
+  // Remove any remaining path separators and null bytes
+  sanitized = sanitized.replace(/[\\/\0]/g, '');
+  // Remove ".." sequences
+  sanitized = sanitized.replace(/\.\./g, '');
+  // Keep only safe characters: alphanumeric, dot, underscore, hyphen
+  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_');
+  // Collapse multiple underscores
+  sanitized = sanitized.replace(/_+/g, '_');
+  // Trim and enforce max length
+  sanitized = sanitized.substring(0, maxLength);
+  // Fallback if empty
+  if (!sanitized || sanitized === '.' || sanitized === '..') {
+    sanitized = `upload_${Date.now()}`;
+  }
+  return sanitized;
+}
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  health: healthRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -109,23 +136,49 @@ export const appRouter = router({
         contentType: z.string(),
       }))
       .mutation(async ({ input }) => {
-        // Generate unique file key
-        const fileKey = `${input.artistId}/${Date.now()}-${input.fileName}`;
+        // Sanitize filename to prevent path traversal
+        const sanitizedFileName = sanitizeFileName(input.fileName);
+        // Generate unique file key with sanitized filename
+        const fileKey = `public/${input.artistId}/${Date.now()}-${sanitizedFileName}`;
         
         // Return the signed upload URL for client to upload
-        return await createSignedUploadUrl(fileKey);
+        return await createSignedUploadUrl(BUCKETS.PORTFOLIO_IMAGES, fileKey);
       }),
     
     add: artistOwnerProcedure
       .input(z.object({
         artistId: z.number(),
-        imageUrl: z.string(),
         imageKey: z.string(),
         caption: z.string().optional(),
         style: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        return await db.addPortfolioImage(input);
+        // Sanitize imageKey using same semantics as sanitizeFileName
+        // Step 1: Remove null bytes
+        let sanitizedKey = input.imageKey.replace(/\0/g, '');
+        // Step 2: Convert backslashes to forward slashes (POSIX)
+        sanitizedKey = sanitizedKey.replace(/\\/g, '/');
+        // Step 3: Collapse consecutive slashes
+        sanitizedKey = sanitizedKey.replace(/\/+/g, '/');
+        // Step 4: Remove ".." path traversal sequences
+        sanitizedKey = sanitizedKey.replace(/\.\./g, '');
+        // Step 5: Remove leading slashes
+        sanitizedKey = sanitizedKey.replace(/^\/+/, '');
+        // Step 6: Normalize path segments (remove empty segments from collapsed slashes)
+        sanitizedKey = sanitizedKey.split('/').filter(Boolean).join('/');
+        
+        // Validate ownership: imageKey must start with the artist's path
+        const expectedPrefix = `public/${input.artistId}/`;
+        if (!sanitizedKey.startsWith(expectedPrefix)) {
+          throw new Error("Invalid image key: does not belong to this artist");
+        }
+        
+        const imageUrl = getPublicUrl(BUCKETS.PORTFOLIO_IMAGES, sanitizedKey);
+        return await db.addPortfolioImage({
+          ...input,
+          imageKey: sanitizedKey,
+          imageUrl,
+        });
       }),
     
     delete: protectedProcedure
@@ -146,7 +199,7 @@ export const appRouter = router({
         
         // Delete from Supabase storage
         try {
-          await deleteFile(image.imageKey);
+          await deleteFile(BUCKETS.PORTFOLIO_IMAGES, image.imageKey);
         } catch (error) {
           // Log but don't fail - continue with DB deletion even if storage deletion fails
           // This prevents orphaned DB records
@@ -278,47 +331,12 @@ export const appRouter = router({
       }),
   }),
 
-  payments: router({
-    createCheckout: protectedProcedure
-      .input(z.object({
-        bookingId: z.number(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        const booking = await db.getBookingById(input.bookingId);
-        if (!booking) {
-          throw new Error("Booking not found");
-        }
-        
-        // Verify the user owns this booking
-        if (booking.userId !== ctx.user.id) {
-          throw new Error("Forbidden: You can only create checkout sessions for your own bookings");
-        }
-
-        const product = PRODUCTS.BOOKING_DEPOSIT;
-        const origin = ctx.req.headers.origin || "http://localhost:3000";
-
-        const session = await createCheckoutSession({
-          priceInCents: product.priceInCents,
-          productName: product.name,
-          productDescription: product.description,
-          customerEmail: ctx.user.email || booking.customerEmail,
-          metadata: {
-            bookingId: input.bookingId.toString(),
-            userId: ctx.user.id.toString(),
-            customerEmail: ctx.user.email || booking.customerEmail,
-            customerName: ctx.user.name || booking.customerName,
-          },
-          successUrl: `${origin}/payment/success`,
-          cancelUrl: `${origin}/payment/cancelled`,
-        });
-        
-        if (!session.url) {
-          throw new Error("Failed to create checkout session: No URL returned from Stripe");
-        }
-
-        return { url: session.url };
-      }),
-  }),
+  // Client marketplace routers
+  clients: clientsRouter,
+  requests: requestsRouter,
+  bids: bidsRouter,
+  verification: verificationRouter,
 });
 
 export type AppRouter = typeof appRouter;
+

@@ -13,7 +13,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook, initWebhookProcessor, getWebhookQueueStats } from "../webhookHandler";
 import { ENV } from "./env";
 import { logger } from "./logger";
-import { initializeBucket } from "./supabaseStorage";
+import { initializeBuckets } from "./supabaseStorage";
 import { initSentry, sentryErrorHandler, captureException } from "./sentry";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -211,12 +211,12 @@ if (process.env.NODE_ENV === "development") {
   const server = createServer(app);
 
   const startLocalServer = async () => {
-    // Initialize Supabase Storage bucket on startup
+    // Initialize Supabase Storage buckets on startup
     try {
-      await initializeBucket();
-      logger.info("Supabase storage bucket initialized successfully");
+      await initializeBuckets();
+      logger.info("Supabase storage buckets initialized successfully");
     } catch (error) {
-      logger.error("Failed to initialize storage bucket", { error });
+      logger.error("Failed to initialize storage buckets", { error });
     }
 
     // Initialize webhook retry queue processor

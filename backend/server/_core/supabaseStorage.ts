@@ -1,103 +1,127 @@
 import { supabaseAdmin } from './supabase';
 
-const BUCKET_NAME = 'portfolio-images';
+export const BUCKETS = {
+  PORTFOLIO_IMAGES: 'portfolio-images',
+  REQUEST_IMAGES: 'request-images',
+  ID_DOCUMENTS: 'id-documents',
+};
+
+const BUCKET_CONFIGS = [
+  {
+    name: BUCKETS.PORTFOLIO_IMAGES,
+    public: true,
+    fileSizeLimit: 5242880, // 5MB
+    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
+  },
+  {
+    name: BUCKETS.REQUEST_IMAGES,
+    public: true,
+    fileSizeLimit: 5242880, // 5MB
+    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
+  },
+  {
+    name: BUCKETS.ID_DOCUMENTS,
+    public: false, // PRIVATE
+    fileSizeLimit: 10485760, // 10MB
+    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'],
+  },
+];
+
 
 /**
  * Supabase Storage helpers
- * Replaces Manus Forge storage with Supabase Storage
  */
 
 /**
- * Upload a file to Supabase Storage
+ * Upload a file to a specific Supabase Storage bucket
+ * @param bucketName - The name of the bucket
  * @param path - Relative path in bucket (e.g., "artists/123/image.jpg")
  * @param data - File buffer, Uint8Array, or Blob
  * @param contentType - MIME type (e.g., "image/jpeg")
- * @returns Public URL of uploaded file
  */
 export async function uploadFile(
+  bucketName: string,
   path: string,
   data: Buffer | Uint8Array | Blob,
   contentType: string
-): Promise<string> {
-  const { data: uploadData, error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
+): Promise<void> {
+  const { error } = await supabaseAdmin.storage
+    .from(bucketName)
     .upload(path, data, {
       contentType,
       upsert: true, // Overwrite if exists
     });
 
   if (error) {
-    console.error('[Storage] Upload failed:', error);
+    console.error(`[Storage] Upload to bucket "${bucketName}" failed:`, error);
     throw new Error(`Failed to upload file: ${error.message}`);
   }
-
-  // Get public URL
-  const { data: urlData } = supabaseAdmin.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(uploadData.path);
-
-  return urlData.publicUrl;
 }
 
 /**
- * Delete a file from Supabase Storage
+ * Delete a file from a specific Supabase Storage bucket
+ * @param bucketName - The name of the bucket
  * @param path - Relative path in bucket
  */
-export async function deleteFile(path: string): Promise<void> {
+export async function deleteFile(bucketName: string, path: string): Promise<void> {
   const { error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .remove([path]);
 
   if (error) {
-    console.error('[Storage] Delete failed:', error);
+    console.error(`[Storage] Delete from bucket "${bucketName}" failed:`, error);
     throw new Error(`Failed to delete file: ${error.message}`);
   }
 }
 
 /**
- * Delete multiple files from Supabase Storage
+ * Delete multiple files from a specific Supabase Storage bucket
+ * @param bucketName - The name of the bucket
  * @param paths - Array of relative paths in bucket
  */
-export async function deleteFiles(paths: string[]): Promise<void> {
+export async function deleteFiles(bucketName: string, paths: string[]): Promise<void> {
   const { error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .remove(paths);
 
   if (error) {
-    console.error('[Storage] Batch delete failed:', error);
+    console.error(`[Storage] Batch delete from bucket "${bucketName}" failed:`, error);
     throw new Error(`Failed to delete files: ${error.message}`);
   }
 }
 
 /**
- * Get public URL for a file
+ * Get public URL for a file in a PUBLIC bucket
+ * @param bucketName - The name of the bucket
  * @param path - Relative path in bucket
  * @returns Public URL
  */
-export function getPublicUrl(path: string): string {
+export function getPublicUrl(bucketName: string, path: string): string {
   const { data } = supabaseAdmin.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .getPublicUrl(path);
 
   return data.publicUrl;
 }
 
 /**
- * Create a signed URL for temporary access
+ * Create a signed URL for temporary access to a file in ANY bucket (public or private)
+ * @param bucketName - The name of the bucket
  * @param path - Relative path in bucket
  * @param expiresIn - Expiration time in seconds (default: 1 hour)
  * @returns Signed URL
  */
 export async function createSignedUrl(
+  bucketName: string,
   path: string,
   expiresIn: number = 3600
 ): Promise<string> {
   const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .createSignedUrl(path, expiresIn);
 
   if (error) {
-    console.error('[Storage] Create signed URL failed:', error);
+    console.error(`[Storage] Create signed URL for bucket "${bucketName}" failed:`, error);
     throw new Error(`Failed to create signed URL: ${error.message}`);
   }
 
@@ -105,17 +129,18 @@ export async function createSignedUrl(
 }
 
 /**
- * Create a signed upload URL for client-side uploads
+ * Create a signed upload URL for client-side uploads to a specific bucket
+ * @param bucketName - The name of the bucket
  * @param path - Relative path in bucket
  * @returns Object containing signed URL and path
  */
-export async function createSignedUploadUrl(path: string): Promise<{ signedUrl: string, path: string }> {
+export async function createSignedUploadUrl(bucketName: string, path: string): Promise<{ signedUrl: string, path: string }> {
   const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .createSignedUploadUrl(path);
 
   if (error) {
-    console.error('[Storage] Create signed upload URL failed:', error);
+    console.error(`[Storage] Create signed upload URL for bucket "${bucketName}" failed:`, error);
     throw new Error(`Failed to create signed upload URL: ${error.message}`);
   }
 
@@ -123,17 +148,18 @@ export async function createSignedUploadUrl(path: string): Promise<{ signedUrl: 
 }
 
 /**
- * List files in a directory
+ * List files in a directory within a specific bucket
+ * @param bucketName - The name of the bucket
  * @param path - Directory path (e.g., "artists/123")
  * @returns Array of file objects
  */
-export async function listFiles(path: string) {
+export async function listFiles(bucketName: string, path: string) {
   const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .list(path);
 
   if (error) {
-    console.error('[Storage] List files failed:', error);
+    console.error(`[Storage] List files in bucket "${bucketName}" failed:`, error);
     throw new Error(`Failed to list files: ${error.message}`);
   }
 
@@ -141,27 +167,34 @@ export async function listFiles(path: string) {
 }
 
 /**
- * Initialize storage bucket (run once on setup)
- * Creates the bucket if it doesn't exist and sets it to public
+ * Initialize all storage buckets defined in BUCKET_CONFIGS
+ * Creates each bucket if it doesn't exist with its specified settings.
  */
-export async function initializeBucket() {
-  // Check if bucket exists
-  const { data: buckets } = await supabaseAdmin.storage.listBuckets();
-  const bucketExists = buckets?.some(b => b.name === BUCKET_NAME);
+export async function initializeBuckets() {
+  const { data: existingBuckets, error: listError } = await supabaseAdmin.storage.listBuckets();
 
-  if (!bucketExists) {
-    // Create bucket
-    const { error: createError } = await supabaseAdmin.storage.createBucket(BUCKET_NAME, {
-      public: true, // Make bucket public for direct image access
-      fileSizeLimit: 5242880, // 5MB limit
-      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
-    });
+  if (listError) {
+    console.error('[Storage] Failed to list buckets:', listError);
+    throw new Error(`Failed to list storage buckets: ${listError.message}`);
+  }
 
-    if (createError) {
-      console.error('[Storage] Failed to create bucket:', createError);
-      throw new Error(`Failed to create storage bucket: ${createError.message}`);
+  for (const config of BUCKET_CONFIGS) {
+    const bucketExists = existingBuckets.some(b => b.name === config.name);
+    if (!bucketExists) {
+      console.log(`[Storage] Bucket "${config.name}" not found. Creating...`);
+      const { error: createError } = await supabaseAdmin.storage.createBucket(config.name, {
+        public: config.public,
+        fileSizeLimit: config.fileSizeLimit,
+        allowedMimeTypes: config.allowedMimeTypes,
+      });
+
+      if (createError) {
+        console.error(`[Storage] Failed to create bucket "${config.name}":`, createError);
+        // Don't throw, just log the error and continue, so one failure doesn't stop others
+      } else {
+        console.log(`[Storage] Bucket "${config.name}" created successfully.`);
+      }
     }
-
-    console.log('[Storage] Bucket created successfully');
   }
 }
+

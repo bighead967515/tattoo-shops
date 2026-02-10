@@ -90,7 +90,7 @@ interface MapViewProps {
   className?: string;
   initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
-  mapStyle?: maptilersdk.MapStyleVariant;
+  mapStyle?: maptilersdk.MapStyleVariant | string;
   onMapReady?: (map: maptilersdk.Map) => void;
 }
 

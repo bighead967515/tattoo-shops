@@ -2,26 +2,11 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Header from "@/components/Header";
-import TattooCard from "@/components/TattooCard";
+import HomepageFeed from "@/components/HomepageFeed";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, MapPin, Calendar, Shield, Star, CheckCircle, Award } from "lucide-react";
-
-const tattooData = [
-  { id: 1, image: "/tattoo-1.jpg", artistName: "Sarah Mitchell", artistInitials: "SM", location: "Ink Studio, New York", rating: 5, reviewCount: 124 },
-  { id: 2, image: "/tattoo-2.jpg", artistName: "Kenji Tanaka", artistInitials: "KT", location: "Dragon Art Tattoo, Tokyo", rating: 5, reviewCount: 89 },
-  { id: 3, image: "/tattoo-3.jpg", artistName: "Maya Rodriguez", artistInitials: "MR", location: "Sacred Geometry Studio, LA", rating: 5, reviewCount: 156 },
-  { id: 4, image: "/tattoo-4.jpg", artistName: "Emma Laurent", artistInitials: "EL", location: "Fine Line Collective, Paris", rating: 5, reviewCount: 203 },
-  { id: 5, image: "/tattoo-5.jpg", artistName: "Marcus Stone", artistInitials: "MS", location: "Traditional Ink, Chicago", rating: 5, reviewCount: 78 },
-  { id: 6, image: "/tattoo-6.jpg", artistName: "Luna Chen", artistInitials: "LC", location: "Watercolor Dreams, San Francisco", rating: 4, reviewCount: 92 },
-  { id: 7, image: "/tattoo-7.jpg", artistName: "Alex Rivers", artistInitials: "AR", location: "Minimalist Ink, Portland", rating: 5, reviewCount: 67 },
-  { id: 8, image: "/tattoo-8.jpg", artistName: "Viktor Novak", artistInitials: "VN", location: "Neo Traditional Studio, Prague", rating: 5, reviewCount: 145 },
-  { id: 9, image: "/tattoo-9.jpg", artistName: "Aria Patel", artistInitials: "AP", location: "Dotwork Gallery, London", rating: 5, reviewCount: 112 },
-  { id: 10, image: "/tattoo-10.jpg", artistName: "Kai Makani", artistInitials: "KM", location: "Tribal Arts, Honolulu", rating: 5, reviewCount: 98 },
-  { id: 11, image: "/tattoo-11.jpg", artistName: "Isabella Rossi", artistInitials: "IR", location: "Realism Masters, Milan", rating: 5, reviewCount: 187 },
-  { id: 12, image: "/tattoo-12.jpg", artistName: "Yuki Nakamura", artistInitials: "YN", location: "Kawaii Ink, Osaka", rating: 4, reviewCount: 76 },
-];
 
 const suggestionTags = [
   "Norse mythology",
@@ -54,7 +39,7 @@ export default function Home() {
               Find Your Perfect Tattoo Artist
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-8">
-              Browse portfolios, read verified reviews, and book appointments with top-rated tattoo artists in your area
+              Browse portfolios, post your tattoo idea, and get bids from top-rated artists
             </p>
 
             {/* Search Bar */}
@@ -99,9 +84,9 @@ export default function Home() {
                 <Search className="w-5 h-5 mr-2" />
                 Browse Artists
               </Button>
-              <Button size="lg" variant="outline" onClick={() => setLocation("/artist-finder")} className="text-lg px-8 py-6">
+              <Button size="lg" variant="outline" onClick={() => setLocation("/client/new-request")} className="text-lg px-8 py-6">
                 <MapPin className="w-5 h-5 mr-2" />
-                Find Near Me
+                Post a Request
               </Button>
             </div>
           </div>
@@ -137,7 +122,7 @@ export default function Home() {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Book your next tattoo in three simple steps
+            Get your dream tattoo in three simple steps
           </p>
         </div>
 
@@ -146,9 +131,9 @@ export default function Home() {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Search className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-3">1. Browse & Filter</h3>
+            <h3 className="text-xl font-semibold mb-3">1. Post Your Idea</h3>
             <p className="text-muted-foreground">
-              Search by style, location, or rating. View portfolios and read verified reviews from real customers.
+              Describe your desired tattoo, upload reference images, and set your budget.
             </p>
           </Card>
 
@@ -158,7 +143,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-semibold mb-3">2. Book Appointment</h3>
             <p className="text-muted-foreground">
-              Choose your preferred date and time. Secure your spot with a $50 deposit paid safely online.
+              Choose your preferred date and time and book your appointment seamlessly.
             </p>
           </Card>
 
@@ -166,41 +151,31 @@ export default function Home() {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-3">3. Get Your Tattoo</h3>
+            <h3 className="text-xl font-semibold mb-3">3. Book & Get Tattooed</h3>
             <p className="text-muted-foreground">
-              Receive confirmation and reminders. Show up and get the tattoo of your dreams from a verified artist.
+              Accept your favorite bid, book the appointment, and get the tattoo of your dreams.
             </p>
           </Card>
         </div>
       </div>
 
-      {/* Featured Tattoos Gallery */}
+      {/* Latest Tattoo Requests */}
       <div className="container py-20 border-t">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Explore Tattoos</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Latest Tattoo Requests</h2>
           <p className="text-xl text-muted-foreground">
-            Find your next tattoo inspiration with our extensive collection of designs and styles. Browse through curated galleries and{" "}
+            Browse ideas from the community or {" "}
             <button
-              onClick={() => setLocation("/artist-finder")}
+              onClick={() => setLocation("/client/new-request")}
               className="text-primary hover:underline font-medium"
             >
-              book an appointment
+              post your own request
             </button>{" "}
-            with a talented artist to bring your idea to life.
+            to get bids from artists.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {tattooData.map((tattoo) => (
-            <TattooCard key={tattoo.id} {...tattoo} />
-          ))}
-        </div>
-
-        <div className="text-center mt-12">
-          <Button size="lg" onClick={() => setLocation("/artists")} className="px-8">
-            View All Artists
-          </Button>
-        </div>
+        <HomepageFeed />
       </div>
 
       {/* Why Choose Us Section */}

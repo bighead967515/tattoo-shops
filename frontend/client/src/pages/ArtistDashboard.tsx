@@ -9,16 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Image as ImageIcon, Settings, Plus, Trash2, Loader2, ExternalLink } from "lucide-react";
+import { Calendar, User, Image as ImageIcon, Settings, Plus, Trash2, Loader2, ExternalLink, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
+import ArtistDashboardFeed from "@/components/ArtistDashboardFeed";
+import UpgradePrompt from "@/components/UpgradePrompt";
+import { Progress } from "@/components/ui/progress";
+import axios from "axios";
 
 export default function ArtistDashboard() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, loading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const { data: artist, isLoading: artistLoading, refetch: refetchArtist } = trpc.artists.getByUserId.useQuery(
     undefined, 
@@ -116,6 +121,7 @@ export default function ArtistDashboard() {
     if (!file || !artist) return;
 
     setIsUploading(true);
+    setUploadProgress(0);
     try {
       // 1. Get signed upload URL
       const { signedUrl, path } = await getUploadUrlMutation.mutateAsync({
@@ -124,24 +130,20 @@ export default function ArtistDashboard() {
         contentType: file.type,
       });
 
-      // 2. Upload file directly to Supabase Storage
-      const response = await fetch(signedUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type,
+      // 2. Upload file directly to Supabase Storage using axios for progress
+      await axios.put(signedUrl, file, {
+        headers: { 'Content-Type': file.type },
+        onUploadProgress: (progressEvent) => {
+          if (typeof progressEvent.total === 'number' && progressEvent.total > 0) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+          }
         },
       });
 
-      if (!response.ok) throw new Error("Upload failed");
-
-      // 3. Add to portfolio database
-      // Generate public URL (assuming public bucket)
-      const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/portfolio-images/${path}`;
-
+      // 3. Add to portfolio database by passing the key
       await addPortfolioImageMutation.mutateAsync({
         artistId: artist.id,
-        imageUrl: publicUrl,
         imageKey: path,
         caption: file.name,
       });
@@ -149,6 +151,7 @@ export default function ArtistDashboard() {
       console.error(error);
       toast.error("Failed to upload image");
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -171,10 +174,14 @@ export default function ArtistDashboard() {
         </div>
 
         <Tabs defaultValue="portfolio" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-lg grid-cols-4">
             <TabsTrigger value="portfolio">
               <ImageIcon className="w-4 h-4 mr-2" />
               Portfolio
+            </TabsTrigger>
+            <TabsTrigger value="requests">
+              <Briefcase className="w-4 h-4 mr-2" />
+              Requests
             </TabsTrigger>
             <TabsTrigger value="bookings">
               <Calendar className="w-4 h-4 mr-2" />
@@ -202,6 +209,12 @@ export default function ArtistDashboard() {
                 onChange={handleFileUpload}
               />
             </div>
+            {isUploading && uploadProgress !== null && (
+              <div className="space-y-2">
+                <Label>Uploading...</Label>
+                <Progress value={uploadProgress} className="w-full" />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {portfolioLoading ? (
@@ -231,6 +244,19 @@ export default function ArtistDashboard() {
                 ))
               )}
             </div>
+          </TabsContent>
+
+          {/* Requests Tab */}
+          <TabsContent value="requests" className="space-y-4">
+             <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
+            {artist.subscriptionTier === 'free' ? (
+              <UpgradePrompt 
+                feature="View & Bid on Requests"
+                description="Upgrade to a paid plan to view and bid on new tattoo requests from clients."
+              />
+            ) : (
+              <ArtistDashboardFeed />
+            )}
           </TabsContent>
 
           {/* Bookings Tab */}

@@ -7,7 +7,7 @@ import { serial, text, timestamp, varchar, boolean, integer, pgTable, pgEnum, un
  */
 
 // Define role enum for PostgreSQL
-export const roleEnum = pgEnum("role", ["user", "admin", "artist"]);
+export const roleEnum = pgEnum("role", ["user", "admin", "artist", "client"]);
 
 // Define verification status enum
 export const verificationStatusEnum = pgEnum("verification_status", [
@@ -49,7 +49,7 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const artists = pgTable("artists", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   shopName: varchar("shop_name", { length: 255 }).notNull(),
   bio: text("bio"),
   specialties: text("specialties"), // Comma-separated list
@@ -68,7 +68,8 @@ export const artists = pgTable("artists", {
   averageRating: text("averageRating"),
   totalReviews: integer("totalReviews").default(0),
   isApproved: boolean("isApproved").default(false),
-  subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("free").notNull(), // 'free' or 'premium'
+  subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("free").notNull(), // 'free', 'amateur', 'professional', 'frontPage'
+  bidsUsed: integer("bidsUsed").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -199,3 +200,133 @@ export const verificationDocuments = pgTable("verificationDocuments", {
 
 export type VerificationDocument = typeof verificationDocuments.$inferSelect;
 export type InsertVerificationDocument = typeof verificationDocuments.$inferInsert;
+
+// ============================================
+// CLIENT MARKETPLACE TABLES
+// ============================================
+
+// Define request status enum
+export const requestStatusEnum = pgEnum("request_status", [
+  "open",       // Accepting bids
+  "in_progress", // Artist selected, work in progress
+  "completed",   // Tattoo completed
+  "cancelled"    // Client cancelled
+]);
+
+// Define bid status enum
+export const bidStatusEnum = pgEnum("bid_status", [
+  "pending",    // Waiting for client review
+  "accepted",   // Client accepted this bid
+  "rejected",   // Client rejected this bid
+  "withdrawn"   // Artist withdrew bid
+]);
+
+/**
+ * Client profiles - extends user information for clients
+ */
+export const clients = pgTable("clients", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  displayName: varchar("displayName", { length: 255 }).notNull(),
+  bio: text("bio"),
+  preferredStyles: text("preferredStyles"), // Comma-separated list
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  phone: varchar("phone", { length: 50 }),
+  onboardingCompleted: boolean("onboardingCompleted").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = typeof clients.$inferInsert;
+
+/**
+ * Tattoo requests posted by clients
+ * Clients describe what they want and artists can bid
+ */
+export const tattooRequests = pgTable("tattooRequests", {
+  id: serial("id").primaryKey(),
+  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  style: varchar("style", { length: 100 }), // e.g., "Realism", "Traditional", "Watercolor"
+  placement: varchar("placement", { length: 100 }).notNull(), // e.g., "forearm", "back", "sleeve"
+  size: varchar("size", { length: 50 }).notNull(), // e.g., "small", "medium", "large", "full sleeve"
+  colorPreference: varchar("colorPreference", { length: 50 }), // "color", "black_and_grey", "either"
+  budgetMin: integer("budgetMin"), // In cents
+  budgetMax: integer("budgetMax"), // In cents
+  preferredCity: varchar("preferredCity", { length: 100 }),
+  preferredState: varchar("preferredState", { length: 50 }),
+  willingToTravel: boolean("willingToTravel").default(false),
+  desiredTimeframe: varchar("desiredTimeframe", { length: 100 }), // e.g., "ASAP", "Within 1 month", "Flexible"
+  status: requestStatusEnum("status").default("open").notNull(),
+  // NOTE: selectedBidId references bids.id. Due to circular dependency (bids references tattooRequests),
+  // the FK constraint is added via migration after both tables exist: 
+  // ALTER TABLE "tattooRequests" ADD CONSTRAINT "tattooRequests_selectedBidId_fkey" 
+  // FOREIGN KEY ("selectedBidId") REFERENCES "bids"("id") ON DELETE SET NULL;
+  selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
+  viewCount: integer("viewCount").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt"), // Optional expiration date
+});
+
+export type TattooRequest = typeof tattooRequests.$inferSelect;
+export type InsertTattooRequest = typeof tattooRequests.$inferInsert;
+
+/**
+ * Reference images for tattoo requests
+ * Clients upload inspiration/reference images
+ */
+export const requestImages = pgTable("requestImages", {
+  id: serial("id").primaryKey(),
+  requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
+  imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
+  imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
+  caption: text("caption"),
+  isMainImage: boolean("isMainImage").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RequestImage = typeof requestImages.$inferSelect;
+export type InsertRequestImage = typeof requestImages.$inferInsert;
+
+/**
+ * Artist bids on tattoo requests
+ */
+export const bids = pgTable("bids", {
+  id: serial("id").primaryKey(),
+  requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
+  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
+  priceEstimate: integer("priceEstimate").notNull(), // In cents
+  estimatedHours: integer("estimatedHours"),
+  message: text("message").notNull(), // Artist's pitch to the client
+  availableDate: timestamp("availableDate"), // When artist can do the work
+  portfolioLinks: text("portfolioLinks"), // Links to relevant portfolio pieces
+  status: bidStatusEnum("status").default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => ({
+  // One bid per artist per request
+  uniqueArtistRequest: unique().on(table.artistId, table.requestId),
+}));
+
+export type Bid = typeof bids.$inferSelect;
+export type InsertBid = typeof bids.$inferInsert;
+
+/**
+ * Messages between clients and artists about a request/bid
+ */
+export const requestMessages = pgTable("requestMessages", {
+  id: serial("id").primaryKey(),
+  requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
+  bidId: integer("bidId").references(() => bids.id, { onDelete: "cascade" }), // Optional - can be general request message
+  senderId: integer("senderId").references(() => users.id, { onDelete: "set null" }), // Nullable - set null if user deleted
+  message: text("message").notNull(),
+  isRead: boolean("isRead").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RequestMessage = typeof requestMessages.$inferSelect;
+export type InsertRequestMessage = typeof requestMessages.$inferInsert;

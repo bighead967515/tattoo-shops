@@ -86,11 +86,16 @@ pnpm test
 ## Key Features
 
 - Artist profile management
-- Portfolio image uploads
+- Portfolio image uploads with progress indicators
 - Client search and discovery
-- Booking system
+- Booking system with enhanced error handling
 - Payment processing via Stripe
+- Client tattoo request board where clients can post requests and artists can bid on them
 - AI-powered features (Gemini integration)
+- Health check endpoint for monitoring
+- Global network connectivity error handling
+- SEO-friendly artist profiles with meta tags and structured data
+- Automatic sitemap generation script
 
 ## Scripts
 

@@ -13,12 +13,16 @@ import Dashboard from "./pages/Dashboard";
 import ArtistDashboard from "./pages/ArtistDashboard";
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancelled from "./pages/PaymentCancelled";
 import Help from "./pages/Help";
 import CancellationPolicy from "./pages/CancellationPolicy";
 import Pricing from "./pages/Pricing";
 import LicenseUpload from "./pages/LicenseUpload";
+// Client marketplace pages
+import ClientOnboarding from "./pages/ClientOnboarding";
+import ClientDashboard from "./pages/ClientDashboard";
+import NewRequest from "./pages/NewRequest";
+import RequestBoard from "./pages/RequestBoard";
+import RequestDetail from "./pages/RequestDetail";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -33,12 +37,16 @@ function Router() {
       <Route path="/artist-dashboard" component={ArtistDashboard} />
       <Route path="/login" component={Login} />
       <Route path="/auth/callback" component={AuthCallback} />
-      <Route path="/payment/success" component={PaymentSuccess} />
-      <Route path="/payment/cancelled" component={PaymentCancelled} />
       <Route path="/help" component={Help} />
       <Route path="/cancellation-policy" component={CancellationPolicy} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/license-upload" component={LicenseUpload} />
+      {/* Client marketplace routes */}
+      <Route path="/client/onboarding" component={ClientOnboarding} />
+      <Route path="/client/dashboard" component={ClientDashboard} />
+      <Route path="/client/new-request" component={NewRequest} />
+      <Route path="/requests" component={RequestBoard} />
+      <Route path="/requests/:id" component={RequestDetail} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

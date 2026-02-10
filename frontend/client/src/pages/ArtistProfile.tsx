@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Star, MapPin, Phone, Globe, Instagram, Facebook, Heart, Calendar, Upload } from "lucide-react";
 import { toast } from "sonner";
-import BookingDialog from "@/components/BookingDialog";
 import ReviewCard from "@/components/ReviewCard";
 import ReviewFilters from "@/components/ReviewFilters";
 
@@ -237,6 +236,7 @@ export default function ArtistProfile() {
               </Button>
               <Button
                 size="lg"
+.
                 variant="outline"
                 className="w-full"
                 onClick={handleToggleFavorite}

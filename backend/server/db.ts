@@ -83,7 +83,7 @@ export async function withTransaction<T>(
   }
   
   return _sqlClient.begin(async (sql) => {
-    const txDb = drizzle(sql);
+    const txDb = drizzle(sql as any);
     return callback(txDb);
   }) as Promise<T>;
 }

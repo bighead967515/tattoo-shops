@@ -1,6 +1,6 @@
 import { eq, and, lte, inArray } from "drizzle-orm";
-import { db } from "./db";
-import { webhookQueue, type WebhookQueueItem, type InsertWebhookQueueItem } from "../drizzle/schema";
+import { getDb } from "./db";
+import { webhookQueue, type InsertWebhookQueueItem } from "../drizzle/schema";
 import { logger } from "./_core/logger";
 
 /**
@@ -38,6 +38,9 @@ export async function queueWebhookForRetry(
   payload: unknown,
   error?: string
 ): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
   try {
     // Check if already in queue
     const existing = await db
@@ -77,6 +80,9 @@ export async function queueWebhookForRetry(
  * Process pending webhook events from the queue
  */
 export async function processWebhookQueue(processor: WebhookProcessor): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
   const now = new Date();
   let processedCount = 0;
 
@@ -201,14 +207,15 @@ export async function getQueueStats(): Promise<{
   failed: number;
   total: number;
 }> {
+  const db = await getDb();
+  const defaultStats = { pending: 0, processing: 0, completed: 0, failed: 0, total: 0 };
+  if (!db) return defaultStats;
+
   try {
     const allItems = await db.select().from(webhookQueue);
     
     const stats = {
-      pending: 0,
-      processing: 0,
-      completed: 0,
-      failed: 0,
+      ...defaultStats,
       total: allItems.length,
     };
 
@@ -230,8 +237,9 @@ export async function getQueueStats(): Promise<{
     }
 
     return stats;
-  } catch {
-    return { pending: 0, processing: 0, completed: 0, failed: 0, total: 0 };
+  } catch (e: any) {
+    logger.error("Failed to get queue stats", { error: e.message });
+    return defaultStats;
   }
 }
 
@@ -239,6 +247,9 @@ export async function getQueueStats(): Promise<{
  * Clean up old completed and failed events
  */
 export async function cleanupOldEvents(olderThanDays: number = 30): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
@@ -274,6 +285,9 @@ export async function cleanupOldEvents(olderThanDays: number = 30): Promise<numb
  * Manually retry a failed event
  */
 export async function retryFailedEvent(eventId: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
   try {
     const result = await db
       .update(webhookQueue)
