@@ -51,15 +51,16 @@ export default function BookingDialog({
       onOpenChange(false); // Close dialog on success
     },
     onError: (error) => {
-      const message = error.message;
-      if (message.includes("Invalid email address")) {
-        toast.error("Please provide a valid email address.");
-      } else if (message.includes("ZodError")) {
-        // Example of a more specific error, you might want to parse the ZodError for more details
-        toast.error("Please check your input fields for errors.");
-      } 
-      else {
-        toast.error("Failed to send booking request. Please try again later.");
+      if (error.data?.zodError?.fieldErrors) {
+        const errors = error.data.zodError.fieldErrors;
+        for (const field in errors) {
+          const messages = errors[field];
+          if (messages) {
+            toast.error(`${field}: ${messages.join(", ")}`);
+          }
+        }
+      } else {
+        toast.error(error.message || "Failed to send booking request. Please try again later.");
       }
     },
   });

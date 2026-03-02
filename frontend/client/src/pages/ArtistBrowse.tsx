@@ -6,6 +6,7 @@ import ArtistFilters, { FilterState } from "@/components/ArtistFilters";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star } from "lucide-react";
+import ArtistCardSkeleton from "@/components/ArtistCardSkeleton";
 
 export default function ArtistBrowse() {
   const [, setLocation] = useLocation();
@@ -13,12 +14,16 @@ export default function ArtistBrowse() {
     styles: [],
     minRating: 0,
     minExperience: 0,
+    city: "",
+    state: "",
   });
 
   const { data: artists, isLoading, isError, error } = trpc.artists.search.useQuery({
     styles: filters.styles.length > 0 ? filters.styles : undefined,
     minRating: filters.minRating > 0 ? filters.minRating : undefined,
     minExperience: filters.minExperience > 0 ? filters.minExperience : undefined,
+    city: filters.city || undefined,
+    state: filters.state || undefined,
   });
 
   const handleClearFilters = () => {
@@ -26,6 +31,8 @@ export default function ArtistBrowse() {
       styles: [],
       minRating: 0,
       minExperience: 0,
+      city: "",
+      state: "",
     });
   };
 
@@ -51,11 +58,17 @@ export default function ArtistBrowse() {
             />
           </aside>
 
+          import ArtistCardSkeleton from "@/components/ArtistCardSkeleton";
+
+// ... (rest of the component)
+
           {/* Artists Grid */}
           <div>
             {isLoading ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">Loading artists...</p>
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <ArtistCardSkeleton key={i} />
+                ))}
               </div>
             ) : isError ? (
               <div className="text-center py-12">

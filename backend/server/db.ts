@@ -197,6 +197,7 @@ export async function searchArtists(filters: {
   minRating?: number;
   minExperience?: number;
   city?: string;
+  state?: string;
 }) {
   const db = await getDb();
   if (!db) return [];
@@ -224,6 +225,11 @@ export async function searchArtists(filters: {
   // Filter by city
   if (filters.city) {
     conditions.push(eq(artists.city, filters.city));
+  }
+
+  // Filter by state
+  if (filters.state) {
+	conditions.push(eq(artists.state, filters.state));
   }
   
   return await db.select().from(artists).where(and(...conditions));

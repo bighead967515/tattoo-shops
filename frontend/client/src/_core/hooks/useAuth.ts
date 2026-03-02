@@ -55,24 +55,6 @@ export function useAuth(options?: UseAuthOptions) {
     logoutMutation.error,
     logoutMutation.isPending,
   ]);
-  
-  // Persist user info to localStorage when it changes
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    
-    // Don't clear storage during initial loading state
-    if (meQuery.isLoading) return;
-    
-    if (meQuery.data) {
-      localStorage.setItem(
-        "manus-runtime-user-info",
-        JSON.stringify(meQuery.data)
-      );
-    } else if (meQuery.isSuccess) {
-      // Only remove if query succeeded but returned no data (truly unauthenticated)
-      localStorage.removeItem("manus-runtime-user-info");
-    }
-  }, [meQuery.data, meQuery.isLoading, meQuery.isSuccess]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;

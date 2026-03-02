@@ -1,31 +1,30 @@
-# Gemini Agent Instructions
+Tech Stack & Architecture
+Frontend: React (Vite), TypeScript, Tailwind CSS, shadcn/ui.
 
-# Universal Inc - Gemini Agent Instructions
+Backend: Express.js with tRPC (Type-safe API).
 
-This project is a tattoo artist directory and booking platform. Use these rules when suggesting or writing code.
+Database: PostgreSQL via Drizzle ORM.
 
-## 🛠 Tech Stack & Architecture
-- **Frontend**: React + Vite, TypeScript, Tailwind CSS, shadcn/ui.
-- **Backend**: Express.js with tRPC for type-safe API calls.
-- **Database**: PostgreSQL with Drizzle ORM.
-- **Storage**: Supabase Storage for images.
-- **Payments**: Stripe integration.
+Storage: Supabase Storage (Portfolio/Profile images).
 
-## 📐 Coding Standards
-- **Strict TypeScript**: Always use explicit types; avoid `any`.
-- **Component Style**: Use functional components with hooks. Break down components if they exceed 150 lines.
-- **Iconography**: Use `lucide-react` for all icons.
-- **API Pattern**: Use tRPC routers in `backend/server`. Validate all inputs with **Zod schemas** shared between frontend and backend.
-- **Database**: Use Drizzle ORM for all queries. Manage changes via `pnpm db:generate` and `pnpm db:push`.
+Payments: Stripe SDK.
 
-## ⚡ State & UI Rules
-- **Data Fetching**: Use React Query (via tRPC) for server state. Avoid Redux/Zustand for API data.
-- **User Experience**: Implement skeleton screens from shadcn/ui for all loading states.
-- **Optimization**: Process portfolio images for performance before uploading to Supabase.
+📐 Development Standards
+Strict Typing: No any types. Use Zod schemas in shared/ for cross-stack validation.
 
-## 📋 Workflow & Quality
-- **File Structure**: Follow the existing `backend/`, `frontend/client/`, and `tests/` layout.
-- **Documentation**: Refer to `TODO.md` for priorities. Update `API_KEYS_CHECKLIST.md` for new credentials.
-- **Code Clarity**: Prioritize clear naming over comments. Explain "why," not "what."
-- **Testing**: New utility functions in `shared/` must have unit tests in the `tests/` folder.
-- **Deployment**: Always run `pnpm build` locally to verify TypeScript and linting before pushing to `main`.
+Component Logic: Functional components only. If a file exceeds 150 lines, it must be decomposed.
+
+Data Fetching: Use TanStack Query (via tRPC). Do not use external state managers (Redux/Zustand) for server-side data.
+
+UI/UX: Use lucide-react for icons and shadcn/ui Skeletons for all loading states.
+
+📋 Workflow & Quality Control
+Database Changes: All schema updates must be handled via pnpm db:generate and pnpm db:push.
+
+Image Handling: Portfolio uploads must be optimized/compressed before hitting Supabase.
+
+Testing: Any new logic in shared/ requires a corresponding unit test in tests/.
+
+Pre-Flight: Run pnpm build locally before any push to main to catch linting or TS errors.
+
+Documentation: Keep TODO.md and API_KEYS_CHECKLIST.md updated as the source of truth for project momentum.

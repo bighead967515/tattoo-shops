@@ -59,6 +59,7 @@ export const appRouter = router({
         minRating: z.number().optional(),
         minExperience: z.number().optional(),
         city: z.string().optional(),
+        state: z.string().optional(),
       }))
       .query(async ({ input }) => {
         return await db.searchArtists(input);

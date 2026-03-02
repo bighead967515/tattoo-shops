@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { X } from "lucide-react";
 
@@ -9,6 +10,8 @@ export interface FilterState {
   styles: string[];
   minRating: number;
   minExperience: number;
+  city: string;
+  state: string;
 }
 
 interface ArtistFiltersProps {
@@ -53,10 +56,16 @@ export default function ArtistFilters({
     onFiltersChange({ ...filters, minExperience: value[0] });
   };
 
+  const handleLocationChange = (field: 'city' | 'state', value: string) => {
+    onFiltersChange({ ...filters, [field]: value });
+  };
+
   const hasActiveFilters =
     filters.styles.length > 0 ||
     filters.minRating > 0 ||
-    filters.minExperience > 0;
+    filters.minExperience > 0 ||
+    filters.city ||
+    filters.state;
 
   return (
     <Card className="p-6 sticky top-20">
@@ -76,10 +85,27 @@ export default function ArtistFilters({
       </div>
 
       <div className="space-y-6">
+        {/* Location */}
+        <div>
+          <h4 className="font-medium mb-3">Location</h4>
+          <div className="space-y-2">
+            <Input 
+              placeholder="City"
+              value={filters.city}
+              onChange={(e) => handleLocationChange('city', e.target.value)}
+            />
+            <Input 
+              placeholder="State"
+              value={filters.state}
+              onChange={(e) => handleLocationChange('state', e.target.value)}
+            />
+          </div>
+        </div>
+
         {/* Tattoo Styles */}
         <div>
           <h4 className="font-medium mb-3">Tattoo Styles</h4>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {TATTOO_STYLES.map((style) => (
               <div key={style} className="flex items-center space-x-2">
                 <Checkbox
@@ -150,6 +176,16 @@ export default function ArtistFilters({
         <div className="mt-6 pt-6 border-t">
           <h4 className="text-sm font-medium mb-2">Active Filters:</h4>
           <div className="flex flex-wrap gap-2">
+            {filters.city && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                {filters.city}
+              </span>
+            )}
+            {filters.state && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                {filters.state}
+              </span>
+            )}
             {filters.styles.map((style) => (
               <span
                 key={style}
