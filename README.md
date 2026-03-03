@@ -1,111 +1,227 @@
-# Universal Inc - Tattoo Artist Directory Platform
+# Universal Inc. — Tattoo Artist Directory & Booking Platform
 
-TypeScript/Node.js-based tattoo artist directory and booking platform.
-
-## Overview
-
-Universal Inc is a comprehensive platform for tattoo artists and clients, featuring artist profiles, portfolio management, booking capabilities, and payment processing.
+A full-stack web application for finding, connecting with, and booking tattoo artists. Clients can browse artist portfolios, post tattoo requests for artists to bid on, and book appointments — all with integrated payments and real-time communication.
 
 ## Tech Stack
 
-- **Frontend**: React + Vite, TypeScript
-- **Backend**: Express.js, tRPC
-- **Database**: PostgreSQL with Drizzle ORM
-- **Payments**: Stripe
-- **Storage**: Supabase Storage (S3-compatible)
-- **Styling**: Tailwind CSS + shadcn/ui components
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 19, Vite, TypeScript, Wouter (routing), TanStack React Query |
+| **UI** | Tailwind CSS 4, shadcn/ui, Framer Motion, dark/light theme |
+| **Backend** | Node.js, Express, tRPC (type-safe API) |
+| **Database** | PostgreSQL (Supabase), Drizzle ORM |
+| **Auth** | Supabase Auth — Google, GitHub, and email/password |
+| **Storage** | Supabase Storage (portfolio images, ID documents) |
+| **Payments** | Stripe (checkout sessions, webhooks, subscription tiers) |
+| **Email** | Resend (booking confirmations, artist invitations) |
+| **Monitoring** | Sentry, Winston logging, health check endpoint |
+| **Deployment** | Vercel (static frontend + serverless API) |
+| **Testing** | Vitest (unit), Playwright (e2e), Artillery (load) |
 
 ## Project Structure
 
 ```
-tattoo-shops/ (root)
-├── backend/             # Backend Application Code
-│   ├── drizzle/         # Database schema and migrations
-│   ├── server/          # Express backend with tRPC
-│   └── shared/          # Shared types and constants
-├── frontend/            # Frontend Application Code
-│   └── client/          # React frontend
-└── tests/               # Test files
+├── backend/
+│   ├── drizzle/          # Database schema, migrations, relations
+│   ├── server/           # Express + tRPC server
+│   │   ├── routers.ts          # Artist, portfolio, review, booking, favorite routes
+│   │   ├── clientRouters.ts    # Client profile, tattoo request, bid routes
+│   │   ├── verificationRouter.ts # License upload + admin review with AI OCR
+│   │   ├── geminiVision.ts     # Smart Portfolio Tagging (Gemini Vision)
+│   │   ├── geminiDiscovery.ts  # Tattoo Discovery query parser (Gemini)
+│   │   ├── geminiBidOptimizer.ts # Prompt Refiner + Bid Assistant (Gemini)
+│   │   ├── geminiSafety.ts     # License OCR + Review Sentiment Analysis (Gemini)
+│   │   ├── stripe.ts           # Stripe checkout with circuit breaker
+│   │   ├── email.ts            # Resend email with retry logic
+│   │   ├── webhookHandler.ts   # Stripe webhook processing + retry queue
+│   │   └── _core/              # Context, auth, env, logging, Supabase clients
+│   └── shared/           # Shared types, constants, tier limits
+├── frontend/
+│   └── client/
+│       └── src/
+│           ├── pages/          # 20 route-based pages (incl. admin moderation)
+│           ├── components/     # Reusable UI components
+│           ├── hooks/          # Custom React hooks
+│           ├── contexts/       # Theme context
+│           └── lib/            # Utilities, tRPC client
+├── tests/
+│   ├── backend/          # API unit tests
+│   ├── frontend/         # Accessibility, error handling tests
+│   ├── e2e/              # Playwright performance tests
+│   ├── integration/      # User flow tests
+│   └── load/             # Artillery load test configs
+└── vercel.json           # Deployment configuration
 ```
+
+## Features
+
+### For Artists
+- **Profile management** — shop name, bio, specialties, styles, location, social links
+- **Portfolio uploads** — image gallery with captions and style tags (via Supabase Storage)
+- **Smart Portfolio Tagging (AI)** — Gemini Vision automatically detects tattoo styles, tags content subjects, generates SEO descriptions, and scores image quality on every upload
+- **Booking management** — accept, confirm, or cancel appointments
+- **Request board** — browse client tattoo requests and submit bids
+- **AI Bid Assistant** — Professional/Icon tier artists get AI-drafted bid responses with suggested pricing, estimated hours, and personalized pitch messages based on their profile and the request details
+- **License verification** — upload documents for verified artist status with AI-powered OCR that extracts names, license numbers, and expiration dates and cross-references against the artist's profile
+- **Subscription tiers** — Free, Amateur ($9/mo), Professional ($19/mo), Front Page ($39/mo)
+- **Analytics & reviews** — ratings, review responses, helpful votes
+
+### For Clients
+- **Tattoo Discovery (AI)** — describe your dream tattoo in natural language and AI matches you to artists whose portfolios fit the vibe, style, and subject
+- **Artist discovery** — search and filter by style, rating, experience, and location
+- **Tattoo requests** — post requests with description, style, placement, size, budget, and reference images
+- **AI Prompt Refiner** — when writing a request, AI analyzes the description and suggests follow-up questions if it's too vague, with completeness scoring and improved description suggestions
+- **Bid system** — receive and compare bids from multiple artists
+- **Booking & payments** — book appointments with Stripe-powered deposits
+- **Favorites** — save and track preferred artists
+- **Dashboard** — manage requests, track bids, view booking history
+
+### Platform
+- **Type-safe API** — end-to-end TypeScript with tRPC
+- **OAuth authentication** — Google, GitHub, and email via Supabase Auth
+- **Stripe payments** — checkout sessions, webhook processing with retry queue and exponential backoff
+- **Email notifications** — booking confirmations and artist invitations via Resend
+- **Circuit breaker pattern** — resilient external service calls (Stripe, email)
+- **Smart Portfolio Tagging** — computer vision via Gemini 2.0 Flash for auto style detection, content tagging, SEO descriptions, and image quality scoring
+- **Tattoo Discovery** — Gemini-powered natural language search parses user intent (style, subject, placement, size) and matches against AI-tagged portfolios with relevance scoring
+- **Request-to-Bid Optimization** — AI Prompt Refiner helps clients write detailed requests; AI Bid Assistant drafts personalized proposals for Professional/Icon artists
+- **Administrative Safety (AI)** — License Verification OCR extracts and verifies document data via Gemini Vision; Review Sentiment Analysis flags fraudulent, abusive, or spam reviews for human moderation
+- **Admin Moderation Dashboard** — unified admin panel at `/admin/moderation` with pending license verifications (OCR results, name matching, confidence scores) and flagged reviews (toxicity/spam/fraud scores, one-click approve/hide)
+- **SEO** — meta tags, structured data, automatic sitemap generation
+- **Dark/light mode** — theme toggle with system preference detection
+
+## Database Schema
+
+13 tables managed by Drizzle ORM:
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Supabase Auth users — role, verification status, Stripe customer ID |
+| `artists` | Artist profiles — specialties, location, ratings, subscription tier |
+| `portfolioImages` | Portfolio gallery — image URL, caption, style tag, AI-detected styles/tags/quality |
+| `verificationDocuments` | Uploaded licenses/permits — document metadata, OCR extracted data, AI verification verdict |
+| `reviews` | 1–5 star ratings, comments, helpful votes, artist responses, AI moderation scores |
+| `bookings` | Appointments — date, description, placement, budget, payment status |
+| `favorites` | User → artist favorites |
+| `clients` | Client profiles — preferred styles, location |
+| `tattooRequests` | Posted requests — style, placement, size, budget range, expiration |
+| `requestImages` | Reference images attached to requests |
+| `bids` | Artist bids on requests — price, hours, message, available date |
+| `requestMessages` | Client ↔ artist messaging on requests |
+| `verificationDocuments` | Uploaded license/permit documents for review |
+| `webhookQueue` | Stripe webhook retry queue with exponential backoff |
+
+## Subscription Tiers
+
+| Tier | Price | Portfolio Photos | Bookings | Direct Contact | Reviews | Analytics | Featured |
+|------|-------|-----------------|----------|---------------|---------|-----------|----------|
+| **Apprentice** (Free) | $0/mo | 3 | — | — | — | — | — |
+| **Artist** (Amateur) | $9/mo | 15 | ✓ | ✓ | — | — | — |
+| **Professional** | $19/mo | Unlimited | ✓ | ✓ | ✓ | ✓ | — |
+| **Icon** (Front Page) | $39/mo | Unlimited | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- pnpm (recommended) or npm
-- PostgreSQL database
+- Node.js 18+
+- pnpm 10+
+- PostgreSQL database (or [Supabase](https://supabase.com) project)
+- Stripe account
+- Resend account
 
 ### Installation
 
-1. Install dependencies:
 ```bash
+# Clone and install
 pnpm install
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your credentials
 ```
 
-2. Set up environment variables:
-Create a `.env` file with:
-```
-DATABASE_URL=postgresql://...
-SUPABASE_URL=https://...
-SUPABASE_SERVICE_KEY=...
-SUPABASE_ANON_KEY=...
-STRIPE_SECRET_KEY=...
-STRIPE_WEBHOOK_SECRET=...
-RESEND_API_KEY=...
-JWT_SECRET=...
-OWNER_OPEN_ID=...
+### Environment Variables
+
+```env
+DATABASE_URL=postgresql://...          # Supabase PostgreSQL connection string
+JWT_SECRET=...                         # Min 32 characters
+SUPABASE_URL=https://...               # Supabase project URL
+SUPABASE_SERVICE_KEY=...               # Supabase service role key
+SUPABASE_ANON_KEY=...                  # Supabase anonymous key
+STRIPE_SECRET_KEY=sk_...               # Stripe secret key
+STRIPE_WEBHOOK_SECRET=whsec_...        # Stripe webhook signing secret
+RESEND_API_KEY=re_...                  # Resend API key
+GOOGLE_AI_API_KEY=AIza...               # Google AI (Gemini) API key for Smart Portfolio Tagging, Tattoo Discovery, Bid Optimization, License OCR & Review Moderation
+OWNER_OPEN_ID=...                      # Admin user identifier
 ```
 
-3. Run database migrations:
+### Database Setup
+
 ```bash
-pnpm db:push
+pnpm db:push    # Generate and run migrations
 ```
 
 ### Development
 
-Start the development server:
 ```bash
-pnpm dev
+pnpm dev        # Start dev server (backend + Vite frontend)
 ```
 
-This will start the backend server, which also serves the frontend in development mode.
+The server starts on `http://localhost:3000` by default.
 
-### Building for Production
-
-```bash
-pnpm build
-```
-
-### Testing
+### Production Build
 
 ```bash
-pnpm test
+pnpm build      # Vite frontend build + esbuild server bundle
+pnpm start      # Run production server
 ```
-
-## Key Features
-
-- Artist profile management
-- Portfolio image uploads with progress indicators
-- Client search and discovery
-- Booking system with enhanced error handling
-- Payment processing via Stripe
-- Client tattoo request board where clients can post requests and artists can bid on them
-- AI-powered features (Gemini integration)
-- Health check endpoint for monitoring
-- Global network connectivity error handling
-- SEO-friendly artist profiles with meta tags and structured data
-- Automatic sitemap generation script
 
 ## Scripts
 
-- `pnpm dev` - Start development server
-- `pnpm build` - Build for production
-- `pnpm test` - Run tests
-- `pnpm db:push` - Generate and run database migrations
+| Command | Description |
+|---------|------------|
+| `pnpm dev` | Start development server with hot reload |
+| `pnpm build` | Build frontend (Vite) and backend (esbuild) |
+| `pnpm start` | Run production server |
+| `pnpm check` | TypeScript type checking |
+| `pnpm test` | Run unit tests (Vitest) |
+| `pnpm format` | Format code with Prettier |
+| `pnpm db:push` | Generate and run database migrations |
+| `pnpm load:browse` | Run browsing load test |
+| `pnpm load:booking` | Run booking flow load test |
+| `pnpm load:spike` | Run spike load test |
 
+## API Overview
+
+The API uses [tRPC](https://trpc.io) for type-safe client-server communication.
+
+**Core routes** (`/api/trpc/*`):
+- `auth.me`, `auth.logout` — session management
+- `artists.*` — CRUD, search with filters
+- `portfolio.*` — image upload URLs, add/delete
+- `reviews.*` — create, list by artist
+- `bookings.*` — create, list, update status
+- `favorites.*` — add, remove, check
+
+**Client marketplace routes**:
+- `clients.*` — profile management
+- `requests.*` — create, list, filter, manage tattoo requests
+- `bids.*` — create, accept, withdraw bids
+
+**Other endpoints**:
+- `GET /api/health` — health check
+- `POST /api/webhooks/stripe` — Stripe webhook handler
+- `POST /api/verification/*` — license document upload
+
+## Deployment
+
+Configured for **Vercel** via `vercel.json`:
+- Frontend served as static files from Vite build
+- Backend runs as a serverless function
+- API routes proxied to `/api/*`
 
 ## Additional Documentation
 
-- See `GEMINI.md` for AI integration details
-- See `todo.md` for development roadmap
+- See `GEMINI.md` for AI integration details  
+- See `TODO.md` for development roadmap

@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Upload, X } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, X, Sparkles, MessageCircleQuestion, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const TATTOO_STYLES = [
@@ -283,6 +284,21 @@ export default function NewRequest() {
               <p className="text-sm text-muted-foreground mt-1">
                 {formData.description.length}/5000 characters (minimum 20)
               </p>
+
+              {/* AI Prompt Refiner */}
+              <PromptRefinerSection
+                description={formData.description}
+                context={{
+                  title: formData.title,
+                  style: formData.style,
+                  placement: formData.placement,
+                  size: formData.size,
+                  colorPreference: formData.colorPreference,
+                }}
+                onUseImproved={(improved) =>
+                  setFormData({ ...formData, description: improved })
+                }
+              />
             </div>
 
             {/* Reference Images */}
@@ -503,5 +519,171 @@ export default function NewRequest() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ============================================
+// AI Prompt Refiner Component
+// ============================================
+function PromptRefinerSection({
+  description,
+  context,
+  onUseImproved,
+}: {
+  description: string;
+  context: {
+    title?: string;
+    style?: string;
+    placement?: string;
+    size?: string;
+    colorPreference?: string;
+  };
+  onUseImproved: (improved: string) => void;
+}) {
+  const refine = trpc.requests.refineDescription.useMutation();
+
+  const handleRefine = () => {
+    if (description.length < 10) {
+      toast.error("Write at least a short description before getting AI feedback.");
+      return;
+    }
+    refine.mutate({
+      description,
+      title: context.title || undefined,
+      style: context.style || undefined,
+      placement: context.placement || undefined,
+      size: context.size || undefined,
+      colorPreference: context.colorPreference || undefined,
+    });
+  };
+
+  if (!refine.data && !refine.isPending) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        onClick={handleRefine}
+        disabled={description.length < 10}
+      >
+        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-primary" />
+        Get AI Feedback
+      </Button>
+    );
+  }
+
+  if (refine.isPending) {
+    return (
+      <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        AI is analyzing your description...
+      </div>
+    );
+  }
+
+  if (refine.isError) {
+    return (
+      <div className="mt-3 text-sm text-destructive">
+        AI analysis failed. You can still submit your request.
+        <Button type="button" variant="ghost" size="sm" onClick={handleRefine} className="ml-2">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const data = refine.data;
+  if (!data) return null;
+
+  const scoreColor =
+    data.completenessScore >= 7
+      ? "text-green-600 dark:text-green-400"
+      : data.completenessScore >= 4
+      ? "text-yellow-600 dark:text-yellow-400"
+      : "text-red-500";
+
+  const ScoreIcon =
+    data.completenessScore >= 7 ? CheckCircle2 : data.completenessScore >= 4 ? MessageCircleQuestion : AlertTriangle;
+
+  return (
+    <Card className="mt-3 bg-primary/5 border-primary/20">
+      <CardContent className="pt-4 pb-3 space-y-3">
+        {/* Score header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ScoreIcon className={`w-4 h-4 ${scoreColor}`} />
+            <span className={`text-sm font-medium ${scoreColor}`}>
+              Completeness: {data.completenessScore}/10
+            </span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-xs h-7"
+            onClick={handleRefine}
+          >
+            <Sparkles className="w-3 h-3 mr-1" />
+            Re-analyze
+          </Button>
+        </div>
+
+        {/* Suggested questions */}
+        {data.suggestedQuestions.length > 0 && (
+          <div>
+            <p className="text-sm font-medium mb-1.5">
+              To help artists give you the best bid, consider answering:
+            </p>
+            <ul className="space-y-1">
+              {data.suggestedQuestions.map((q, i) => (
+                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                  <MessageCircleQuestion className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Missing aspects badges */}
+        {data.missingAspects.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {data.missingAspects.map((aspect) => (
+              <Badge key={aspect} variant="outline" className="text-xs">
+                {aspect.replace(/_/g, " ")}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Improved description suggestion */}
+        {data.improvedDescription && (
+          <div className="bg-background/60 rounded-md p-3 border">
+            <p className="text-xs font-medium mb-1">Suggested improved description:</p>
+            <p className="text-sm text-muted-foreground italic mb-2">
+              "{data.improvedDescription}"
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => onUseImproved(data.improvedDescription!)}
+            >
+              Use this description
+            </Button>
+          </div>
+        )}
+
+        {/* Tip */}
+        {data.tip && (
+          <p className="text-xs text-muted-foreground">
+            <Sparkles className="w-3 h-3 inline mr-1 text-primary" />
+            {data.tip}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

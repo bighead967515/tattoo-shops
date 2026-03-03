@@ -1,6 +1,23 @@
 /**
  * Artist subscription tier limits and features
+ *
+ * NOTE: The canonical SubscriptionTier Zod enum lives in @shared/const.ts
+ * (artist_free | artist_amateur | artist_pro | artist_icon |
+ *  client_free | client_plus | client_elite).
+ * The legacy keys below (free, amateur, professional, frontPage) are kept
+ * for backward-compatibility with existing feature-flag look-ups.
  */
+
+import {
+  SubscriptionTiers,
+  type SubscriptionTier,
+  TIER_LIMITS as UNIFIED_TIER_LIMITS,
+} from "./const";
+
+// Re-export for consumers that import from this file
+export { SubscriptionTiers, UNIFIED_TIER_LIMITS };
+export type { SubscriptionTier };
+
 
 export const TIER_LIMITS = {
   free: {
@@ -77,19 +94,75 @@ export const TIER_PRICING = {
   },
 } as const;
 
-export type SubscriptionTier = keyof typeof TIER_LIMITS;
+/** @deprecated Use SubscriptionTier from @shared/const instead */
+export type ArtistTierKey = keyof typeof TIER_LIMITS;
 
-export function getTierLimits(tier: SubscriptionTier) {
+export function getTierLimits(tier: ArtistTierKey) {
   // Fallback to free if the tier string is invalid
   return TIER_LIMITS[tier] || TIER_LIMITS.free;
 }
 
-export function getTierPricing(tier: SubscriptionTier) {
+export function getTierPricing(tier: ArtistTierKey) {
   return TIER_PRICING[tier] || TIER_PRICING.free;
 }
 
-export function canUploadMorePhotos(tier: SubscriptionTier, currentCount: number): boolean {
+export function canUploadMorePhotos(tier: ArtistTierKey, currentCount: number): boolean {
   const limits = getTierLimits(tier);
   return currentCount < limits.portfolioPhotos;
 }
 
+// ============================================
+// CLIENT SUBSCRIPTION TIERS
+// ============================================
+
+export const CLIENT_TIER_LIMITS = {
+  free: {
+    name: 'Collector',
+    requestsPerMonth: 1,
+    aiGenerationsPerMonth: 0,
+    directChatWithArtists: false,
+    priorityRequestBoard: false,
+    depositFeeWaived: false,
+  },
+  enthusiast: {
+    name: 'Enthusiast',
+    requestsPerMonth: 10,
+    aiGenerationsPerMonth: 10,
+    directChatWithArtists: false,
+    priorityRequestBoard: true,
+    depositFeeWaived: false,
+  },
+  elite: {
+    name: 'Elite Ink',
+    requestsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
+    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
+    directChatWithArtists: true,
+    priorityRequestBoard: true,
+    depositFeeWaived: true,
+  },
+} as const;
+
+export const CLIENT_TIER_PRICING = {
+  free: {
+    monthly: 0,
+    stripePriceIdMonth: null,
+  },
+  enthusiast: {
+    monthly: 900, // $9.00
+    stripePriceIdMonth: 'price_client_enthusiast_mo', // Placeholder — set in Stripe Dashboard
+  },
+  elite: {
+    monthly: 1900, // $19.00
+    stripePriceIdMonth: 'price_client_elite_mo', // Placeholder — set in Stripe Dashboard
+  },
+} as const;
+
+export type ClientSubscriptionTier = keyof typeof CLIENT_TIER_LIMITS;
+
+export function getClientTierLimits(tier: ClientSubscriptionTier) {
+  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.free;
+}
+
+export function getClientTierPricing(tier: ClientSubscriptionTier) {
+  return CLIENT_TIER_PRICING[tier] || CLIENT_TIER_PRICING.free;
+}

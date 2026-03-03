@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Image as ImageIcon, Settings, Plus, Trash2, Loader2, ExternalLink, Briefcase } from "lucide-react";
+import { Calendar, User, Image as ImageIcon, Settings, Plus, Trash2, Loader2, ExternalLink, Briefcase, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
@@ -224,24 +224,75 @@ export default function ArtistDashboard() {
                   <p className="text-muted-foreground">Your portfolio is empty. Add your best work!</p>
                 </div>
               ) : (
-                portfolio?.map((image) => (
-                  <Card key={image.id} className="overflow-hidden group relative">
-                    <img 
-                      src={image.imageUrl} 
-                      alt={image.caption || ""} 
-                      className="w-full aspect-square object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button 
-                        variant="destructive" 
-                        size="icon"
-                        onClick={() => deletePortfolioImageMutation.mutate({ id: image.id })}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                ))
+                portfolio?.map((image) => {
+                  const aiStyles: string[] = image.aiStyles ? JSON.parse(image.aiStyles) : [];
+                  const aiTags: string[] = image.aiTags ? JSON.parse(image.aiTags) : [];
+                  const qualityIssues: string[] = image.qualityIssues ? JSON.parse(image.qualityIssues) : [];
+                  const hasQualityWarning = image.qualityScore !== null && image.qualityScore < 50;
+                  const isProcessing = image.aiProcessedAt === null && image.qualityScore === null;
+
+                  return (
+                    <Card key={image.id} className="overflow-hidden group relative">
+                      <img 
+                        src={image.imageUrl} 
+                        alt={image.aiDescription || image.caption || ""} 
+                        className="w-full aspect-square object-cover"
+                      />
+                      {/* Quality warning overlay */}
+                      {hasQualityWarning && (
+                        <div className="absolute top-2 left-2 flex items-center gap-1 bg-destructive/90 text-destructive-foreground text-xs px-2 py-1 rounded">
+                          <AlertTriangle className="h-3 w-3" />
+                          Quality: {image.qualityScore}/100
+                        </div>
+                      )}
+                      {/* AI processing indicator */}
+                      {isProcessing && (
+                        <div className="absolute top-2 right-2 flex items-center gap-1 bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded">
+                          <Sparkles className="h-3 w-3 animate-pulse" />
+                          Analyzing...
+                        </div>
+                      )}
+                      {/* AI tags display */}
+                      {(aiStyles.length > 0 || aiTags.length > 0) && (
+                        <div className="p-2 space-y-1 border-t">
+                          {aiStyles.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {aiStyles.map((style) => (
+                                <Badge key={style} variant="secondary" className="text-xs">
+                                  {style}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          {aiTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {aiTags.slice(0, 3).map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          {qualityIssues.length > 0 && !qualityIssues.includes("analysis-failed") && (
+                            <p className="text-xs text-muted-foreground">
+                              Issues: {qualityIssues.join(", ")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {/* Hover overlay with delete + re-analyze buttons */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <Button 
+                          variant="destructive" 
+                          size="icon"
+                          onClick={() => deletePortfolioImageMutation.mutate({ id: image.id })}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })
               )}
             </div>
           </TabsContent>

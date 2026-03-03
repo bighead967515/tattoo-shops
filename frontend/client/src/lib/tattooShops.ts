@@ -73,29 +73,7 @@ export async function loadTattooShops(): Promise<TattooShop[]> {
   }
 }
 
-export async function geocodeAddress(
-  address: string,
-  geocoder: google.maps.Geocoder
-): Promise<{ lat: number; lng: number } | null> {
-  return new Promise((resolve) => {
-    if (!address) {
-      resolve(null);
-      return;
-    }
-    
-    geocoder.geocode({ address }, (results, status) => {
-      if (status === 'OK' && results && results[0]) {
-        const location = results[0].geometry.location;
-        resolve({
-          lat: location.lat(),
-          lng: location.lng(),
-        });
-      } else {
-        resolve(null);
-      }
-    });
-  });
-}
+
 
 export function parseRating(ratingString: string): { rating: number; count: number } {
   const match = ratingString.match(/([\d.]+)\/5\s*\((\d+)\s*ratings?\)/);

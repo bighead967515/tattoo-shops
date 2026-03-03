@@ -1,0 +1,89 @@
+1. Feature: AI Tattoo Generation (Paid Clients)Since you are using React 19 and tRPC, we will implement this by connecting to a GenAI API (like Gemini 1.5 Flash or Stable Diffusion via Replicate/OpenAI).A. Backend: tRPC AI Router (backend/server/routers/ai.ts)We use a Zod schema to validate the prompt and ensure only paid clients can hit this endpoint.TypeScriptimport { z } from "zod";
+import { router, protectedProcedure } from "../_core/trpc";
+import { TRPCError } from "@trpc/server";
+
+export const aiRouter = router({
+  generateDesign: protectedProcedure
+    .input(z.object({
+      prompt: z.string().min(10),
+      style: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 1. Check Subscription Status (Integration with Stripe)
+      const user = await ctx.db.query.users.findFirst({
+        where: (u, { eq }) => eq(u.id, ctx.user.id),
+      });
+
+      if (user?.role !== 'client' || user?.subscriptionTier === 'free') {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "AI Generation is a premium feature. Please upgrade your plan.",
+        });
+      }
+
+      // 2. Call AI Service (Example: Gemini or Replicate)
+      // Logic to call external API and get Image URL...
+      const imageUrl = "https://supabase-storage-url.com/generated-ink.png"; 
+
+      return { imageUrl };
+    }),
+});
+B. Frontend: Generation UI (frontend/client/src/components/AIGenerator.tsx)Following the 150-line rule and using shadcn/ui Skeletons.TypeScriptimport { useState } from "react";
+import { trpc } from "../lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Sparkles } from "lucide-react"; // Use lucide-react as per rules
+
+export function AIGenerator() {
+  const [prompt, setPrompt] = useState("");
+  const generate = trpc.ai.generateDesign.useMutation();
+
+  return (
+    <div className="space-y-4 p-6 border rounded-xl bg-card">
+      <h3 className="text-lg font-bold flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-primary" />
+        AI Design Lab
+      </h3>
+      
+      <textarea 
+        className="w-full p-3 rounded-md bg-background border"
+        placeholder="Describe your tattoo (e.g., 'A geometric wolf with watercolor splashes on the shoulder')..."
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+      />
+
+      {generate.isLoading ? (
+        <Skeleton className="w-full h-[300px] rounded-lg" />
+      ) : generate.data?.imageUrl ? (
+        <img src={generate.data.imageUrl} className="w-full rounded-lg" alt="Generated" />
+      ) : null}
+
+      <Button 
+        onClick={() => generate.mutate({ prompt })}
+        disabled={generate.isLoading || prompt.length < 10}
+      >
+        {generate.isLoading ? "Inking..." : "Generate Concept"}
+      </Button>
+    </div>
+  );
+}
+2. Feature: Client Subscription TiersYou already have artist tiers; adding client tiers creates a "B2C" revenue stream.A. Updated Database Schema (backend/drizzle/schema.ts)Add a subscriptionTier and aiCredits to the clients table.TierPriceFeaturesCollector (Free)$0Browse artists, post 1 request/mo.Enthusiast$9/mo10 AI Generations, priority request board.Elite Ink$19/moUnlimited AI, direct chat with Pro artists, 0% deposit fees.TypeScriptexport const clients = pgTable("clients", {
+  id: uuid("id").primaryKey().references(() => users.id),
+  subscriptionTier: text("subscription_tier").default("free"), // 'free', 'enthusiast', 'elite'
+  aiCredits: integer("ai_credits").default(0),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+});
+B. Stripe Integration Logic (backend/server/stripe.ts)When a client upgrades, the Stripe Webhook must update the subscriptionTier in your PostgreSQL database.TypeScript// Inside your webhook handler
+if (event.type === 'customer.subscription.created') {
+  const session = event.data.object as Stripe.Subscription;
+  const planId = session.items.data[0].plan.id;
+
+  let tier = 'free';
+  if (planId === process.env.STRIPE_ENTHUSIAST_PLAN) tier = 'enthusiast';
+  if (planId === process.env.STRIPE_ELITE_PLAN) tier = 'elite';
+
+  await db.update(clients)
+    .set({ subscriptionTier: tier, aiCredits: tier === 'enthusiast' ? 10 : 999 })
+    .where(eq(clients.stripeSubscriptionId, session.id));
+}
+Implementation Steps for You:Stripe Setup: Create two new "Products" in your Stripe Dashboard for "Enthusiast" and "Elite" tiers.API Key: Add GEMINI_API_KEY or OPENAI_API_KEY to your .env and update API_KEYS_CHECKLIST.md.Drizzle Update: Run pnpm db:generate and pnpm db:push to update the client table.Frontend: Drop the AIGenerator component into the Client Dashboard.Would you like me to help you write the specific AI prompt engineering logic to ensure the generated images look like actual tattoo stencils (clean lines, white backgrounds)?

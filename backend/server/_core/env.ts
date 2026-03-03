@@ -11,6 +11,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
   SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
+  GOOGLE_AI_API_KEY: z.string().min(1, "GOOGLE_AI_API_KEY is required for Smart Portfolio Tagging"),
   PORT: z.string().default("3000"),
 });
 
@@ -35,6 +36,7 @@ export const ENV = {
   supabaseUrl: parsed.data.SUPABASE_URL,
   supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,
   supabaseAnonKey: parsed.data.SUPABASE_ANON_KEY,
+  googleAiApiKey: parsed.data.GOOGLE_AI_API_KEY,
   nodeEnv: parsed.data.NODE_ENV,
   port: parseInt(parsed.data.PORT, 10),
 };

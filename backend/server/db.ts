@@ -1,7 +1,7 @@
 import { eq, desc, and, sql, or, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, artists, portfolioImages, reviews, bookings, favorites, InsertArtist, InsertPortfolioImage, InsertReview, InsertBooking, InsertFavorite } from "../drizzle/schema";
+import { InsertUser, users, artists, portfolioImages, reviews, bookings, favorites, verificationDocuments, clients, InsertArtist, InsertPortfolioImage, InsertReview, InsertBooking, InsertFavorite } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { logger } from './_core/logger';
 
@@ -257,6 +257,17 @@ export async function getPortfolioByArtistId(artistId: number) {
   return await db.select().from(portfolioImages).where(eq(portfolioImages.artistId, artistId)).orderBy(desc(portfolioImages.createdAt));
 }
 
+export async function getPortfolioCountByArtistId(artistId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(portfolioImages)
+    .where(eq(portfolioImages.artistId, artistId));
+  return result[0]?.count ?? 0;
+}
+
 export async function getPortfolioImageById(id: number) {
   const db = await getDb();
   if (!db) return null;
@@ -270,6 +281,30 @@ export async function deletePortfolioImage(id: number) {
   if (!db) throw new Error("Database not available");
   
   return await db.delete(portfolioImages).where(eq(portfolioImages.id, id));
+}
+
+/**
+ * Update AI-generated fields on a portfolio image (Smart Portfolio Tagging)
+ */
+export async function updatePortfolioImageAI(
+  id: number,
+  data: {
+    aiStyles?: string | null;
+    aiTags?: string | null;
+    aiDescription?: string | null;
+    qualityScore?: number | null;
+    qualityIssues?: string | null;
+    aiProcessedAt?: Date | null;
+    style?: string | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .update(portfolioImages)
+    .set(data)
+    .where(eq(portfolioImages.id, id));
 }
 
 // Review functions
@@ -409,4 +444,337 @@ export async function isFavorite(userId: number, artistId: number) {
   
   const result = await db.select().from(favorites).where(and(eq(favorites.userId, userId), eq(favorites.artistId, artistId))).limit(1);
   return result.length > 0;
+}
+
+/**
+ * Semantic search: find artists whose portfolio images match parsed AI intent.
+ * Joins artists with portfolioImages and searches across aiStyles, aiTags,
+ * aiDescription, plus artist-level styles, specialties, and bio.
+ *
+ * Returns artists ranked by relevance (number of matching signals) with their
+ * top matching portfolio images attached.
+ */
+export async function discoverArtists(intent: {
+  styles: string[];
+  tags: string[];
+  keywords: string[];
+  vibeDescription: string;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Build ILIKE conditions for portfolio image AI fields
+  const allTerms = [
+    ...intent.styles,
+    ...intent.tags,
+    ...intent.keywords,
+  ].filter(Boolean);
+
+  if (allTerms.length === 0 && !intent.vibeDescription) {
+    // No useful search terms — fall back to all approved artists
+    return (await db.select().from(artists).where(eq(artists.isApproved, true))).map(a => ({
+      ...a,
+      matchedImages: [] as Array<typeof portfolioImages.$inferSelect>,
+      relevanceScore: 0,
+    }));
+  }
+
+  // Step 1: Find portfolio images that match any of the search terms
+  const imageConditions: ReturnType<typeof sql>[] = [];
+
+  for (const term of allTerms) {
+    const likeTerm = `%${term}%`;
+    imageConditions.push(sql`${portfolioImages.aiStyles} ILIKE ${likeTerm}`);
+    imageConditions.push(sql`${portfolioImages.aiTags} ILIKE ${likeTerm}`);
+    imageConditions.push(sql`${portfolioImages.aiDescription} ILIKE ${likeTerm}`);
+    imageConditions.push(sql`${portfolioImages.caption} ILIKE ${likeTerm}`);
+    imageConditions.push(sql`${portfolioImages.style} ILIKE ${likeTerm}`);
+  }
+
+  // Also search by vibe description keywords (split into individual words > 3 chars)
+  if (intent.vibeDescription) {
+    const vibeWords = intent.vibeDescription
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .slice(0, 8);
+    for (const word of vibeWords) {
+      const likeTerm = `%${word}%`;
+      imageConditions.push(sql`${portfolioImages.aiDescription} ILIKE ${likeTerm}`);
+    }
+  }
+
+  // Get matching images with artist info
+  const matchingImages = await db
+    .select({
+      image: portfolioImages,
+      artist: artists,
+    })
+    .from(portfolioImages)
+    .innerJoin(artists, eq(portfolioImages.artistId, artists.id))
+    .where(
+      and(
+        eq(artists.isApproved, true),
+        or(...imageConditions)
+      )
+    )
+    .orderBy(desc(portfolioImages.qualityScore));
+
+  // Step 2: Also find artists matching at artist-level (styles, specialties, bio)
+  const artistConditions: ReturnType<typeof sql>[] = [];
+  for (const term of allTerms) {
+    const likeTerm = `%${term}%`;
+    artistConditions.push(sql`${artists.styles} ILIKE ${likeTerm}`);
+    artistConditions.push(sql`${artists.specialties} ILIKE ${likeTerm}`);
+    artistConditions.push(sql`${artists.bio} ILIKE ${likeTerm}`);
+  }
+
+  const matchingArtistsDirect = await db
+    .select()
+    .from(artists)
+    .where(
+      and(
+        eq(artists.isApproved, true),
+        or(...artistConditions)
+      )
+    );
+
+  // Step 3: Merge results — group by artist, calculate relevance score
+  const artistMap = new Map<
+    number,
+    {
+      artist: typeof artists.$inferSelect;
+      matchedImages: Array<typeof portfolioImages.$inferSelect>;
+      relevanceScore: number;
+    }
+  >();
+
+  // Score from matched portfolio images (strongest signal)
+  for (const row of matchingImages) {
+    const existing = artistMap.get(row.artist.id);
+    if (existing) {
+      existing.matchedImages.push(row.image);
+      existing.relevanceScore += 3; // Each matching image = +3
+    } else {
+      artistMap.set(row.artist.id, {
+        artist: row.artist,
+        matchedImages: [row.image],
+        relevanceScore: 3,
+      });
+    }
+  }
+
+  // Score from artist-level matches (secondary signal)
+  for (const artist of matchingArtistsDirect) {
+    const existing = artistMap.get(artist.id);
+    if (existing) {
+      existing.relevanceScore += 2; // Artist-level match = +2 bonus
+    } else {
+      artistMap.set(artist.id, {
+        artist,
+        matchedImages: [],
+        relevanceScore: 2,
+      });
+    }
+  }
+
+  // Sort by relevance score descending, then limit matched images per artist
+  const results = Array.from(artistMap.values())
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .map((entry) => ({
+      ...entry.artist,
+      matchedImages: entry.matchedImages.slice(0, 6), // Top 6 images per artist
+      relevanceScore: entry.relevanceScore,
+    }));
+
+  return results;
+}
+
+// ============================================
+// Verification Document functions
+// ============================================
+
+/**
+ * Update OCR analysis results on a verification document.
+ */
+export async function updateVerificationDocumentOCR(
+  id: number,
+  data: {
+    ocrDocumentType?: string | null;
+    ocrExtractedName?: string | null;
+    ocrExtractedBusinessName?: string | null;
+    ocrLicenseNumber?: string | null;
+    ocrExpirationDate?: string | null;
+    ocrIssuingAuthority?: string | null;
+    ocrConfidence?: number | null;
+    ocrNameMatch?: string | null;
+    ocrVerdict?: string | null;
+    ocrVerdictReason?: string | null;
+    ocrIssues?: string | null;
+    ocrProcessedAt?: Date | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .update(verificationDocuments)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(verificationDocuments.id, id));
+}
+
+/**
+ * Get a verification document by ID.
+ */
+export async function getVerificationDocumentById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(verificationDocuments)
+    .where(eq(verificationDocuments.id, id))
+    .limit(1);
+  return result[0] || null;
+}
+
+/**
+ * Get all verification documents pending review, with user + artist info.
+ */
+export async function getPendingVerificationDocuments() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      document: verificationDocuments,
+      user: {
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        verificationStatus: users.verificationStatus,
+      },
+      artist: {
+        id: artists.id,
+        shopName: artists.shopName,
+        state: artists.state,
+      },
+    })
+    .from(verificationDocuments)
+    .innerJoin(users, eq(verificationDocuments.userId, users.id))
+    .leftJoin(artists, eq(users.id, artists.userId))
+    .where(eq(verificationDocuments.status, "pending"))
+    .orderBy(desc(verificationDocuments.submittedAt));
+}
+
+/**
+ * Admin: update verification document status and user verification status.
+ */
+export async function reviewVerificationDocument(
+  documentId: number,
+  decision: {
+    status: "verified" | "rejected";
+    reviewedBy: number;
+    reviewNotes?: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.transaction(async (tx) => {
+    // Update the document
+    const [doc] = await tx
+      .update(verificationDocuments)
+      .set({
+        status: decision.status,
+        reviewedBy: decision.reviewedBy,
+        reviewNotes: decision.reviewNotes || null,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(verificationDocuments.id, documentId))
+      .returning();
+
+    if (!doc) throw new Error("Verification document not found");
+
+    // Update the user's verification status
+    await tx
+      .update(users)
+      .set({
+        verificationStatus: decision.status,
+        verificationReviewedAt: new Date(),
+        verificationNotes: decision.reviewNotes || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, doc.userId));
+
+    return doc;
+  });
+}
+
+// ============================================
+// Review Moderation functions
+// ============================================
+
+/**
+ * Update AI moderation results on a review.
+ */
+export async function updateReviewModeration(
+  id: number,
+  data: {
+    moderationStatus?: string | null;
+    moderationFlags?: string | null;
+    toxicityScore?: number | null;
+    spamScore?: number | null;
+    fraudScore?: number | null;
+    moderationReason?: string | null;
+    moderatedAt?: Date | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .update(reviews)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(reviews.id, id));
+}
+
+/**
+ * Get reviews flagged or pending moderation.
+ */
+export async function getFlaggedReviews() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      review: reviews,
+      userName: users.name,
+      artistName: artists.shopName,
+    })
+    .from(reviews)
+    .leftJoin(users, eq(reviews.userId, users.id))
+    .leftJoin(artists, eq(reviews.artistId, artists.id))
+    .where(
+      or(
+        eq(reviews.moderationStatus, "flagged"),
+        eq(reviews.moderationStatus, "hidden")
+      )
+    )
+    .orderBy(desc(reviews.createdAt));
+}
+
+/**
+ * Get a review by ID.
+ */
+export async function getReviewById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(reviews)
+    .where(eq(reviews.id, id))
+    .limit(1);
+  return result[0] || null;
 }

@@ -1,134 +1,33 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MapPin, Star, Navigation, ExternalLink, Phone, Mail } from "lucide-react";
-import { MapView } from "@/components/Map";
-import { loadTattooShops, geocodeAddress, parseRating, getInitials, type TattooShop } from "@/lib/tattooShops";
+import { MapPin, Star, ExternalLink, Phone, Mail } from "lucide-react";
+import { loadTattooShops, parseRating, getInitials, type TattooShop } from "@/lib/tattooShops";
 import BookingDialog from "@/components/BookingDialog";
 
-// Helper to escape HTML for InfoWindow content
-const escapeHtml = (str: string): string => {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-};
-
-interface ShopWithLocation extends TattooShop {
-  distance?: string;
-}
-
 export default function ArtistFinder() {
-  const [location, setLocation] = useState("Louisiana");
-  const [shops, setShops] = useState<ShopWithLocation[]>([]);
-  const [filteredShops, setFilteredShops] = useState<ShopWithLocation[]>([]);
+  const [shops, setShops] = useState<TattooShop[]>([]);
+  const [filteredShops, setFilteredShops] = useState<TattooShop[]>([]);
   const [loading, setLoading] = useState(true);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
-  const [geocoder, setGeocoder] = useState<google.maps.Geocoder | null>(null);
   const [searchCity, setSearchCity] = useState("");
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-  const [selectedShop, setSelectedShop] = useState<ShopWithLocation | null>(null);
+  const [selectedShop, setSelectedShop] = useState<TattooShop | null>(null);
 
-  const handleMapReady = useCallback(async (mapInstance: google.maps.Map) => {
-    setMap(mapInstance);
-    const geocoderInstance = new google.maps.Geocoder();
-    setGeocoder(geocoderInstance);
-
-    try {
-      // Load shops from CSV
-      const loadedShops = await loadTattooShops();
-      
-      // Geocode addresses with delay to avoid rate limiting
-      const shopsWithCoords: ShopWithLocation[] = [];
-    
-    for (const shop of loadedShops) {
-      if (shop.address) {
-        const fullAddress = `${shop.address}, ${shop.city}, Louisiana`;
-        const coords = await geocodeAddress(fullAddress, geocoderInstance);
-        
-        if (coords) {
-          shopsWithCoords.push({ ...shop, ...coords });
-        } else {
-          // Try just city if full address fails
-          const cityCoords = await geocodeAddress(`${shop.city}, Louisiana`, geocoderInstance);
-          if (cityCoords) {
-            shopsWithCoords.push({ ...shop, ...cityCoords });
-          }
-        }
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } else if (shop.city) {
-        // If no address, geocode just the city
-        const cityCoords = await geocodeAddress(`${shop.city}, Louisiana`, geocoderInstance);
-        if (cityCoords) {
-          shopsWithCoords.push({ ...shop, ...cityCoords });
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
+  useEffect(() => {
+    async function loadShops() {
+      try {
+        const loadedShops = await loadTattooShops();
+        setShops(loadedShops);
+        setFilteredShops(loadedShops);
+      } catch (error) {
+        console.error('Error loading tattoo shops:', error);
+      } finally {
+        setLoading(false);
       }
     }
-
-    setShops(shopsWithCoords);
-    setFilteredShops(shopsWithCoords);
-    setLoading(false);
-
-    // Add markers for shops with coordinates
-    const newMarkers = shopsWithCoords
-      .filter(shop => shop.lat && shop.lng)
-      .map((shop) => {
-        const marker = new google.maps.Marker({
-          position: { lat: shop.lat!, lng: shop.lng! },
-          map: mapInstance,
-          title: shop.name,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: "#ff8c42",
-            fillOpacity: 1,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-          },
-        });
-
-        const { rating, count } = parseRating(shop.rating);
-        const ratingStars = rating > 0 ? `⭐ ${rating}/5 (${count})` : 'No ratings yet';
-
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px; color: #000; max-width: 250px;">
-              <h3 style="margin: 0 0 4px 0; font-weight: bold; font-size: 16px;">${escapeHtml(shop.name)}</h3>
-              <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">${escapeHtml(shop.city)}</p>
-              ${shop.address ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #888;">${escapeHtml(shop.address)}</p>` : ''}
-              <p style="margin: 0; font-size: 12px; color: #ff8c42;">${escapeHtml(ratingStars)}</p>
-            </div>
-          `,
-        });
-
-        marker.addListener("click", () => {
-          infoWindow.open(mapInstance, marker);
-        });
-
-        return marker;
-      });
-
-    setMarkers(newMarkers);
-
-    // Fit bounds to show all markers
-    if (newMarkers.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      shopsWithCoords.forEach((shop) => {
-        if (shop.lat && shop.lng) {
-          bounds.extend({ lat: shop.lat, lng: shop.lng });
-        }
-      });
-      mapInstance.fitBounds(bounds);
-    }
-    } catch (error) {
-      console.error('Error loading tattoo shops:', error);
-      setLoading(false);
-    }
+    loadShops();
   }, []);
 
   const handleSearch = () => {
@@ -143,78 +42,6 @@ export default function ArtistFinder() {
     );
     
     setFilteredShops(filtered);
-
-    // Update map to show only filtered markers
-    if (!map) return;
-    
-    markers.forEach(marker => marker.setMap(null));
-    
-    const newMarkers = filtered
-      .filter(shop => shop.lat && shop.lng)
-      .map((shop) => {
-        const marker = new google.maps.Marker({
-          position: { lat: shop.lat!, lng: shop.lng! },
-          map: map!,
-          title: shop.name,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: "#ff8c42",
-            fillOpacity: 1,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-          },
-        });
-
-        const { rating, count } = parseRating(shop.rating);
-        const ratingStars = rating > 0 ? `⭐ ${rating}/5 (${count})` : 'No ratings yet';
-
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px; color: #000; max-width: 250px;">
-              <h3 style="margin: 0 0 4px 0; font-weight: bold; font-size: 16px;">${escapeHtml(shop.name)}</h3>
-              <p style="margin: 0 0 4px 0; font-size: 13px; color: #666;">${escapeHtml(shop.city)}</p>
-              ${shop.address ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #888;">${escapeHtml(shop.address)}</p>` : ''}
-              <p style="margin: 0; font-size: 12px; color: #ff8c42;">${escapeHtml(ratingStars)}</p>
-            </div>
-          `,
-        });
-
-        marker.addListener("click", () => {
-          infoWindow.open(map!, marker);
-        });
-
-        return marker;
-      });
-
-    setMarkers(newMarkers);
-
-    // Fit bounds to filtered results
-    if (newMarkers.length > 0 && map) {
-      const bounds = new google.maps.LatLngBounds();
-      filtered.forEach((shop) => {
-        if (shop.lat && shop.lng) {
-          bounds.extend({ lat: shop.lat, lng: shop.lng });
-        }
-      });
-      map.fitBounds(bounds);
-    }
-  };
-
-  const handleUseMyLocation = () => {
-    if (navigator.geolocation && map) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          map.setCenter({ lat: latitude, lng: longitude });
-          map.setZoom(13);
-          setLocation("Current Location");
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
-    }
   };
 
   return (
@@ -241,29 +68,15 @@ export default function ArtistFinder() {
                 className="pl-10 h-12 bg-card border-border text-foreground"
               />
             </div>
-            <Button onClick={handleUseMyLocation} variant="outline" className="h-12 px-6">
-              <Navigation className="h-4 w-4 mr-2" />
-              My Location
-            </Button>
             <Button onClick={handleSearch} className="h-12 px-8">Search</Button>
           </div>
 
           {loading ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">Loading tattoo shops and geocoding addresses...</p>
+              <p className="text-muted-foreground">Loading tattoo shops...</p>
             </div>
           ) : (
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Map */}
-              <div className="lg:sticky lg:top-24 h-[600px] rounded-lg overflow-hidden border border-border">
-                <MapView
-                  onMapReady={handleMapReady}
-                  initialCenter={{ lat: 30.9843, lng: -91.9623 }} // Louisiana center
-                  initialZoom={7}
-                  className="w-full h-full"
-                />
-              </div>
-
+            <div className="max-w-3xl mx-auto">
               {/* Shop List */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">

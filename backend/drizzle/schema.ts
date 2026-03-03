@@ -1,4 +1,5 @@
 import { serial, text, timestamp, varchar, boolean, integer, pgTable, pgEnum, unique } from "drizzle-orm/pg-core";
+import type { SubscriptionTier } from "@shared/const";
 
 /**
  * Core user table backing auth flow.
@@ -35,7 +36,13 @@ export const users = pgTable("users", {
   verificationSubmittedAt: timestamp("verificationSubmittedAt"), // When they uploaded license
   verificationReviewedAt: timestamp("verificationReviewedAt"), // When admin reviewed
   verificationNotes: text("verificationNotes"), // Admin notes about verification
+  /** Canonical subscription tier — immutable fact from Stripe. See SubscriptionTier in @shared/const. */
+  subscriptionTier: varchar("subscriptionTier", { length: 30 })
+    .$type<SubscriptionTier>()
+    .default("artist_free")
+    .notNull(),
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -68,7 +75,11 @@ export const artists = pgTable("artists", {
   averageRating: text("averageRating"),
   totalReviews: integer("totalReviews").default(0),
   isApproved: boolean("isApproved").default(false),
-  subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("free").notNull(), // 'free', 'amateur', 'professional', 'frontPage'
+  /** @deprecated Read from users.subscriptionTier instead. Kept for backward-compat queries. */
+  subscriptionTier: varchar("subscriptionTier", { length: 30 })
+    .$type<SubscriptionTier>()
+    .default("artist_free")
+    .notNull(),
   bidsUsed: integer("bidsUsed").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -87,6 +98,13 @@ export const portfolioImages = pgTable("portfolioImages", {
   imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
   caption: text("caption"),
   style: varchar("style", { length: 100 }), // e.g., "Realism", "Traditional"
+  // AI-generated fields (Smart Portfolio Tagging via Gemini Vision)
+  aiStyles: text("aiStyles"), // JSON array of detected tattoo styles
+  aiTags: text("aiTags"), // JSON array of content tags (subjects, themes)
+  aiDescription: text("aiDescription"), // AI-generated description for SEO
+  qualityScore: integer("qualityScore"), // 1-100 image quality score
+  qualityIssues: text("qualityIssues"), // JSON array of detected issues (blurry, low-res, etc.)
+  aiProcessedAt: timestamp("aiProcessedAt"), // When AI analysis was completed
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -107,6 +125,14 @@ export const reviews = pgTable("reviews", {
   photos: text("photos"), // Comma-separated URLs of review photos
   artistResponse: text("artistResponse"), // Artist's response to review
   artistResponseDate: timestamp("artistResponseDate"), // When artist responded
+  // AI Moderation fields (Review Sentiment Analysis via Gemini)
+  moderationStatus: varchar("moderationStatus", { length: 20 }).default("pending"), // "pending", "approved", "flagged", "hidden"
+  moderationFlags: text("moderationFlags"), // JSON array of flag strings from AI analysis
+  toxicityScore: integer("toxicityScore"), // 0-100
+  spamScore: integer("spamScore"), // 0-100
+  fraudScore: integer("fraudScore"), // 0-100
+  moderationReason: text("moderationReason"), // AI explanation for the moderation decision
+  moderatedAt: timestamp("moderatedAt"), // When AI moderation was completed
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -192,6 +218,19 @@ export const verificationDocuments = pgTable("verificationDocuments", {
   status: verificationStatusEnum("status").default("pending").notNull(),
   reviewedBy: integer("reviewedBy").references(() => users.id, { onDelete: "set null" }), // Admin who reviewed
   reviewNotes: text("reviewNotes"), // Admin review notes
+  // AI OCR Verification fields (License Verification via Gemini)
+  ocrDocumentType: varchar("ocrDocumentType", { length: 50 }), // Detected document type
+  ocrExtractedName: varchar("ocrExtractedName", { length: 255 }), // Name from OCR
+  ocrExtractedBusinessName: varchar("ocrExtractedBusinessName", { length: 255 }), // Business name from OCR
+  ocrLicenseNumber: varchar("ocrLicenseNumber", { length: 100 }), // License number from OCR
+  ocrExpirationDate: varchar("ocrExpirationDate", { length: 20 }), // Expiration date string
+  ocrIssuingAuthority: varchar("ocrIssuingAuthority", { length: 255 }), // Issuing body
+  ocrConfidence: integer("ocrConfidence"), // 0-100 confidence score
+  ocrNameMatch: varchar("ocrNameMatch", { length: 20 }), // "exact", "partial", "mismatch", "unavailable"
+  ocrVerdict: varchar("ocrVerdict", { length: 20 }), // "verified", "needs_review", "rejected"
+  ocrVerdictReason: text("ocrVerdictReason"), // AI explanation for verdict
+  ocrIssues: text("ocrIssues"), // JSON array of detected issues
+  ocrProcessedAt: timestamp("ocrProcessedAt"), // When OCR analysis was completed
   submittedAt: timestamp("submittedAt").defaultNow().notNull(),
   reviewedAt: timestamp("reviewedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -234,6 +273,10 @@ export const clients = pgTable("clients", {
   state: varchar("state", { length: 50 }),
   phone: varchar("phone", { length: 50 }),
   onboardingCompleted: boolean("onboardingCompleted").default(false),
+  // Client Subscription Tiers
+  subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("free").notNull(), // 'free', 'enthusiast', 'elite'
+  aiCredits: integer("aiCredits").default(0).notNull(), // Number of AI generation credits remaining
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID for billing
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

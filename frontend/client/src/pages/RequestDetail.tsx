@@ -25,7 +25,8 @@ import {
   X,
   ArrowLeft,
   Loader2,
-  Calendar
+  Calendar,
+  Sparkles
 } from "lucide-react";
 import UpgradePrompt from "@/components/UpgradePrompt";
 
@@ -35,6 +36,7 @@ export default function RequestDetail() {
   const { user } = useAuth();
   
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
   const [bidForm, setBidForm] = useState({
     priceEstimate: "",
     estimatedHours: "",
@@ -62,6 +64,30 @@ export default function RequestDetail() {
       toast.error(error.message || "Failed to submit bid");
     },
   });
+
+  const draftBid = trpc.bids.draftBid.useMutation({
+    onSuccess: (data) => {
+      setBidForm({
+        ...bidForm,
+        priceEstimate: data.suggestedPrice > 0 ? String(data.suggestedPrice) : bidForm.priceEstimate,
+        estimatedHours: data.suggestedHours > 0 ? String(data.suggestedHours) : bidForm.estimatedHours,
+        message: data.message || bidForm.message,
+      });
+      setAiDraftLoading(false);
+      if (data.pricingRationale) {
+        toast.info(data.pricingRationale, { duration: 6000 });
+      }
+    },
+    onError: (error: { message?: string }) => {
+      setAiDraftLoading(false);
+      toast.error(error.message || "AI draft failed — write your bid manually.");
+    },
+  });
+
+  const handleAiDraft = () => {
+    setAiDraftLoading(true);
+    draftBid.mutate({ requestId });
+  };
 
   const acceptBid = trpc.bids.accept.useMutation({
     onSuccess: () => {
@@ -397,6 +423,25 @@ export default function RequestDetail() {
                           Provide your pricing and availability for this tattoo request.
                         </DialogDescription>
                       </DialogHeader>
+
+                      {/* AI Bid Assistant — Professional/Icon tier only */}
+                      {artistProfile && (artistProfile.subscriptionTier === "professional" || artistProfile.subscriptionTier === "frontPage") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleAiDraft}
+                          disabled={aiDraftLoading}
+                        >
+                          {aiDraftLoading ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 mr-1.5 text-primary" />
+                          )}
+                          {aiDraftLoading ? "Drafting with AI..." : "AI Draft Bid"}
+                        </Button>
+                      )}
                       
                       <div className="space-y-4">
                         <div>

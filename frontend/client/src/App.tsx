@@ -23,6 +23,8 @@ import ClientDashboard from "./pages/ClientDashboard";
 import NewRequest from "./pages/NewRequest";
 import RequestBoard from "./pages/RequestBoard";
 import RequestDetail from "./pages/RequestDetail";
+import AdminModeration from "./pages/AdminModeration";
+import DesignLab from "./pages/DesignLab";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -47,6 +49,9 @@ function Router() {
       <Route path="/client/new-request" component={NewRequest} />
       <Route path="/requests" component={RequestBoard} />
       <Route path="/requests/:id" component={RequestDetail} />
+      <Route path="/client/design-lab" component={DesignLab} />
+      {/* Admin routes */}
+      <Route path="/admin/moderation" component={AdminModeration} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

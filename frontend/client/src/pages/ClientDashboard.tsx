@@ -16,6 +16,7 @@ import {
   XCircle,
   Eye,
   Gavel,
+  Sparkles,
 } from "lucide-react";
 
 function formatCurrency(cents: number): string {
@@ -115,12 +116,20 @@ export default function ClientDashboard() {
             Manage your tattoo requests and artist bids
           </p>
         </div>
-        <Link href="/client/new-request">
-          <Button className="mt-4 md:mt-0">
-            <Plus className="mr-2 h-4 w-4" />
-            New Request
-          </Button>
-        </Link>
+        <div className="flex gap-3 mt-4 md:mt-0">
+          <Link href="/client/design-lab">
+            <Button variant="outline">
+              <Sparkles className="mr-2 h-4 w-4" />
+              AI Design Lab
+            </Button>
+          </Link>
+          <Link href="/client/new-request">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Request
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}

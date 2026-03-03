@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Star, MapPin, Phone, Globe, Instagram, Facebook, Heart, Calendar, Upload } from "lucide-react";
+import { Star, MapPin, Phone, Globe, Instagram, Facebook, Heart, Calendar, Upload, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import ReviewCard from "@/components/ReviewCard";
 import ReviewFilters from "@/components/ReviewFilters";
@@ -326,22 +327,51 @@ export default function ArtistProfile() {
           <p className="text-muted-foreground">Loading portfolio...</p>
         ) : portfolio && portfolio.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {portfolio.map((image) => (
-              <Card key={image.id} className="overflow-hidden group cursor-pointer">
-                <div className="aspect-square relative">
-                  <img
-                    src={image.imageUrl}
-                    alt={image.caption || "Portfolio image"}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                {image.caption && (
-                  <div className="p-3">
-                    <p className="text-sm text-muted-foreground">{image.caption}</p>
+            {portfolio.map((image) => {
+              const aiStyles: string[] = image.aiStyles ? JSON.parse(image.aiStyles) : [];
+              const aiTags: string[] = image.aiTags ? JSON.parse(image.aiTags) : [];
+              const hasAI = aiStyles.length > 0 || aiTags.length > 0;
+
+              return (
+                <Card key={image.id} className="overflow-hidden group cursor-pointer">
+                  <div className="aspect-square relative">
+                    <img
+                      src={image.imageUrl}
+                      alt={image.aiDescription || image.caption || "Portfolio image"}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {hasAI && (
+                      <div className="absolute top-2 right-2">
+                        <Sparkles className="h-4 w-4 text-primary drop-shadow" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </Card>
-            ))}
+                  <div className="p-3 space-y-2">
+                    {image.caption && (
+                      <p className="text-sm text-muted-foreground">{image.caption}</p>
+                    )}
+                    {aiStyles.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {aiStyles.map((style) => (
+                          <Badge key={style} variant="secondary" className="text-xs">
+                            {style}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {aiTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {aiTags.slice(0, 4).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <p className="text-muted-foreground">No portfolio images yet.</p>

@@ -6,7 +6,7 @@ import HomepageFeed from "@/components/HomepageFeed";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search, MapPin, Calendar, Shield, Star, CheckCircle, Award } from "lucide-react";
+import { Search, MapPin, Calendar, Shield, Star, CheckCircle, Award, Sparkles } from "lucide-react";
 
 const suggestionTags = [
   "Norse mythology",
@@ -46,10 +46,10 @@ export default function Home() {
             <div className="max-w-2xl mx-auto mb-8">
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary w-5 h-5" />
                   <Input
                     type="text"
-                    placeholder="Search by style, artist, or location..."
+                    placeholder="Describe your dream tattoo... AI will find matching artists"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -57,7 +57,8 @@ export default function Home() {
                   />
                 </div>
                 <Button size="lg" onClick={handleSearch} className="h-14 px-8">
-                  Search
+                  <Search className="w-5 h-5 mr-2" />
+                  Discover
                 </Button>
               </div>
 

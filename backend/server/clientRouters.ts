@@ -13,6 +13,7 @@ import {
 import { BUCKETS, createSignedUploadUrl, getPublicUrl } from "./_core/supabaseStorage";
 import { TRPCError } from "@trpc/server";
 import path from "path";
+import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
 
 /**
  * Sanitize a filename to prevent path traversal attacks.
@@ -396,6 +397,21 @@ export const requestsRouter = router({
       return newRequest;
     }),
 
+  // AI Prompt Refiner — analyze description completeness and suggest improvements
+  refineDescription: publicProcedure
+    .input(z.object({
+      description: z.string().min(1).max(5000),
+      title: z.string().max(255).optional(),
+      style: z.string().max(100).optional(),
+      placement: z.string().max(100).optional(),
+      size: z.string().max(50).optional(),
+      colorPreference: z.string().max(50).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { description, ...context } = input;
+      return await refineRequestPrompt(description, context);
+    }),
+
   // Get a signed URL for uploading a request image
   getUploadUrl: protectedProcedure
     .input(z.object({
@@ -592,6 +608,74 @@ export const bidsRouter = router({
       client: b.client,
     }));
   }),
+
+  // AI Bid Assistant — draft a bid response (Professional/Icon tier only)
+  draftBid: protectedProcedure
+    .input(z.object({ requestId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+
+      // 1. Verify artist and tier
+      const [artist] = await db
+        .select()
+        .from(artists)
+        .where(eq(artists.userId, ctx.user.id))
+        .limit(1);
+
+      if (!artist) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only artists can use the bid assistant",
+        });
+      }
+
+      if (artist.subscriptionTier !== "professional" && artist.subscriptionTier !== "frontPage") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "AI Bid Assistant is available for Professional and Icon tier artists. Upgrade to access this feature.",
+        });
+      }
+
+      // 2. Get the request
+      const [request] = await db
+        .select()
+        .from(tattooRequests)
+        .where(eq(tattooRequests.id, input.requestId))
+        .limit(1);
+
+      if (!request) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Request not found",
+        });
+      }
+
+      // 3. Draft the bid
+      const draft = await draftBidResponse(
+        {
+          title: request.title,
+          description: request.description,
+          style: request.style,
+          placement: request.placement,
+          size: request.size,
+          colorPreference: request.colorPreference,
+          budgetMin: request.budgetMin,
+          budgetMax: request.budgetMax,
+          desiredTimeframe: request.desiredTimeframe,
+        },
+        {
+          shopName: artist.shopName,
+          bio: artist.bio,
+          styles: artist.styles,
+          specialties: artist.specialties,
+          experience: artist.experience,
+          city: artist.city,
+          state: artist.state,
+        }
+      );
+
+      return draft;
+    }),
 
   // Submit a bid (for artists)
   create: protectedProcedure

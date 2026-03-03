@@ -1,6 +1,7 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, TIER_LIMITS, type SubscriptionTier } from "@shared/const";
+import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { publicProcedure, protectedProcedure, artistProcedure, artistOwnerProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, artistProcedure, artistOwnerProcedure, adminProcedure, router } from "./_core/trpc";
 import { sanitizeInput, sanitizeEmail, sanitizePhone } from "./_core/sanitize";
 import { z } from "zod";
 import * as db from "./db";
@@ -8,6 +9,10 @@ import { createSignedUploadUrl, deleteFile, BUCKETS, getPublicUrl } from "./_cor
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
 import { verificationRouter } from "./verificationRouter";
 import { healthRouter } from "./healthRouter";
+import { analyzePortfolioImage } from "./geminiVision";
+import { parseDiscoveryQuery } from "./geminiDiscovery";
+import { analyzeReviewSentiment } from "./geminiSafety";
+import { aiRouter } from "./aiRouter";
 import path from "path";
 
 /**
@@ -63,6 +68,33 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => {
         return await db.searchArtists(input);
+      }),
+
+    /**
+     * Tattoo Discovery — natural language semantic search.
+     * Parses the user's free-text query with Gemini AI, then matches against
+     * AI-tagged portfolio images and artist profiles.
+     */
+    discover: publicProcedure
+      .input(z.object({
+        query: z.string().min(1).max(500),
+      }))
+      .query(async ({ input }) => {
+        // Step 1: Parse the natural language query into structured intent
+        const intent = await parseDiscoveryQuery(input.query);
+
+        // Step 2: Search artists + portfolio images using parsed intent
+        const results = await db.discoverArtists({
+          styles: intent.styles,
+          tags: intent.tags,
+          keywords: intent.keywords,
+          vibeDescription: intent.vibeDescription,
+        });
+
+        return {
+          intent,
+          artists: results,
+        };
       }),
     
     getById: publicProcedure
@@ -136,7 +168,18 @@ export const appRouter = router({
         fileName: z.string(),
         contentType: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // ── Tier Gatekeeper ──────────────────────────────────────
+        const tier = (ctx.user.subscriptionTier ?? "artist_free") as SubscriptionTier;
+        const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
+        const currentCount = await db.getPortfolioCountByArtistId(input.artistId);
+        if (currentCount >= limit) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `You have reached your tier's portfolio limit (${limit}). Please upgrade to add more images.`,
+          });
+        }
+        // ─────────────────────────────────────────────────────────
         // Sanitize filename to prevent path traversal
         const sanitizedFileName = sanitizeFileName(input.fileName);
         // Generate unique file key with sanitized filename
@@ -153,7 +196,18 @@ export const appRouter = router({
         caption: z.string().optional(),
         style: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // ── Tier Gatekeeper ──────────────────────────────────────
+        const tier = (ctx.user.subscriptionTier ?? "artist_free") as SubscriptionTier;
+        const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
+        const currentCount = await db.getPortfolioCountByArtistId(input.artistId);
+        if (currentCount >= limit) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `You have reached your tier's portfolio limit (${limit}). Please upgrade to add more images.`,
+          });
+        }
+        // ─────────────────────────────────────────────────────────
         // Sanitize imageKey using same semantics as sanitizeFileName
         // Step 1: Remove null bytes
         let sanitizedKey = input.imageKey.replace(/\0/g, '');
@@ -175,11 +229,68 @@ export const appRouter = router({
         }
         
         const imageUrl = getPublicUrl(BUCKETS.PORTFOLIO_IMAGES, sanitizedKey);
-        return await db.addPortfolioImage({
+        const result = await db.addPortfolioImage({
           ...input,
           imageKey: sanitizedKey,
           imageUrl,
         });
+
+        // Run Smart Portfolio Tagging in the background (non-blocking)
+        // Analysis happens async — the image is immediately available while AI processes
+        analyzePortfolioImage(imageUrl)
+          .then(async (analysis) => {
+            if (analysis.qualityScore > 0) {
+              // Get the inserted image ID from the result
+              const images = await db.getPortfolioByArtistId(input.artistId);
+              const inserted = images.find((img) => img.imageKey === sanitizedKey);
+              if (inserted) {
+                await db.updatePortfolioImageAI(inserted.id, {
+                  aiStyles: JSON.stringify(analysis.styles),
+                  aiTags: JSON.stringify(analysis.tags),
+                  aiDescription: analysis.description,
+                  qualityScore: analysis.qualityScore,
+                  qualityIssues: JSON.stringify(analysis.qualityIssues),
+                  aiProcessedAt: new Date(),
+                  // Auto-fill style if not manually set
+                  ...(!input.style && analysis.styles.length > 0
+                    ? { style: analysis.styles[0] }
+                    : {}),
+                });
+              }
+            }
+          })
+          .catch((err) => {
+            // Non-fatal: log and continue — image is still saved
+            console.error("Background AI analysis failed:", err);
+          });
+
+        return result;
+      }),
+
+    // Re-analyze an existing portfolio image with Gemini Vision
+    reanalyze: artistOwnerProcedure
+      .input(z.object({ id: z.number(), artistId: z.number() }))
+      .mutation(async ({ input }) => {
+        const image = await db.getPortfolioImageById(input.id);
+        if (!image) throw new Error("Portfolio image not found");
+        if (image.artistId !== input.artistId) throw new Error("Forbidden");
+
+        const analysis = await analyzePortfolioImage(image.imageUrl);
+        if (analysis.qualityScore === 0) {
+          throw new Error("AI analysis failed — please try again later");
+        }
+
+        await db.updatePortfolioImageAI(input.id, {
+          aiStyles: JSON.stringify(analysis.styles),
+          aiTags: JSON.stringify(analysis.tags),
+          aiDescription: analysis.description,
+          qualityScore: analysis.qualityScore,
+          qualityIssues: JSON.stringify(analysis.qualityIssues),
+          aiProcessedAt: new Date(),
+          style: analysis.styles[0] || image.style,
+        });
+
+        return analysis;
       }),
     
     delete: protectedProcedure
@@ -224,10 +335,54 @@ export const appRouter = router({
         comment: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        return await db.createReview({
+        const result = await db.createReview({
           ...input,
           userId: ctx.user.id,
         });
+
+        // Run Review Sentiment Analysis in the background (non-blocking)
+        // The review is immediately saved; moderation flags are attached async.
+        if (input.comment && input.comment.trim().length > 0) {
+          analyzeReviewSentiment({
+            rating: input.rating,
+            comment: input.comment,
+            verifiedBooking: false,
+          })
+            .then(async (analysis) => {
+              // Get the inserted review ID
+              const reviews = await db.getReviewsByArtistId(input.artistId);
+              const inserted = reviews.find(
+                (r) => r.comment === input.comment && r.rating === input.rating
+              );
+              if (inserted) {
+                // Map AI action to moderation status
+                let moderationStatus: string;
+                if (analysis.moderationAction === "auto_hide") {
+                  moderationStatus = "hidden";
+                } else if (analysis.moderationAction === "flag_for_review") {
+                  moderationStatus = "flagged";
+                } else {
+                  moderationStatus = "approved";
+                }
+
+                await db.updateReviewModeration(inserted.id, {
+                  moderationStatus,
+                  moderationFlags: JSON.stringify(analysis.flags),
+                  toxicityScore: analysis.toxicityScore,
+                  spamScore: analysis.spamScore,
+                  fraudScore: analysis.fraudScore,
+                  moderationReason: analysis.moderationReason,
+                  moderatedAt: new Date(),
+                });
+              }
+            })
+            .catch((err) => {
+              // Non-fatal: log and continue — review is still saved
+              console.error("Background review moderation failed:", err);
+            });
+        }
+
+        return result;
       }),
   }),
 
@@ -337,6 +492,72 @@ export const appRouter = router({
   requests: requestsRouter,
   bids: bidsRouter,
   verification: verificationRouter,
+
+  // Admin moderation
+  moderation: router({
+    /**
+     * Get all flagged/hidden reviews for admin review.
+     */
+    getFlaggedReviews: adminProcedure.query(async () => {
+      return await db.getFlaggedReviews();
+    }),
+
+    /**
+     * Admin: Update moderation status of a review (approve, keep flagged, hide).
+     */
+    updateReviewStatus: adminProcedure
+      .input(z.object({
+        reviewId: z.number(),
+        status: z.enum(["approved", "flagged", "hidden"]),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await db.updateReviewModeration(input.reviewId, {
+          moderationStatus: input.status,
+          moderationReason: input.notes || undefined,
+        });
+      }),
+
+    /**
+     * Admin: Re-analyze a review with Gemini.
+     */
+    reanalyzeReview: adminProcedure
+      .input(z.object({ reviewId: z.number() }))
+      .mutation(async ({ input }) => {
+        const review = await db.getReviewById(input.reviewId);
+        if (!review) throw new Error("Review not found");
+
+        const analysis = await analyzeReviewSentiment({
+          rating: review.rating,
+          comment: review.comment,
+          verifiedBooking: review.verifiedBooking ?? false,
+        });
+
+        let moderationStatus: string;
+        if (analysis.moderationAction === "auto_hide") {
+          moderationStatus = "hidden";
+        } else if (analysis.moderationAction === "flag_for_review") {
+          moderationStatus = "flagged";
+        } else {
+          moderationStatus = "approved";
+        }
+
+        await db.updateReviewModeration(input.reviewId, {
+          moderationStatus,
+          moderationFlags: JSON.stringify(analysis.flags),
+          toxicityScore: analysis.toxicityScore,
+          spamScore: analysis.spamScore,
+          fraudScore: analysis.fraudScore,
+          moderationReason: analysis.moderationReason,
+          moderatedAt: new Date(),
+        });
+
+        return analysis;
+      }),
+  }),
+
+  // ── AI Tattoo Generation ──────────────────────
+  ai: aiRouter,
 });
 
 export type AppRouter = typeof appRouter;
