@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { safeJsonParse } from "@/lib/utils";
 import { useLocation } from "wouter";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -225,9 +226,9 @@ export default function ArtistDashboard() {
                 </div>
               ) : (
                 portfolio?.map((image) => {
-                  const aiStyles: string[] = image.aiStyles ? JSON.parse(image.aiStyles) : [];
-                  const aiTags: string[] = image.aiTags ? JSON.parse(image.aiTags) : [];
-                  const qualityIssues: string[] = image.qualityIssues ? JSON.parse(image.qualityIssues) : [];
+                  const aiStyles: string[] = safeJsonParse<string[]>(image.aiStyles, []);
+                  const aiTags: string[] = safeJsonParse<string[]>(image.aiTags, []);
+                  const qualityIssues: string[] = safeJsonParse<string[]>(image.qualityIssues, []);
                   const hasQualityWarning = image.qualityScore !== null && image.qualityScore < 50;
                   const isProcessing = image.aiProcessedAt === null && image.qualityScore === null;
 
@@ -258,7 +259,7 @@ export default function ArtistDashboard() {
                           {aiStyles.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aiStyles.map((style) => (
-                                <Badge key={style} variant="secondary" className="text-xs">
+                                <Badge key={`style-${style}`} variant="secondary" className="text-xs">
                                   {style}
                                 </Badge>
                               ))}
@@ -267,17 +268,20 @@ export default function ArtistDashboard() {
                           {aiTags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aiTags.slice(0, 3).map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-xs">
+                                <Badge key={`tag-${tag}`} variant="outline" className="text-xs">
                                   {tag}
                                 </Badge>
                               ))}
                             </div>
                           )}
-                          {qualityIssues.length > 0 && !qualityIssues.includes("analysis-failed") && (
-                            <p className="text-xs text-muted-foreground">
-                              Issues: {qualityIssues.join(", ")}
-                            </p>
-                          )}
+                        </div>
+                      )}
+                      {/* Quality issues — shown independently of AI tag presence */}
+                      {qualityIssues.length > 0 && !qualityIssues.includes("analysis-failed") && (
+                        <div className="p-2 border-t">
+                          <p className="text-xs text-muted-foreground">
+                            Issues: {qualityIssues.join(", ")}
+                          </p>
                         </div>
                       )}
                       {/* Hover overlay with delete + re-analyze buttons */}

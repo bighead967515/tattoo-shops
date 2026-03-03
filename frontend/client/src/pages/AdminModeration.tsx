@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { safeJsonParse } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +66,7 @@ function VerificationDocumentsPanel() {
         const doc = item.document;
         const ocrVerdict = doc.ocrVerdict;
         const ocrConfidence = doc.ocrConfidence ?? 0;
-        const ocrIssues: string[] = doc.ocrIssues ? JSON.parse(doc.ocrIssues) : [];
+        const ocrIssues: string[] = safeJsonParse<string[]>(doc.ocrIssues, []);
 
         return (
           <Card key={doc.id} className="p-6">
@@ -273,7 +274,7 @@ function FlaggedReviewsPanel() {
     <div className="space-y-4">
       {reviews.map((item) => {
         const review = item.review;
-        const flags: string[] = review.moderationFlags ? JSON.parse(review.moderationFlags) : [];
+        const flags: string[] = safeJsonParse<string[]>(review.moderationFlags, []);
 
         return (
           <Card key={review.id} className="p-5">

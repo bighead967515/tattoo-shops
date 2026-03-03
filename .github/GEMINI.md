@@ -17,7 +17,7 @@ Email: Resend for transactional booking and invitation triggers.
 📐 Coding & Development Standards
 Strict TypeScript: Explicitly type all variables and functions; the use of any is strictly prohibited.
 
-Component Logic: * Use functional components with hooks exclusively.
+Component Logic: Use functional components with hooks exclusively.
 
 The 150-Line Rule: If a component file exceeds 150 lines, it must be decomposed into smaller, reusable sub-components.
 
@@ -32,7 +32,7 @@ Loading States: Implement shadcn/ui Skeleton screens for every asynchronous data
 
 Image Optimization: Portfolio and profile uploads must be processed (compressed/resized) on the client side or via a worker before hitting Supabase Storage.
 
-Theme: Support both dark and light modes using the next-themes pattern or the local ThemeContext.
+Theme: Support both dark and light modes using the custom `ThemeContext` (see `frontend/client/src/contexts/ThemeContext.tsx`). Public API: wrap the app in `<ThemeProvider>`, consume via the `useTheme()` hook which exposes `theme` (`"light"` | `"dark"`), `toggleTheme()`, and `switchable` flag. Preference is persisted to `localStorage` under the key `"theme"` and applied by toggling the `dark` CSS class on `<html>`.
 
 📋 Workflow & Quality Control
 Database Migrations: All schema updates must be executed via pnpm db:generate followed by pnpm db:push.
@@ -43,7 +43,7 @@ Testing Requirement: Any new utility functions or business logic added to shared
 
 Pre-Flight Check: Always suggest running pnpm build locally to verify TypeScript integrity and linting before proposing a merge to main.
 
-Documentation: * Prioritize clear, descriptive naming over inline comments.
+Documentation: Prioritize clear, descriptive naming over inline comments.
 
 Maintain TODO.md as the source of truth for project priorities.
 

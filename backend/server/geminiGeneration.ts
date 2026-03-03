@@ -65,13 +65,22 @@ export async function generateTattooDesign(
   style: string | undefined,
   userId: number
 ): Promise<GenerationResult> {
+  // Validate prompt
+  const trimmedPrompt = prompt.trim();
+  if (trimmedPrompt.length === 0) {
+    throw new Error("Prompt cannot be empty");
+  }
+  if (trimmedPrompt.length > 2000) {
+    throw new Error("Prompt is too long (max 2000 characters)");
+  }
+
   const styleDirection = style && STYLE_MAP[style.toLowerCase()]
     ? STYLE_MAP[style.toLowerCase()]
     : "Clean, versatile tattoo style with detailed linework";
 
   const fullPrompt = TATTOO_GENERATION_PROMPT
     .replace("{style}", styleDirection)
-    .replace("{prompt}", prompt);
+    .replace("{prompt}", trimmedPrompt);
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -100,11 +109,16 @@ export async function generateTattooDesign(
       throw new Error("No generation candidates returned from Gemini");
     }
 
+    const firstCandidate = candidates[0];
+    if (!firstCandidate?.content?.parts) {
+      throw new Error("Gemini returned an empty candidate with no content parts");
+    }
+
     // Look for image parts in the response
     let imageData: string | null = null;
     let imageMimeType = "image/png";
 
-    for (const part of candidates[0].content.parts) {
+    for (const part of firstCandidate.content.parts) {
       if (part.inlineData) {
         imageData = part.inlineData.data;
         imageMimeType = part.inlineData.mimeType || "image/png";

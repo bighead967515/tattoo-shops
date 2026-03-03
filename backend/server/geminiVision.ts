@@ -56,8 +56,43 @@ export async function analyzePortfolioImage(
   imageUrl: string
 ): Promise<PortfolioAnalysis> {
   try {
-    // Fetch the image as a buffer
-    const response = await fetch(imageUrl);
+    // Validate URL to prevent SSRF — only allow HTTPS and block private IPs
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(imageUrl);
+    } catch {
+      logger.warn(`Invalid image URL for analysis: ${imageUrl}`);
+      return DEFAULT_ANALYSIS;
+    }
+    if (parsedUrl.protocol !== "https:") {
+      logger.warn(`Rejected non-HTTPS image URL: ${parsedUrl.protocol}`);
+      return DEFAULT_ANALYSIS;
+    }
+    // Block private/loopback hostnames
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("172.") ||
+      hostname === "0.0.0.0" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local")
+    ) {
+      logger.warn(`Rejected private/loopback image URL: ${hostname}`);
+      return DEFAULT_ANALYSIS;
+    }
+
+    // Fetch the image as a buffer with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    let response: Response;
+    try {
+      response = await fetch(imageUrl, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!response.ok) {
       logger.warn(`Failed to fetch image for analysis: ${response.status} ${imageUrl}`);
       return DEFAULT_ANALYSIS;

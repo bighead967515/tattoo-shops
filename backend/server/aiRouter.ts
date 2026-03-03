@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, sql, and, gt } from "drizzle-orm";
 import { getDb } from "./db";
 import { clients } from "../drizzle/schema";
 import { generateTattooDesign } from "./geminiGeneration";
@@ -60,14 +60,32 @@ export const aiRouter = router({
         });
       }
 
-      // 3. Check remaining credits (unless unlimited)
+      // 3. Check remaining credits (unless unlimited) — atomic deduction
       if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
-        if (clientProfile.aiCredits <= 0) {
+        // Atomic decrement: only succeeds if aiCredits > 0
+        const [updated] = await db
+          .update(clients)
+          .set({
+            aiCredits: sql`${clients.aiCredits} - 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(clients.id, clientProfile.id),
+              gt(clients.aiCredits, 0)
+            )
+          )
+          .returning({ aiCredits: clients.aiCredits });
+
+        if (!updated) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: `You've used all ${tierLimits.aiGenerationsPerMonth} AI generation credits for this billing period. Upgrade to Elite Ink for unlimited generations.`,
           });
         }
+
+        // Use the DB-returned value for the rest of the request
+        clientProfile.aiCredits = updated.aiCredits;
       }
 
       // 4. Generate the tattoo design
@@ -78,21 +96,10 @@ export const aiRouter = router({
           ctx.user.id
         );
 
-        // 5. Deduct an AI credit (if not unlimited tier)
-        if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
-          await db
-            .update(clients)
-            .set({
-              aiCredits: clientProfile.aiCredits - 1,
-              updatedAt: new Date(),
-            })
-            .where(eq(clients.id, clientProfile.id));
-        }
-
         logger.info(`AI tattoo generated for client #${clientProfile.id} (user #${ctx.user.id}), credits remaining: ${
           tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
             ? "unlimited"
-            : clientProfile.aiCredits - 1
+            : clientProfile.aiCredits
         }`);
 
         return {
@@ -100,7 +107,7 @@ export const aiRouter = router({
           imageKey: result.imageKey,
           creditsRemaining: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
             ? null
-            : clientProfile.aiCredits - 1,
+            : clientProfile.aiCredits,
         };
       } catch (error) {
         logger.error("AI tattoo generation failed:", error);

@@ -12,6 +12,7 @@ import {
 } from "../drizzle/schema";
 import { BUCKETS, createSignedUploadUrl, getPublicUrl } from "./_core/supabaseStorage";
 import { TRPCError } from "@trpc/server";
+import { logger } from "./_core/logger";
 import path from "path";
 import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
 
@@ -398,7 +399,7 @@ export const requestsRouter = router({
     }),
 
   // AI Prompt Refiner — analyze description completeness and suggest improvements
-  refineDescription: publicProcedure
+  refineDescription: protectedProcedure
     .input(z.object({
       description: z.string().min(1).max(5000),
       title: z.string().max(255).optional(),
@@ -409,7 +410,15 @@ export const requestsRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { description, ...context } = input;
-      return await refineRequestPrompt(description, context);
+      try {
+        return await refineRequestPrompt(description, context);
+      } catch (error) {
+        logger.error("AI prompt refinement failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "AI refinement failed — please try again or submit your description as-is.",
+        });
+      }
     }),
 
   // Get a signed URL for uploading a request image
@@ -647,6 +656,14 @@ export const bidsRouter = router({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Request not found",
+        });
+      }
+
+      // 2b. Only draft bids for open requests
+      if (request.status !== "open") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Cannot draft a bid for a request that is ${request.status}. Only open requests accept new bids.`,
         });
       }
 

@@ -63,7 +63,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 - **Request board** — browse client tattoo requests and submit bids
 - **AI Bid Assistant** — Professional/Icon tier artists get AI-drafted bid responses with suggested pricing, estimated hours, and personalized pitch messages based on their profile and the request details
 - **License verification** — upload documents for verified artist status with AI-powered OCR that extracts names, license numbers, and expiration dates and cross-references against the artist's profile
-- **Subscription tiers** — Free, Amateur ($9/mo), Professional ($19/mo), Front Page ($39/mo)
+- **Subscription tiers** — Apprentice (Free), Artist ($9/mo), Professional ($19/mo), Icon ($39/mo)
 - **Analytics & reviews** — ratings, review responses, helpful votes
 
 ### For Clients
@@ -108,7 +108,6 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | `requestImages` | Reference images attached to requests |
 | `bids` | Artist bids on requests — price, hours, message, available date |
 | `requestMessages` | Client ↔ artist messaging on requests |
-| `verificationDocuments` | Uploaded license/permit documents for review |
 | `webhookQueue` | Stripe webhook retry queue with exponential backoff |
 
 ## Subscription Tiers

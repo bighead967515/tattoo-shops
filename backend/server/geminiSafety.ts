@@ -20,7 +20,7 @@ const genAI = new GoogleGenerativeAI(ENV.googleAiApiKey);
 // LICENSE VERIFICATION OCR
 // ============================================
 
-const LICENSE_OCR_PROMPT = `You are a document verification specialist. Analyze this uploaded document image and extract all verifiable information. The document should be a tattoo/body art license, health permit, state-issued ID, or business permit related to tattooing.
+const LICENSE_OCR_PROMPT_TEMPLATE = () => `You are a document verification specialist. Analyze this uploaded document image and extract all verifiable information. The document should be a tattoo/body art license, health permit, state-issued ID, or business permit related to tattooing.
 
 Return a JSON object with the following fields:
 
@@ -152,20 +152,26 @@ export async function verifyLicenseDocument(
 
     // If it looks like a URL, fetch and convert to base64
     if (imageData.startsWith("http")) {
-      const response = await fetch(imageData);
-      if (!response.ok) {
-        logger.warn(`Failed to fetch document for OCR: ${response.status}`);
-        return {
-          ...DEFAULT_OCR_RESULT,
-          nameMatch: "unavailable",
-          nameMatchDetails: "Could not fetch document image",
-          overallVerdict: "needs_review",
-          verdictReason: "Document image could not be retrieved for analysis",
-        };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const response = await fetch(imageData, { signal: controller.signal });
+        if (!response.ok) {
+          logger.warn(`Failed to fetch document for OCR: ${response.status}`);
+          return {
+            ...DEFAULT_OCR_RESULT,
+            nameMatch: "unavailable",
+            nameMatchDetails: "Could not fetch document image",
+            overallVerdict: "needs_review",
+            verdictReason: "Document image could not be retrieved for analysis",
+          };
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        base64Data = Buffer.from(arrayBuffer).toString("base64");
+        mimeType = response.headers.get("content-type") || mimeType;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      const arrayBuffer = await response.arrayBuffer();
-      base64Data = Buffer.from(arrayBuffer).toString("base64");
-      mimeType = response.headers.get("content-type") || mimeType;
     } else {
       base64Data = imageData;
     }
@@ -187,7 +193,7 @@ export async function verifyLicenseDocument(
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const result = await model.generateContent([
-      LICENSE_OCR_PROMPT,
+      LICENSE_OCR_PROMPT_TEMPLATE(),
       {
         inlineData: {
           mimeType,
@@ -263,8 +269,8 @@ export async function verifyLicenseDocument(
       verdictReason = "Automated checks inconclusive — requires manual admin review";
     }
 
-    // Add any issues that affect the verdict
-    if (ocr.issues.includes("possibly-altered")) {
+    // Add any issues that affect the verdict (only escalate, never downgrade)
+    if (ocr.issues.includes("possibly-altered") && verdict !== "rejected") {
       verdict = "needs_review";
       verdictReason += " | Document may have been altered";
     }
@@ -376,10 +382,13 @@ export async function analyzeReviewSentiment(review: {
   }
 
   try {
+    // Build prompt safely — replace tokens in order so user-controlled content
+    // (the comment) can't inject remaining template tokens like {verifiedBooking}.
+    const sanitizedComment = review.comment.replace(/"/g, '\\"');
     const prompt = REVIEW_ANALYSIS_PROMPT
       .replace("{rating}", String(review.rating))
-      .replace("{comment}", review.comment.replace(/"/g, '\\"'))
-      .replace("{verifiedBooking}", String(review.verifiedBooking ?? false));
+      .replace("{verifiedBooking}", String(review.verifiedBooking ?? false))
+      .replace("{comment}", sanitizedComment);
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 

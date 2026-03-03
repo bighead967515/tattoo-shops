@@ -247,7 +247,8 @@ export async function addPortfolioImage(image: InsertPortfolioImage) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  return await db.insert(portfolioImages).values(image);
+  const [inserted] = await db.insert(portfolioImages).values(image).returning();
+  return inserted;
 }
 
 export async function getPortfolioByArtistId(artistId: number) {
@@ -312,12 +313,12 @@ export async function createReview(review: InsertReview) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(reviews).values(review);
+  const [inserted] = await db.insert(reviews).values(review).returning();
   
   // Update artist average rating
   await updateArtistRating(review.artistId);
   
-  return result;
+  return inserted;
 }
 
 export async function getReviewsByArtistId(artistId: number) {
@@ -528,15 +529,17 @@ export async function discoverArtists(intent: {
     artistConditions.push(sql`${artists.bio} ILIKE ${likeTerm}`);
   }
 
-  const matchingArtistsDirect = await db
-    .select()
-    .from(artists)
-    .where(
-      and(
-        eq(artists.isApproved, true),
-        or(...artistConditions)
-      )
-    );
+  const matchingArtistsDirect = artistConditions.length > 0
+    ? await db
+        .select()
+        .from(artists)
+        .where(
+          and(
+            eq(artists.isApproved, true),
+            or(...artistConditions)
+          )
+        )
+    : [];
 
   // Step 3: Merge results — group by artist, calculate relevance score
   const artistMap = new Map<

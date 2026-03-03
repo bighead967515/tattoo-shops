@@ -67,12 +67,12 @@ export default function RequestDetail() {
 
   const draftBid = trpc.bids.draftBid.useMutation({
     onSuccess: (data) => {
-      setBidForm({
-        ...bidForm,
-        priceEstimate: data.suggestedPrice > 0 ? String(data.suggestedPrice) : bidForm.priceEstimate,
-        estimatedHours: data.suggestedHours > 0 ? String(data.suggestedHours) : bidForm.estimatedHours,
-        message: data.message || bidForm.message,
-      });
+      setBidForm((prev) => ({
+        ...prev,
+        priceEstimate: data.suggestedPrice > 0 ? String(data.suggestedPrice) : prev.priceEstimate,
+        estimatedHours: data.suggestedHours > 0 ? String(data.suggestedHours) : prev.estimatedHours,
+        message: data.message || prev.message,
+      }));
       setAiDraftLoading(false);
       if (data.pricingRationale) {
         toast.info(data.pricingRationale, { duration: 6000 });

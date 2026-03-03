@@ -36,7 +36,7 @@ export default function ArtistBrowse() {
       setActiveQuery(q);
       setMode("discover");
     }
-  }, [searchString]);
+  }, [searchString, activeQuery]);
 
   // Structured filter search (existing)
   const filterSearch = trpc.artists.search.useQuery(
@@ -165,12 +165,12 @@ export default function ArtistBrowse() {
                 <p className="text-sm font-medium">AI understood your request:</p>
                 <div className="flex flex-wrap gap-2">
                   {intent.styles.map((style) => (
-                    <Badge key={style} variant="default" className="text-xs">
+                    <Badge key={`style-${style}`} variant="default" className="text-xs">
                       {style}
                     </Badge>
                   ))}
                   {intent.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-xs">
+                    <Badge key={`tag-${tag}`} variant="secondary" className="text-xs">
                       {tag}
                     </Badge>
                   ))}
@@ -185,7 +185,7 @@ export default function ArtistBrowse() {
                     </Badge>
                   )}
                   {intent.keywords.map((kw) => (
-                    <Badge key={kw} variant="outline" className="text-xs">
+                    <Badge key={`kw-${kw}`} variant="outline" className="text-xs">
                       {kw}
                     </Badge>
                   ))}

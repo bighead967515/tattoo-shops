@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { safeJsonParse } from "@/lib/utils";
 import { getLoginUrl } from "@/const";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -328,8 +329,8 @@ export default function ArtistProfile() {
         ) : portfolio && portfolio.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {portfolio.map((image) => {
-              const aiStyles: string[] = image.aiStyles ? JSON.parse(image.aiStyles) : [];
-              const aiTags: string[] = image.aiTags ? JSON.parse(image.aiTags) : [];
+              const aiStyles: string[] = safeJsonParse<string[]>(image.aiStyles, []);
+              const aiTags: string[] = safeJsonParse<string[]>(image.aiTags, []);
               const hasAI = aiStyles.length > 0 || aiTags.length > 0;
 
               return (
@@ -353,7 +354,7 @@ export default function ArtistProfile() {
                     {aiStyles.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {aiStyles.map((style) => (
-                          <Badge key={style} variant="secondary" className="text-xs">
+                          <Badge key={`style-${style}`} variant="secondary" className="text-xs">
                             {style}
                           </Badge>
                         ))}
@@ -362,7 +363,7 @@ export default function ArtistProfile() {
                     {aiTags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {aiTags.slice(0, 4).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
+                          <Badge key={`tag-${tag}`} variant="outline" className="text-xs">
                             {tag}
                           </Badge>
                         ))}

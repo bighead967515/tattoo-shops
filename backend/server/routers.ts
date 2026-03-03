@@ -75,7 +75,7 @@ export const appRouter = router({
      * Parses the user's free-text query with Gemini AI, then matches against
      * AI-tagged portfolio images and artist profiles.
      */
-    discover: publicProcedure
+    discover: protectedProcedure
       .input(z.object({
         query: z.string().min(1).max(500),
       }))
@@ -239,24 +239,19 @@ export const appRouter = router({
         // Analysis happens async — the image is immediately available while AI processes
         analyzePortfolioImage(imageUrl)
           .then(async (analysis) => {
-            if (analysis.qualityScore > 0) {
-              // Get the inserted image ID from the result
-              const images = await db.getPortfolioByArtistId(input.artistId);
-              const inserted = images.find((img) => img.imageKey === sanitizedKey);
-              if (inserted) {
-                await db.updatePortfolioImageAI(inserted.id, {
-                  aiStyles: JSON.stringify(analysis.styles),
-                  aiTags: JSON.stringify(analysis.tags),
-                  aiDescription: analysis.description,
-                  qualityScore: analysis.qualityScore,
-                  qualityIssues: JSON.stringify(analysis.qualityIssues),
-                  aiProcessedAt: new Date(),
-                  // Auto-fill style if not manually set
-                  ...(!input.style && analysis.styles.length > 0
-                    ? { style: analysis.styles[0] }
-                    : {}),
-                });
-              }
+            if (analysis.qualityScore > 0 && result?.id) {
+              await db.updatePortfolioImageAI(result.id, {
+                aiStyles: JSON.stringify(analysis.styles),
+                aiTags: JSON.stringify(analysis.tags),
+                aiDescription: analysis.description,
+                qualityScore: analysis.qualityScore,
+                qualityIssues: JSON.stringify(analysis.qualityIssues),
+                aiProcessedAt: new Date(),
+                // Auto-fill style if not manually set
+                ...(!input.style && analysis.styles.length > 0
+                  ? { style: analysis.styles[0] }
+                  : {}),
+              });
             }
           })
           .catch((err) => {
@@ -349,12 +344,7 @@ export const appRouter = router({
             verifiedBooking: false,
           })
             .then(async (analysis) => {
-              // Get the inserted review ID
-              const reviews = await db.getReviewsByArtistId(input.artistId);
-              const inserted = reviews.find(
-                (r) => r.comment === input.comment && r.rating === input.rating
-              );
-              if (inserted) {
+              if (result?.id) {
                 // Map AI action to moderation status
                 let moderationStatus: string;
                 if (analysis.moderationAction === "auto_hide") {
@@ -365,7 +355,7 @@ export const appRouter = router({
                   moderationStatus = "approved";
                 }
 
-                await db.updateReviewModeration(inserted.id, {
+                await db.updateReviewModeration(result.id, {
                   moderationStatus,
                   moderationFlags: JSON.stringify(analysis.flags),
                   toxicityScore: analysis.toxicityScore,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -57,14 +57,19 @@ function DesignLab() {
     enabled: !!user,
   });
 
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
+  const styleRef = useRef(style);
+  styleRef.current = style;
+
   const generateMutation = trpc.ai.generateDesign.useMutation({
     onSuccess: (data) => {
       setGeneratedImages((prev) => [
         {
           imageUrl: data.imageUrl,
           imageKey: data.imageKey,
-          prompt,
-          style: style || "default",
+          prompt: promptRef.current,
+          style: styleRef.current || "default",
         },
         ...prev,
       ]);
@@ -204,6 +209,7 @@ function DesignLab() {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={5}
+                    maxLength={2000}
                     className="resize-none"
                     disabled={isFreeTier || isGenerating}
                   />
@@ -372,17 +378,30 @@ function DesignLab() {
                       />
                       {/* Overlay on hover */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <a
-                          href={image.imageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(image.imageUrl);
+                              const blob = await res.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `tattoo-design-${Date.now()}.png`;
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              URL.revokeObjectURL(url);
+                            } catch {
+                              // Fallback: open in new tab
+                              window.open(image.imageUrl, "_blank");
+                            }
+                          }}
                         >
-                          <Button variant="secondary" size="sm">
-                            <Download className="h-4 w-4 mr-1" />
-                            Download
-                          </Button>
-                        </a>
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </Button>
                       </div>
                     </div>
                     <CardContent className="p-4">

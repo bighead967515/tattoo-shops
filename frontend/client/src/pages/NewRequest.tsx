@@ -541,12 +541,17 @@ function PromptRefinerSection({
   onUseImproved: (improved: string) => void;
 }) {
   const refine = trpc.requests.refineDescription.useMutation();
+  const [lastRefinedDesc, setLastRefinedDesc] = useState("");
+
+  // Track whether the description has changed since the last refinement
+  const isStale = refine.data && description !== lastRefinedDesc;
 
   const handleRefine = () => {
     if (description.length < 10) {
       toast.error("Write at least a short description before getting AI feedback.");
       return;
     }
+    setLastRefinedDesc(description);
     refine.mutate({
       description,
       title: context.title || undefined,
@@ -568,7 +573,7 @@ function PromptRefinerSection({
         disabled={description.length < 10}
       >
         <Sparkles className="w-3.5 h-3.5 mr-1.5 text-primary" />
-        Get AI Feedback
+        {isStale ? "Re-analyze (description changed)" : "Get AI Feedback"}
       </Button>
     );
   }
@@ -607,8 +612,18 @@ function PromptRefinerSection({
     data.completenessScore >= 7 ? CheckCircle2 : data.completenessScore >= 4 ? MessageCircleQuestion : AlertTriangle;
 
   return (
-    <Card className="mt-3 bg-primary/5 border-primary/20">
+    <Card className={`mt-3 bg-primary/5 border-primary/20 ${isStale ? "opacity-60" : ""}`}>
       <CardContent className="pt-4 pb-3 space-y-3">
+        {/* Stale warning */}
+        {isStale && (
+          <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Description changed since last analysis.
+            <Button type="button" variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={handleRefine}>
+              Re-analyze
+            </Button>
+          </div>
+        )}
         {/* Score header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

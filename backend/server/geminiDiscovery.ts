@@ -63,10 +63,17 @@ export async function parseDiscoveryQuery(
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const result = await model.generateContent([
-      DISCOVERY_PROMPT,
-      `User query: "${query}"`,
-    ]);
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: DISCOVERY_PROMPT },
+            { text: `User query: "${query.slice(0, 500)}"` },
+          ],
+        },
+      ],
+    });
 
     const text = result.response.text().trim();
 
@@ -92,7 +99,7 @@ export async function parseDiscoveryQuery(
     };
 
     logger.info(
-      `Discovery query parsed: "${query}" => styles=[${intent.styles.join(", ")}] tags=[${intent.tags.join(", ")}] placement=${intent.placement} size=${intent.size}`
+      `Discovery query parsed: "${query.slice(0, 80)}${query.length > 80 ? "..." : ""}" => styles=[${intent.styles.join(", ")}] tags=[${intent.tags.join(", ")}] placement=${intent.placement} size=${intent.size}`
     );
 
     return intent;

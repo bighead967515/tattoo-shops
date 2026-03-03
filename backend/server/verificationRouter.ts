@@ -196,6 +196,13 @@ export const verificationRouter = router({
   getDocument: adminProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return await db.getVerificationDocumentById(input.id);
+      const doc = await db.getVerificationDocumentById(input.id);
+      if (!doc) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Verification document not found",
+        });
+      }
+      return doc;
     }),
 });

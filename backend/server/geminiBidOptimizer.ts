@@ -222,7 +222,7 @@ export async function draftBidResponse(
       request.style ? `Style: ${request.style}` : null,
       `Placement: ${request.placement}`,
       `Size: ${request.size}`,
-      request.colorPreference ? `Color Preference: ${request.colorPreference.replace("_", " & ")}` : null,
+      request.colorPreference ? `Color Preference: ${request.colorPreference.replace(/_/g, " & ")}` : null,
       request.budgetMin || request.budgetMax
         ? `Budget: ${request.budgetMin ? `$${(request.budgetMin / 100).toFixed(0)}` : "?"} - ${request.budgetMax ? `$${(request.budgetMax / 100).toFixed(0)}` : "?"}`
         : null,
@@ -274,8 +274,8 @@ export async function draftBidResponse(
     logger.error("Gemini Bid Assistant failed:", error);
     return {
       message: "",
-      suggestedPrice: 0,
-      suggestedHours: 0,
+      suggestedPrice: 50,
+      suggestedHours: 1,
       pricingRationale: "AI draft generation failed — please write your bid manually.",
       toneNotes: "",
     };

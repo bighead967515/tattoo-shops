@@ -36,11 +36,15 @@ export const users = pgTable("users", {
   verificationSubmittedAt: timestamp("verificationSubmittedAt"), // When they uploaded license
   verificationReviewedAt: timestamp("verificationReviewedAt"), // When admin reviewed
   verificationNotes: text("verificationNotes"), // Admin notes about verification
-  /** Canonical subscription tier — immutable fact from Stripe. See SubscriptionTier in @shared/const. */
+  /**
+   * Canonical subscription tier — immutable fact from Stripe. See SubscriptionTier in @shared/const.
+   * SOURCE OF TRUTH for billing tier. Nullable: set during onboarding based on role.
+   * Onboarding must set: artists → "artist_free", clients → "client_free".
+   * artists.subscriptionTier and clients.subscriptionTier are deprecated copies; prefer this column.
+   */
   subscriptionTier: varchar("subscriptionTier", { length: 30 })
-    .$type<SubscriptionTier>()
-    .default("artist_free")
-    .notNull(),
+    .$type<SubscriptionTier | null>()
+    .default(null),
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -273,7 +277,11 @@ export const clients = pgTable("clients", {
   state: varchar("state", { length: 50 }),
   phone: varchar("phone", { length: 50 }),
   onboardingCompleted: boolean("onboardingCompleted").default(false),
-  // Client Subscription Tiers
+  /**
+   * @deprecated Read from users.subscriptionTier instead. Kept for backward-compat queries.
+   * During the transition, application-level sync propagates users.subscriptionTier → clients.subscriptionTier
+   * whenever Stripe webhooks update the user record.
+   */
   subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("free").notNull(), // 'free', 'enthusiast', 'elite'
   aiCredits: integer("aiCredits").default(0).notNull(), // Number of AI generation credits remaining
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID for billing
