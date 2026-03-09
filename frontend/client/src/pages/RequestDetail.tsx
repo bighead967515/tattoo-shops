@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useRoute, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,7 +30,26 @@ import {
   Sparkles
 } from "lucide-react";
 import UpgradePrompt from "@/components/UpgradePrompt";
-import { canUseAiBidAssistant, isFreeArtistTier } from "@shared/tierCompat";
+import { canUseAiBidAssistant, isFreeArtistTier, isFreeClientTier } from "@shared/tierCompat";
+
+const FONT_FAMILY_OPTIONS = [
+  { label: "System Sans", value: "ui-sans-serif, system-ui, sans-serif" },
+  { label: "Serif", value: "Georgia, 'Times New Roman', serif" },
+  { label: "Monospace", value: "'Courier New', monospace" },
+  { label: "Display", value: "'Trebuchet MS', 'Segoe UI', sans-serif" },
+  { label: "Script", value: "'Brush Script MT', cursive" },
+] as const;
+
+const FONT_WEIGHT_OPTIONS = [
+  { label: "Regular", value: "400" },
+  { label: "Medium", value: "500" },
+  { label: "Semibold", value: "600" },
+  { label: "Bold", value: "700" },
+] as const;
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 export default function RequestDetail() {
   const [, params] = useRoute("/requests/:id");
@@ -45,6 +65,19 @@ export default function RequestDetail() {
     availableDate: "",
     portfolioLinks: "",
   });
+  const [textFontFamily, setTextFontFamily] = useState<string>(FONT_FAMILY_OPTIONS[0].value);
+  const [textFontWeight, setTextFontWeight] = useState<string>("500");
+  const [textColor, setTextColor] = useState<string>("#111827");
+  const [titleFontSize, setTitleFontSize] = useState<number>(30);
+  const [bodyFontSize, setBodyFontSize] = useState<number>(14);
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
+  const [overlayText, setOverlayText] = useState<string>("");
+  const [overlayFontFamily, setOverlayFontFamily] = useState<string>(FONT_FAMILY_OPTIONS[0].value);
+  const [overlayFontWeight, setOverlayFontWeight] = useState<string>("700");
+  const [overlayFontSize, setOverlayFontSize] = useState<number>(26);
+  const [overlayColor, setOverlayColor] = useState<string>("#ffffff");
+  const [overlayX, setOverlayX] = useState<number>(50);
+  const [overlayY, setOverlayY] = useState<number>(80);
 
   const { data: request, isLoading, refetch } = trpc.requests.getById.useQuery(
     { id: requestId },
@@ -137,14 +170,68 @@ export default function RequestDetail() {
   type BidType = NonNullable<typeof request>["bids"][number];
   type ImageType = NonNullable<typeof request>["images"][number];
 
+  useEffect(() => {
+    if (!request?.images?.length) {
+      setSelectedImageId(null);
+      return;
+    }
+
+    const stillExists = request.images.some((image: ImageType) => image.id === selectedImageId);
+    if (!stillExists) {
+      setSelectedImageId(request.images[0].id);
+    }
+  }, [request?.images, selectedImageId]);
+
   const isClient = user?.role === "client";
   const isArtist = user?.role === "artist";
   const isOwner = request?.client.userId === user?.id;
+  const ownerTier = (user?.subscriptionTier ?? request?.client.subscriptionTier ?? "client_free") as
+    | string
+    | null
+    | undefined;
+  const isPaidClientOwner = Boolean(isClient && isOwner && !isFreeClientTier(ownerTier));
+  const isFreeClientOwner = Boolean(isClient && isOwner && isFreeClientTier(ownerTier));
   const hasAlreadyBid = request?.bids.some((b: BidType) => b.artist.userId === user?.id);
   // New logic for "5 free bids"
   const bidsRemaining = Math.max(0, 5 - (artistProfile?.bidsUsed ?? 0));
   const isFreeTier = isFreeArtistTier(artistProfile?.subscriptionTier);
   const canBid = !isFreeTier || (isFreeTier && bidsRemaining > 0);
+
+  const detailTitleStyle: CSSProperties | undefined = isPaidClientOwner
+    ? {
+        fontFamily: textFontFamily,
+        fontWeight: textFontWeight as CSSProperties["fontWeight"],
+        fontSize: `${titleFontSize}px`,
+        color: textColor,
+      }
+    : undefined;
+
+  const detailBodyStyle: CSSProperties | undefined = isPaidClientOwner
+    ? {
+        fontFamily: textFontFamily,
+        fontWeight: textFontWeight as CSSProperties["fontWeight"],
+        fontSize: `${bodyFontSize}px`,
+        color: textColor,
+      }
+    : undefined;
+
+  const resetTextStyle = () => {
+    setTextFontFamily(FONT_FAMILY_OPTIONS[0].value);
+    setTextFontWeight("500");
+    setTextColor("#111827");
+    setTitleFontSize(30);
+    setBodyFontSize(14);
+  };
+
+  const clearOverlay = () => {
+    setOverlayText("");
+    setOverlayFontFamily(FONT_FAMILY_OPTIONS[0].value);
+    setOverlayFontWeight("700");
+    setOverlayFontSize(26);
+    setOverlayColor("#ffffff");
+    setOverlayX(50);
+    setOverlayY(80);
+  };
 
   if (isLoading) {
     return (
@@ -189,7 +276,7 @@ export default function RequestDetail() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-2xl">{request.title}</CardTitle>
+                  <CardTitle className="text-2xl" style={detailTitleStyle}>{request.title}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-2">
                     <User className="h-4 w-4" />
                     Posted by {request.client.displayName}
@@ -207,15 +294,56 @@ export default function RequestDetail() {
                   {request.images.map((image: ImageType) => (
                     <div
                       key={image.id}
-                      className={`aspect-square overflow-hidden rounded-lg ${
+                      className={`relative aspect-square overflow-hidden rounded-lg ${
                         image.isMainImage ? "col-span-2 row-span-2" : ""
+                      } ${
+                        isPaidClientOwner && selectedImageId === image.id ? "ring-2 ring-primary/70" : ""
                       }`}
+                      onClick={() => {
+                        if (!isPaidClientOwner) return;
+                        setSelectedImageId(image.id);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!isPaidClientOwner) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedImageId(image.id);
+                        }
+                      }}
+                      role={isPaidClientOwner ? "button" : undefined}
+                      tabIndex={isPaidClientOwner ? 0 : undefined}
+                      aria-label={
+                        isPaidClientOwner
+                          ? `Select image ${image.id} for text overlay`
+                          : undefined
+                      }
                     >
                       <img
                         src={image.imageUrl}
                         alt={image.caption || "Reference image"}
                         className="object-cover w-full h-full"
                       />
+                      {isPaidClientOwner &&
+                        overlayText.trim() &&
+                        selectedImageId === image.id && (
+                          <div className="pointer-events-none absolute inset-0">
+                            <span
+                              className="absolute max-w-[90%] whitespace-pre-wrap break-words drop-shadow-[0_2px_6px_rgba(0,0,0,0.75)]"
+                              style={{
+                                left: `${overlayX}%`,
+                                top: `${overlayY}%`,
+                                transform: "translate(-50%, -50%)",
+                                fontFamily: overlayFontFamily,
+                                fontWeight: overlayFontWeight as CSSProperties["fontWeight"],
+                                fontSize: `${overlayFontSize}px`,
+                                color: overlayColor,
+                                lineHeight: 1.1,
+                              }}
+                            >
+                              {overlayText}
+                            </span>
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>
@@ -223,8 +351,8 @@ export default function RequestDetail() {
 
               {/* Description */}
               <div>
-                <h3 className="font-semibold mb-2">Description</h3>
-                <p className="text-muted-foreground whitespace-pre-wrap">
+                <h3 className="font-semibold mb-2" style={detailBodyStyle}>Description</h3>
+                <p className="text-muted-foreground whitespace-pre-wrap" style={detailBodyStyle}>
                   {request.description}
                 </p>
               </div>
@@ -232,7 +360,7 @@ export default function RequestDetail() {
               <Separator />
 
               {/* Details grid */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4" style={detailBodyStyle}>
                 {request.style && (
                   <div className="flex items-center gap-2">
                     <Palette className="h-4 w-4 text-muted-foreground" />
@@ -396,6 +524,235 @@ export default function RequestDetail() {
 
         {/* Right column - Actions */}
         <div className="space-y-6">
+          {/* Text and font tools for paid request owners */}
+          {isPaidClientOwner && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Text &amp; Font Tools</CardTitle>
+                <CardDescription>
+                  Style this request text and preview text overlays on your reference images.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Request Text Styling</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="request-text-font-family">Font Family</Label>
+                      <Select value={textFontFamily} onValueChange={setTextFontFamily}>
+                        <SelectTrigger id="request-text-font-family" className="w-full">
+                          <SelectValue placeholder="Choose a font family" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FONT_FAMILY_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="request-text-font-weight">Font Weight</Label>
+                      <Select value={textFontWeight} onValueChange={setTextFontWeight}>
+                        <SelectTrigger id="request-text-font-weight" className="w-full">
+                          <SelectValue placeholder="Choose a font weight" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FONT_WEIGHT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="request-title-font-size">Title Size</Label>
+                        <Input
+                          id="request-title-font-size"
+                          type="number"
+                          min={20}
+                          max={56}
+                          value={titleFontSize}
+                          onChange={(event) => {
+                            const parsed = Number(event.target.value);
+                            if (Number.isNaN(parsed)) return;
+                            setTitleFontSize(clampNumber(parsed, 20, 56));
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="request-body-font-size">Body Size</Label>
+                        <Input
+                          id="request-body-font-size"
+                          type="number"
+                          min={12}
+                          max={28}
+                          value={bodyFontSize}
+                          onChange={(event) => {
+                            const parsed = Number(event.target.value);
+                            if (Number.isNaN(parsed)) return;
+                            setBodyFontSize(clampNumber(parsed, 12, 28));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="request-text-color">Text Color</Label>
+                      <Input
+                        id="request-text-color"
+                        type="color"
+                        value={textColor}
+                        onChange={(event) => setTextColor(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Image Text Overlay</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="overlay-target-image">Target Image</Label>
+                    <Select
+                      value={selectedImageId ? String(selectedImageId) : undefined}
+                      onValueChange={(value) => setSelectedImageId(Number(value))}
+                    >
+                      <SelectTrigger id="overlay-target-image" className="w-full">
+                        <SelectValue placeholder="Select an image" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {request.images.map((image: ImageType, index: number) => (
+                          <SelectItem key={image.id} value={String(image.id)}>
+                            Image {index + 1}
+                            {image.isMainImage ? " (Main)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="overlay-text">Overlay Text</Label>
+                    <Textarea
+                      id="overlay-text"
+                      rows={3}
+                      maxLength={200}
+                      placeholder="Add text to preview on the selected image..."
+                      value={overlayText}
+                      onChange={(event) => setOverlayText(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="overlay-font-family">Overlay Font Family</Label>
+                    <Select value={overlayFontFamily} onValueChange={setOverlayFontFamily}>
+                      <SelectTrigger id="overlay-font-family" className="w-full">
+                        <SelectValue placeholder="Choose overlay font family" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FONT_FAMILY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="overlay-font-weight">Overlay Font Weight</Label>
+                    <Select value={overlayFontWeight} onValueChange={setOverlayFontWeight}>
+                      <SelectTrigger id="overlay-font-weight" className="w-full">
+                        <SelectValue placeholder="Choose overlay font weight" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FONT_WEIGHT_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-font-size">Font Size</Label>
+                      <Input
+                        id="overlay-font-size"
+                        type="number"
+                        min={10}
+                        max={120}
+                        value={overlayFontSize}
+                        onChange={(event) => {
+                          const parsed = Number(event.target.value);
+                          if (Number.isNaN(parsed)) return;
+                          setOverlayFontSize(clampNumber(parsed, 10, 120));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-color">Text Color</Label>
+                      <Input
+                        id="overlay-color"
+                        type="color"
+                        value={overlayColor}
+                        onChange={(event) => setOverlayColor(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-x-position">X Position (%)</Label>
+                      <Input
+                        id="overlay-x-position"
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={overlayX}
+                        onChange={(event) => {
+                          const parsed = Number(event.target.value);
+                          if (Number.isNaN(parsed)) return;
+                          setOverlayX(clampNumber(parsed, 0, 100));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-y-position">Y Position (%)</Label>
+                      <Input
+                        id="overlay-y-position"
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={overlayY}
+                        onChange={(event) => {
+                          const parsed = Number(event.target.value);
+                          if (Number.isNaN(parsed)) return;
+                          setOverlayY(clampNumber(parsed, 0, 100));
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex-col gap-2">
+                <Button variant="outline" className="w-full" onClick={resetTextStyle}>
+                  Reset Text Style
+                </Button>
+                <Button variant="outline" className="w-full" onClick={clearOverlay}>
+                  Clear Overlay
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+
+          {isFreeClientOwner && (
+            <UpgradePrompt
+              feature="Text & Font Tools"
+              description="Upgrade to Client Plus or Elite to style request text and add image text overlays."
+            />
+          )}
+
           {/* Submit bid card (for artists) */}
           {isArtist && request.status === "open" && !hasAlreadyBid && artistProfile && (
             <Card>
