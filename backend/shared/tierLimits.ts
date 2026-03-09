@@ -116,7 +116,7 @@ export function canUploadMorePhotos(tier: ArtistTierKey, currentCount: number): 
 // ============================================
 
 export const CLIENT_TIER_LIMITS = {
-  free: {
+  client_free: {
     name: 'Collector',
     requestsPerMonth: 1,
     aiGenerationsPerMonth: 0,
@@ -124,7 +124,7 @@ export const CLIENT_TIER_LIMITS = {
     priorityRequestBoard: false,
     depositFeeWaived: false,
   },
-  enthusiast: {
+  client_plus: {
     name: 'Enthusiast',
     requestsPerMonth: 10,
     aiGenerationsPerMonth: 10,
@@ -132,7 +132,7 @@ export const CLIENT_TIER_LIMITS = {
     priorityRequestBoard: true,
     depositFeeWaived: false,
   },
-  elite: {
+  client_elite: {
     name: 'Elite Ink',
     requestsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
     aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
@@ -143,15 +143,15 @@ export const CLIENT_TIER_LIMITS = {
 } as const;
 
 export const CLIENT_TIER_PRICING = {
-  free: {
+  client_free: {
     monthly: 0,
     stripePriceIdMonth: null,
   },
-  enthusiast: {
+  client_plus: {
     monthly: 900, // $9.00
     stripePriceIdMonth: 'price_client_enthusiast_mo', // Placeholder — set in Stripe Dashboard
   },
-  elite: {
+  client_elite: {
     monthly: 1900, // $19.00
     stripePriceIdMonth: 'price_client_elite_mo', // Placeholder — set in Stripe Dashboard
   },
@@ -160,9 +160,9 @@ export const CLIENT_TIER_PRICING = {
 export type ClientSubscriptionTier = keyof typeof CLIENT_TIER_LIMITS;
 
 export function getClientTierLimits(tier: ClientSubscriptionTier) {
-  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.free;
+  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
 }
 
 export function getClientTierPricing(tier: ClientSubscriptionTier) {
-  return CLIENT_TIER_PRICING[tier] || CLIENT_TIER_PRICING.free;
+  return CLIENT_TIER_PRICING[tier] || CLIENT_TIER_PRICING.client_free;
 }

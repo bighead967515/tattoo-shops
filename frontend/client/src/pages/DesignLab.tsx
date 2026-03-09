@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -57,19 +57,14 @@ function DesignLab() {
     enabled: !!user,
   });
 
-  const promptRef = useRef(prompt);
-  promptRef.current = prompt;
-  const styleRef = useRef(style);
-  styleRef.current = style;
-
   const generateMutation = trpc.ai.generateDesign.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       setGeneratedImages((prev) => [
         {
           imageUrl: data.imageUrl,
           imageKey: data.imageKey,
-          prompt: promptRef.current,
-          style: styleRef.current || "default",
+          prompt: variables.prompt,
+          style: variables.style || "default",
         },
         ...prev,
       ]);
@@ -384,6 +379,7 @@ function DesignLab() {
                           onClick={async () => {
                             try {
                               const res = await fetch(image.imageUrl);
+                              if (!res.ok) throw new Error(`Download failed: ${res.status}`);
                               const blob = await res.blob();
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");

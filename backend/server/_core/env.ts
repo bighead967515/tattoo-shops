@@ -7,6 +7,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
   STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
+  // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
+  STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
+  STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
   RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -32,6 +35,8 @@ export const ENV = {
   isProduction: parsed.data.NODE_ENV === "production",
   stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
   stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
+  stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
+  stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,
   resendApiKey: parsed.data.RESEND_API_KEY,
   supabaseUrl: parsed.data.SUPABASE_URL,
   supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,

@@ -39,22 +39,6 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Analytics script - handled dynamically to avoid Vite bundling errors with undefined env vars -->
-    <script>
-      (function() {
-        var analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
-        var websiteId = "%VITE_ANALYTICS_WEBSITE_ID%";
-        var isEndpointConfigured = analyticsEndpoint && analyticsEndpoint.indexOf("%") !== 0;
-        
-        if (isEndpointConfigured) {
-          var script = document.createElement("script");
-          script.defer = true;
-          script.src = analyticsEndpoint + "/umami";
-          script.setAttribute("data-website-id", websiteId);
-          document.body.appendChild(script);
-        }
-      })();
-    </script>
   </body>
 
 </html>

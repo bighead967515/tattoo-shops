@@ -57,6 +57,60 @@ export async function createCheckoutSession({
   });
 }
 
+/**
+ * Create a Stripe Checkout Session for a client subscription upgrade.
+ * Uses `mode: "subscription"` with the Stripe Price ID for the chosen tier.
+ */
+export async function createSubscriptionCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl,
+}: {
+  priceId: string;
+  customerEmail: string;
+  stripeCustomerId?: string;
+  metadata: Record<string, string>;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      mode: "subscription",
+      ...(stripeCustomerId
+        ? { customer: stripeCustomerId }
+        : { customer_email: customerEmail }),
+      metadata,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true,
+    });
+
+    return session;
+  });
+}
+
+/**
+ * Map a Stripe Price ID to a client subscription tier.
+ * Returns null if the Price ID doesn't match a known client tier.
+ */
+export function stripePriceToClientTier(
+  priceId: string
+): "client_plus" | "client_elite" | null {
+  if (priceId === ENV.stripeClientPlusPriceId) return "client_plus";
+  if (priceId === ENV.stripeClientElitePriceId) return "client_elite";
+  return null;
+}
+
 export async function constructWebhookEvent(
   payload: string | Buffer,
   signature: string

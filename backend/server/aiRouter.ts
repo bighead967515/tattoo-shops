@@ -50,7 +50,7 @@ export const aiRouter = router({
       }
 
       // 2. Check subscription tier and AI credits
-      const tier = (clientProfile.subscriptionTier || "free") as ClientSubscriptionTier;
+      const tier = (clientProfile.subscriptionTier || "client_free") as ClientSubscriptionTier;
       const tierLimits = getClientTierLimits(tier);
 
       if (tierLimits.aiGenerationsPerMonth === 0) {
@@ -132,7 +132,7 @@ export const aiRouter = router({
 
     if (!clientProfile) {
       return {
-        tier: "free" as const,
+        tier: "client_free" as const,
         tierName: "Collector",
         aiCredits: 0,
         maxCredits: 0,
@@ -140,7 +140,7 @@ export const aiRouter = router({
       };
     }
 
-    const tier = (clientProfile.subscriptionTier || "free") as ClientSubscriptionTier;
+    const tier = (clientProfile.subscriptionTier || "client_free") as ClientSubscriptionTier;
     const tierLimits = getClientTierLimits(tier);
 
     return {

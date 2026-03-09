@@ -1,9 +1,13 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { constructWebhookEvent } from "./stripe";
+import { constructWebhookEvent, stripePriceToClientTier } from "./stripe";
 import * as db from "./db";
+import { getDb } from "./db";
+import { clients, users } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 import { logger } from "./_core/logger";
 import { queueWebhookForRetry, startQueueProcessor, getQueueStats } from "./webhookQueue";
+import { CLIENT_TIER_LIMITS } from "../shared/tierLimits";
 
 // Flag to track if processor is started
 let processorStarted = false;
@@ -94,9 +98,173 @@ async function processWebhookEvent(eventType: string, event: Stripe.Event): Prom
       break;
     }
 
+    // ============================================
+    // CLIENT SUBSCRIPTION LIFECYCLE
+    // ============================================
+
+    case "customer.subscription.created":
+    case "customer.subscription.updated": {
+      const subscription = event.data.object as Stripe.Subscription;
+      await handleSubscriptionChange(subscription, eventType);
+      break;
+    }
+
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+      await handleSubscriptionCancelled(subscription);
+      break;
+    }
+
     default:
       logger.debug("Received unhandled webhook event type", { eventType });
   }
+}
+
+/**
+ * Handle subscription created / updated events.
+ * Maps the Stripe Price ID to a client tier, updates both
+ * the canonical `users.subscriptionTier` and the legacy
+ * `clients.subscriptionTier` + `aiCredits`.
+ */
+async function handleSubscriptionChange(
+  subscription: Stripe.Subscription,
+  eventType: string
+): Promise<void> {
+  const stripeCustomerId = typeof subscription.customer === "string"
+    ? subscription.customer
+    : subscription.customer.id;
+
+  const priceId = subscription.items.data[0]?.plan?.id;
+  if (!priceId) {
+    logger.warn("Subscription event missing plan price ID", {
+      eventType,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  const tier = stripePriceToClientTier(priceId);
+  if (!tier) {
+    logger.debug("Subscription price does not match a client tier — may be an artist subscription", {
+      priceId,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  const database = await getDb();
+  if (!database) {
+    throw new Error("Database not available for subscription webhook");
+  }
+
+  // Find the user by stripeCustomerId
+  const [user] = await database
+    .select()
+    .from(users)
+    .where(eq(users.stripeCustomerId, stripeCustomerId))
+    .limit(1);
+
+  if (!user) {
+    logger.warn("No user found for stripeCustomerId during subscription change", {
+      stripeCustomerId,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  const tierLimits = CLIENT_TIER_LIMITS[tier];
+  const aiCredits = tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+    ? 999
+    : tierLimits.aiGenerationsPerMonth;
+
+  // Atomically update users (source of truth) and clients (legacy copy)
+  await database.transaction(async (tx) => {
+    // Update canonical tier on users table
+    await tx
+      .update(users)
+      .set({
+        subscriptionTier: tier,
+        stripeSubscriptionId: subscription.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    // Propagate to clients table (legacy sync)
+    await tx
+      .update(clients)
+      .set({
+        subscriptionTier: tier,
+        aiCredits,
+        stripeSubscriptionId: subscription.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(clients.userId, user.id));
+  });
+
+  logger.info("Client subscription changed", {
+    userId: user.id,
+    tier,
+    aiCredits,
+    subscriptionId: subscription.id,
+    eventType,
+  });
+}
+
+/**
+ * Handle subscription cancellation / expiration.
+ * Downgrades the client back to the free tier.
+ */
+async function handleSubscriptionCancelled(
+  subscription: Stripe.Subscription
+): Promise<void> {
+  const stripeCustomerId = typeof subscription.customer === "string"
+    ? subscription.customer
+    : subscription.customer.id;
+
+  const database = await getDb();
+  if (!database) {
+    throw new Error("Database not available for subscription cancellation webhook");
+  }
+
+  const [user] = await database
+    .select()
+    .from(users)
+    .where(eq(users.stripeCustomerId, stripeCustomerId))
+    .limit(1);
+
+  if (!user) {
+    logger.warn("No user found for stripeCustomerId during subscription cancellation", {
+      stripeCustomerId,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  await database.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        subscriptionTier: "client_free",
+        stripeSubscriptionId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    await tx
+      .update(clients)
+      .set({
+        subscriptionTier: "client_free",
+        aiCredits: 0,
+        stripeSubscriptionId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(clients.userId, user.id));
+  });
+
+  logger.info("Client subscription cancelled — downgraded to free", {
+    userId: user.id,
+    subscriptionId: subscription.id,
+  });
 }
 
 export async function handleStripeWebhook(req: Request, res: Response) {

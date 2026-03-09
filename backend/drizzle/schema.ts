@@ -282,7 +282,7 @@ export const clients = pgTable("clients", {
    * During the transition, application-level sync propagates users.subscriptionTier → clients.subscriptionTier
    * whenever Stripe webhooks update the user record.
    */
-  subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("free").notNull(), // 'free', 'enthusiast', 'elite'
+  subscriptionTier: varchar("subscriptionTier", { length: 20 }).default("client_free").notNull(), // 'client_free', 'enthusiast', 'elite'
   aiCredits: integer("aiCredits").default(0).notNull(), // Number of AI generation credits remaining
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID for billing
   createdAt: timestamp("createdAt").defaultNow().notNull(),

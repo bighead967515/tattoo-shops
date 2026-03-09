@@ -384,7 +384,12 @@ export async function analyzeReviewSentiment(review: {
   try {
     // Build prompt safely — replace tokens in order so user-controlled content
     // (the comment) can't inject remaining template tokens like {verifiedBooking}.
-    const sanitizedComment = review.comment.replace(/"/g, '\\"');
+    const sanitizedComment = review.comment
+      .replace(/\\/g, '\\\\')    // Escape backslashes first
+      .replace(/"/g, '\\"')      // Escape double quotes
+      .replace(/\n/g, '\\n')     // Escape newlines
+      .replace(/\r/g, '\\r')     // Escape carriage returns
+      .replace(/\t/g, '\\t');    // Escape tabs
     const prompt = REVIEW_ANALYSIS_PROMPT
       .replace("{rating}", String(review.rating))
       .replace("{verifiedBooking}", String(review.verifiedBooking ?? false))

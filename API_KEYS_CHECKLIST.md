@@ -41,9 +41,23 @@ Complete this checklist to get all required API keys for your tattoo artist dire
    - `STRIPE_SECRET_KEY` - Secret key (starts with `sk_test_` for testing)
 5. Go to Developers > Webhooks
 6. Add endpoint: `https://yourdomain.com/api/webhooks/stripe`
-7. Select events: `checkout.session.completed`, `payment_intent.payment_failed`
+7. Select events: `checkout.session.completed`, `payment_intent.payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
 8. Copy webhook signing secret to `.env`:
    - `STRIPE_WEBHOOK_SECRET` - (starts with `whsec_`)
+
+#### Client Subscription Products (Enthusiast & Elite)
+
+9. Go to Products in the Stripe Dashboard
+10. **Create "Enthusiast" product** ($9/mo):
+    - Name: `Enthusiast`
+    - Price: `$9.00 / month` (recurring)
+    - Copy the **Price ID** (starts with `price_`) to `.env`:
+      - `STRIPE_CLIENT_PLUS_PRICE_ID`
+11. **Create "Elite Ink" product** ($19/mo):
+    - Name: `Elite Ink`
+    - Price: `$19.00 / month` (recurring)
+    - Copy the **Price ID** to `.env`:
+      - `STRIPE_CLIENT_ELITE_PRICE_ID`
 
 **Cost**: 2.9% + 30¢ per successful transaction
 

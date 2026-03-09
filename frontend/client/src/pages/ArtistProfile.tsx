@@ -238,7 +238,6 @@ export default function ArtistProfile() {
               </Button>
               <Button
                 size="lg"
-.
                 variant="outline"
                 className="w-full"
                 onClick={handleToggleFavorite}

@@ -43,7 +43,7 @@ initSentry();
 app.use(
   cors({
     origin: ENV.isProduction 
-      ? ["https://tattoo-shops.vercel.app", "https://universalinc.com"] 
+      ? ["https://universalinc.com", "https://www.universalinc.com"]
       : ["http://localhost:3000", "http://localhost:5173"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
@@ -204,12 +204,13 @@ app.use((err: Error & { statusCode?: number; status?: number }, _req: express.Re
   });
 });
 
-// This block handles local development.
-// Vercel will ignore this and use the exported `app` directly.
-if (process.env.NODE_ENV === "development") {
+// Start the server in both development and production.
+// In development, Vite provides HMR. In production, static files are served from dist/public.
+// When deployed to Vercel, this block is ignored and the exported `app` is used directly.
+{
   const server = createServer(app);
 
-  const startLocalServer = async () => {
+  const startServer = async () => {
     // Initialize Supabase Storage buckets on startup
     try {
       await initializeBuckets();
@@ -239,7 +240,7 @@ if (process.env.NODE_ENV === "development") {
     });
   };
 
-  startLocalServer().catch((error) => {
+  startServer().catch((error) => {
     logger.error("Failed to start server", { error });
     process.exit(1);
   });
