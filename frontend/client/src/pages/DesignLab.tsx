@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Header } from "@/components/Header";
+import Header from "@/components/Header";
 import {
   Sparkles,
   Download,
