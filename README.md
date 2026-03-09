@@ -1,21 +1,22 @@
 # Universal Inc. — Tattoo Artist Directory & Booking Platform
 
-A full-stack web application for finding, connecting with, and booking tattoo artists. Clients can browse artist portfolios, post tattoo requests for artists to bid on, and book appointments — all with integrated payments and real-time communication.
+A full-stack web application for finding, connecting with, and booking tattoo artists. Clients can browse artist portfolios, post tattoo requests for artists to bid on, generate AI tattoo designs, and book appointments — all with integrated payments and real-time communication.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | React 19, Vite, TypeScript, Wouter (routing), TanStack React Query |
-| **UI** | Tailwind CSS 4, shadcn/ui, Framer Motion, dark/light theme |
-| **Backend** | Node.js, Express, tRPC (type-safe API) |
+| **Frontend** | React 19, Vite 7, TypeScript 5.9, Wouter (routing), TanStack React Query |
+| **UI** | Tailwind CSS 4, shadcn/ui (Radix), Framer Motion, Recharts, dark/light theme |
+| **Backend** | Node.js, Express 4, tRPC 11 (type-safe API) |
 | **Database** | PostgreSQL (Supabase), Drizzle ORM |
 | **Auth** | Supabase Auth — Google, GitHub, and email/password |
-| **Storage** | Supabase Storage (portfolio images, ID documents) |
-| **Payments** | Stripe (checkout sessions, webhooks, subscription tiers) |
+| **Storage** | Supabase Storage (portfolio images, reference images, ID documents) |
+| **Payments** | Stripe (checkout sessions, subscriptions, webhooks) |
+| **AI** | Google Gemini 2.0 Flash (design generation, vision tagging, NLP discovery, review moderation, license OCR, bid drafting) |
 | **Email** | Resend (booking confirmations, artist invitations) |
 | **Monitoring** | Sentry, Winston logging, health check endpoint |
-| **Deployment** | Vercel (static frontend + serverless API) |
+| **Deployment** | Vercel (static + serverless) / Railway |
 | **Testing** | Vitest (unit), Playwright (e2e), Artillery (load) |
 
 ## Project Structure
@@ -24,23 +25,27 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 ├── backend/
 │   ├── drizzle/          # Database schema, migrations, relations
 │   ├── server/           # Express + tRPC server
-│   │   ├── routers.ts          # Artist, portfolio, review, booking, favorite routes
+│   │   ├── routers.ts          # Artist, portfolio, review, booking, favorite, moderation routes
 │   │   ├── clientRouters.ts    # Client profile, tattoo request, bid routes
+│   │   ├── aiRouter.ts         # AI tattoo design generation + credit tracking
 │   │   ├── verificationRouter.ts # License upload + admin review with AI OCR
+│   │   ├── healthRouter.ts     # Health check endpoint
 │   │   ├── geminiVision.ts     # Smart Portfolio Tagging (Gemini Vision)
 │   │   ├── geminiDiscovery.ts  # Tattoo Discovery query parser (Gemini)
+│   │   ├── geminiGeneration.ts # AI tattoo design generation (Gemini)
 │   │   ├── geminiBidOptimizer.ts # Prompt Refiner + Bid Assistant (Gemini)
 │   │   ├── geminiSafety.ts     # License OCR + Review Sentiment Analysis (Gemini)
-│   │   ├── stripe.ts           # Stripe checkout with circuit breaker
+│   │   ├── stripe.ts           # Stripe checkout + subscriptions with circuit breaker
 │   │   ├── email.ts            # Resend email with retry logic
 │   │   ├── webhookHandler.ts   # Stripe webhook processing + retry queue
+│   │   ├── webhookQueue.ts     # Webhook retry queue with exponential backoff
 │   │   └── _core/              # Context, auth, env, logging, Supabase clients
 │   └── shared/           # Shared types, constants, tier limits
 ├── frontend/
 │   └── client/
 │       └── src/
-│           ├── pages/          # 20 route-based pages (incl. admin moderation)
-│           ├── components/     # Reusable UI components
+│           ├── pages/          # 21 route-based pages
+│           ├── components/     # 15 reusable UI components + shadcn/ui library
 │           ├── hooks/          # Custom React hooks
 │           ├── contexts/       # Theme context
 │           └── lib/            # Utilities, tRPC client
@@ -61,34 +66,65 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 - **Smart Portfolio Tagging (AI)** — Gemini Vision automatically detects tattoo styles, tags content subjects, generates SEO descriptions, and scores image quality on every upload
 - **Booking management** — accept, confirm, or cancel appointments
 - **Request board** — browse client tattoo requests and submit bids
-- **AI Bid Assistant** — Professional/Icon tier artists get AI-drafted bid responses with suggested pricing, estimated hours, and personalized pitch messages based on their profile and the request details
-- **License verification** — upload documents for verified artist status with AI-powered OCR that extracts names, license numbers, and expiration dates and cross-references against the artist's profile
+- **AI Bid Assistant** — Professional/Icon tier artists get AI-drafted bid responses with suggested pricing, estimated hours, and personalized pitch messages
+- **License verification** — upload documents for verified artist status with AI-powered OCR that extracts names, license numbers, and expiration dates
 - **Subscription tiers** — Apprentice (Free), Artist ($9/mo), Professional ($19/mo), Icon ($39/mo)
 - **Analytics & reviews** — ratings, review responses, helpful votes
 
 ### For Clients
-- **Tattoo Discovery (AI)** — describe your dream tattoo in natural language and AI matches you to artists whose portfolios fit the vibe, style, and subject
+- **AI Design Lab** — generate AI tattoo stencil concepts from text prompts across 14 styles (Traditional, Realism, Watercolor, Japanese, Geometric, Minimalist, etc.), tier-gated with credit system
+- **Tattoo Discovery (AI)** — describe your dream tattoo in natural language and AI matches you to artists by style, subject, and vibe
 - **Artist discovery** — search and filter by style, rating, experience, and location
 - **Tattoo requests** — post requests with description, style, placement, size, budget, and reference images
-- **AI Prompt Refiner** — when writing a request, AI analyzes the description and suggests follow-up questions if it's too vague, with completeness scoring and improved description suggestions
+- **AI Prompt Refiner** — AI analyzes request descriptions for completeness and suggests improvements
 - **Bid system** — receive and compare bids from multiple artists
 - **Booking & payments** — book appointments with Stripe-powered deposits
 - **Favorites** — save and track preferred artists
 - **Dashboard** — manage requests, track bids, view booking history
+- **Client onboarding** — guided setup with preferred styles and location
 
 ### Platform
 - **Type-safe API** — end-to-end TypeScript with tRPC
 - **OAuth authentication** — Google, GitHub, and email via Supabase Auth
-- **Stripe payments** — checkout sessions, webhook processing with retry queue and exponential backoff
+- **Stripe payments** — checkout sessions, subscriptions, webhook processing with retry queue and exponential backoff
 - **Email notifications** — booking confirmations and artist invitations via Resend
 - **Circuit breaker pattern** — resilient external service calls (Stripe, email)
-- **Smart Portfolio Tagging** — computer vision via Gemini 2.0 Flash for auto style detection, content tagging, SEO descriptions, and image quality scoring
-- **Tattoo Discovery** — Gemini-powered natural language search parses user intent (style, subject, placement, size) and matches against AI-tagged portfolios with relevance scoring
-- **Request-to-Bid Optimization** — AI Prompt Refiner helps clients write detailed requests; AI Bid Assistant drafts personalized proposals for Professional/Icon artists
-- **Administrative Safety (AI)** — License Verification OCR extracts and verifies document data via Gemini Vision; Review Sentiment Analysis flags fraudulent, abusive, or spam reviews for human moderation
-- **Admin Moderation Dashboard** — unified admin panel at `/admin/moderation` with pending license verifications (OCR results, name matching, confidence scores) and flagged reviews (toxicity/spam/fraud scores, one-click approve/hide)
-- **SEO** — meta tags, structured data, automatic sitemap generation
+- **7 AI features** powered by Google Gemini 2.0 Flash:
+  - **Design Generation** — text-to-tattoo stencil concept art with style selection
+  - **Smart Portfolio Tagging** — computer vision auto-tags styles, subjects, SEO descriptions, quality scores
+  - **Tattoo Discovery** — NLP search parses intent and matches against AI-tagged portfolios
+  - **Prompt Refiner** — helps clients write detailed, complete tattoo requests
+  - **Bid Assistant** — drafts personalized artist proposals with suggested pricing
+  - **License OCR** — extracts and verifies document data from uploaded licenses
+  - **Review Moderation** — toxicity/spam/fraud scoring with auto-flagging
+- **Admin Moderation Dashboard** — pending license verifications (OCR results, confidence scores) and flagged reviews (toxicity/spam/fraud scores, one-click approve/hide)
+- **SEO** — meta tags, structured data, dynamic sitemap generation
 - **Dark/light mode** — theme toggle with system preference detection
+
+## Pages
+
+| Route | Page | Access |
+|-------|------|--------|
+| `/` | Home | Public |
+| `/artists` | Artist Browse | Public |
+| `/artist/:id` | Artist Profile | Public |
+| `/artist-finder` | AI-powered Artist Finder | Public |
+| `/for-artists` | Artist Landing Page | Public |
+| `/pricing` | Subscription Pricing | Public |
+| `/requests` | Request Board | Public |
+| `/requests/:id` | Request Detail | Public |
+| `/login` | Login | Public |
+| `/auth/callback` | Auth Callback | Public |
+| `/help` | Help & FAQ | Public |
+| `/cancellation-policy` | Cancellation Policy | Public |
+| `/dashboard` | User Dashboard | Authenticated |
+| `/artist-dashboard` | Artist Dashboard | Artist |
+| `/license-upload` | License Verification | Artist |
+| `/client/onboarding` | Client Onboarding | Client |
+| `/client/dashboard` | Client Dashboard | Client |
+| `/client/new-request` | New Tattoo Request | Client |
+| `/client/design-lab` | AI Design Lab | Client |
+| `/admin/moderation` | Admin Moderation | Admin |
 
 ## Database Schema
 
@@ -197,30 +233,37 @@ The API uses [tRPC](https://trpc.io) for type-safe client-server communication.
 
 **Core routes** (`/api/trpc/*`):
 - `auth.me`, `auth.logout` — session management
-- `artists.*` — CRUD, search with filters
-- `portfolio.*` — image upload URLs, add/delete
-- `reviews.*` — create, list by artist
+- `artists.*` — CRUD, search with filters, AI-powered discovery
+- `portfolio.*` — image upload URLs, add/delete with AI tagging
+- `reviews.*` — create (with AI moderation), list by artist
 - `bookings.*` — create, list, update status
 - `favorites.*` — add, remove, check
+- `moderation.*` — admin: flagged reviews, update status, re-analyze
 
 **Client marketplace routes**:
-- `clients.*` — profile management
-- `requests.*` — create, list, filter, manage tattoo requests
-- `bids.*` — create, accept, withdraw bids
+- `clients.*` — profile management, subscription checkout
+- `requests.*` — create, list, filter, AI prompt refinement, reference images
+- `bids.*` — create, accept, AI bid drafting (Professional/Icon tier)
+
+**AI routes**:
+- `ai.generateDesign` — text-to-tattoo concept generation
+- `ai.getCredits` — check remaining AI generation credits
 
 **Other endpoints**:
-- `GET /api/health` — health check
-- `POST /api/webhooks/stripe` — Stripe webhook handler
+- `GET /api/health` — health check with DB status and webhook queue stats
+- `POST /api/stripe/webhook` — Stripe webhook handler (raw body for signature verification)
 - `POST /api/verification/*` — license document upload
+- `GET /sitemap.xml` — dynamic SEO sitemap with all artists
 
 ## Deployment
 
-Configured for **Vercel** via `vercel.json`:
-- Frontend served as static files from Vite build
-- Backend runs as a serverless function
-- API routes proxied to `/api/*`
+Configured for **Vercel** (`vercel.json`) and **Railway** (`railway.json`):
+
+**Vercel**: Frontend served as static files from Vite build, backend runs as serverless function, API routes proxied to `/api/*`.
+
+**Railway**: Railpack builder, V2 runtime, multi-region support (europe-west4), auto-restart on failure (max 10 retries).
 
 ## Additional Documentation
 
-- See `GEMINI.md` for AI integration details  
+- See `GEMINI.md` for AI integration details
 - See `TODO.md` for development roadmap

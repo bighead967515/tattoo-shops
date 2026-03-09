@@ -1,1 +1,0 @@
-ALTER TABLE "artists" ADD COLUMN "bidsUsed" integer DEFAULT 0 NOT NULL;

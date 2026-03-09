@@ -1,5 +1,5 @@
 {
-  "id": "d61a001d-9d2f-4bf7-98ee-26fb9998a20f",
+  "id": "fe18a158-79a1-4772-b8b4-f5770b586674",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -132,10 +132,10 @@
         },
         "subscriptionTier": {
           "name": "subscriptionTier",
-          "type": "varchar(20)",
+          "type": "varchar(30)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'free'"
+          "default": "'artist_free'"
         },
         "bidsUsed": {
           "name": "bidsUsed",
@@ -176,7 +176,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "artists_userId_unique": {
+          "name": "artists_userId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "userId"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -511,6 +519,26 @@
           "notNull": false,
           "default": false
         },
+        "subscriptionTier": {
+          "name": "subscriptionTier",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'client_free'"
+        },
+        "aiCredits": {
+          "name": "aiCredits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stripeSubscriptionId": {
+          "name": "stripeSubscriptionId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -543,7 +571,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "clients_userId_unique": {
+          "name": "clients_userId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "userId"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -659,6 +695,42 @@
         "style": {
           "name": "style",
           "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aiStyles": {
+          "name": "aiStyles",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aiTags": {
+          "name": "aiTags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aiDescription": {
+          "name": "aiDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qualityScore": {
+          "name": "qualityScore",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qualityIssues": {
+          "name": "qualityIssues",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aiProcessedAt": {
+          "name": "aiProcessedAt",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -926,6 +998,49 @@
           "primaryKey": false,
           "notNull": false
         },
+        "moderationStatus": {
+          "name": "moderationStatus",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'pending'"
+        },
+        "moderationFlags": {
+          "name": "moderationFlags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "toxicityScore": {
+          "name": "toxicityScore",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spamScore": {
+          "name": "spamScore",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fraudScore": {
+          "name": "fraudScore",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "moderationReason": {
+          "name": "moderationReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "moderatedAt": {
+          "name": "moderatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -1121,19 +1236,6 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "tattooRequests_selectedBidId_bids_id_fk": {
-          "name": "tattooRequests_selectedBidId_bids_id_fk",
-          "tableFrom": "tattooRequests",
-          "tableTo": "bids",
-          "columnsFrom": [
-            "selectedBidId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1222,8 +1324,21 @@
           "primaryKey": false,
           "notNull": false
         },
+        "subscriptionTier": {
+          "name": "subscriptionTier",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
+        },
         "stripeCustomerId": {
           "name": "stripeCustomerId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripeSubscriptionId": {
+          "name": "stripeSubscriptionId",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
@@ -1329,6 +1444,78 @@
         "reviewNotes": {
           "name": "reviewNotes",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrDocumentType": {
+          "name": "ocrDocumentType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrExtractedName": {
+          "name": "ocrExtractedName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrExtractedBusinessName": {
+          "name": "ocrExtractedBusinessName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrLicenseNumber": {
+          "name": "ocrLicenseNumber",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrExpirationDate": {
+          "name": "ocrExpirationDate",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrIssuingAuthority": {
+          "name": "ocrIssuingAuthority",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrConfidence": {
+          "name": "ocrConfidence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrNameMatch": {
+          "name": "ocrNameMatch",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrVerdict": {
+          "name": "ocrVerdict",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrVerdictReason": {
+          "name": "ocrVerdictReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrIssues": {
+          "name": "ocrIssues",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocrProcessedAt": {
+          "name": "ocrProcessedAt",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },

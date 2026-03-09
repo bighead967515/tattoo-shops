@@ -10,6 +10,6 @@ export default defineConfig({
   out: "./backend/drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: connectionString + "?options=endpoint%3Ddirect",
+    url: connectionString,
   },
 });
