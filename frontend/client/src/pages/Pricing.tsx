@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check, X, Crown, Zap } from "lucide-react";
 import { Link } from "wouter";
-import { TIER_LIMITS, TIER_PRICING, SubscriptionTier } from "@shared/tierLimits";
+import { TIER_LIMITS, TIER_PRICING } from "@shared/tierLimits";
+import { toLegacyArtistTier, type ArtistCanonicalTier } from "@shared/tierCompat";
 import { cn } from "@/lib/utils";
 
-const tierOrder: SubscriptionTier[] = ["free", "amateur", "professional", "frontPage"];
+const tierOrder: ArtistCanonicalTier[] = ["artist_free", "artist_amateur", "artist_pro", "artist_icon"];
 
 export default function Pricing() {
   return (
@@ -30,9 +31,10 @@ export default function Pricing() {
         <section className="py-16 container">
           <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8 max-w-7xl mx-auto">
             {tierOrder.map(tier => {
-              const limits = TIER_LIMITS[tier];
-              const pricing = TIER_PRICING[tier];
-              const isMostPopular = tier === 'professional';
+              const legacyTier = toLegacyArtistTier(tier);
+              const limits = TIER_LIMITS[legacyTier];
+              const pricing = TIER_PRICING[legacyTier];
+              const isMostPopular = tier === "artist_pro";
 
               return (
                 <Card 
@@ -59,10 +61,10 @@ export default function Pricing() {
                     </div>
                     <p className="text-muted-foreground text-sm h-10">
                       {
-                        tier === 'free' ? 'A free profile to get you started' :
-                        tier === 'amateur' ? 'Unlock bookings and direct contact' :
-                        tier === 'professional' ? 'Full suite for growing your business' :
-                        'Maximum visibility and front page feature'
+                        tier === "artist_free" ? "A free profile to get you started" :
+                        tier === "artist_amateur" ? "Unlock bookings and direct contact" :
+                        tier === "artist_pro" ? "Full suite for growing your business" :
+                        "Maximum visibility and front page feature"
                       }
                     </p>
                   </div>
@@ -70,7 +72,7 @@ export default function Pricing() {
                   <Button className="w-full mb-8 group" variant={isMostPopular ? "default" : "outline"} asChild>
                     <Link href="/for-artists">
                       <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                      {tier === 'free' ? 'Get Started' : 'Choose Plan'}
+                      {tier === "artist_free" ? "Get Started" : "Choose Plan"}
                     </Link>
                   </Button>
 

@@ -29,6 +29,10 @@ export const protectedProcedure = t.procedure.use(requireUser);
 
 export const artistProcedure = protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+
     const artist = await getArtistByUserId(ctx.user.id);
     
     if (!artist && ctx.user.role !== 'admin') {
@@ -38,12 +42,7 @@ export const artistProcedure = protectedProcedure.use(
       });
     }
 
-    return next({
-      ctx: {
-        ...ctx,
-        artist,
-      },
-    });
+    return next({ ctx });
   })
 );
 
@@ -52,14 +51,18 @@ export const artistProcedure = protectedProcedure.use(
  * Checks input.artistId or input.id depending on the mutation/query
  */
 export const artistOwnerProcedure = artistProcedure.use(
-  t.middleware(async ({ ctx, next, rawInput }) => {
+  t.middleware(async ({ ctx, next, input }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+
     if (ctx.user.role === 'admin') return next({ ctx });
 
-    const input = rawInput as { artistId?: number; id?: number };
-    const targetArtistId = input?.artistId ?? input?.id;
+    const artist = await getArtistByUserId(ctx.user.id);
+    const parsedInput = input as { artistId?: number; id?: number } | undefined;
+    const targetArtistId = parsedInput?.artistId ?? parsedInput?.id;
 
-    // artist can be null if an admin is using the procedure but doesn't have an artist profile
-    if (!ctx.artist || (targetArtistId && ctx.artist.id !== targetArtistId)) {
+    if (!artist || (targetArtistId && artist.id !== targetArtistId)) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You are not authorized to manage this artist profile",
@@ -72,6 +75,10 @@ export const artistOwnerProcedure = artistProcedure.use(
 
 export const adminProcedure = protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+
     if (ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }

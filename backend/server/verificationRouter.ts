@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
-import * as db from "./db";
+import * as dbFns from "./db";
 import { users, verificationDocuments } from "../drizzle/schema";
 import { BUCKETS, createSignedUploadUrl, createSignedUrl } from "./_core/supabaseStorage";
 import { TRPCError } from "@trpc/server";
@@ -55,7 +55,7 @@ export const verificationRouter = router({
       // Sanitize filename to prevent path traversal
       const sanitizedFileName = sanitizeFileName(fileName);
       const fileKey = `private/${ctx.user.id}/${Date.now()}-${sanitizedFileName}`;
-      return await createSignedUploadUrl(BUCKETS.ID_DOCUMENTS, fileKey, contentType);
+      return await createSignedUploadUrl(BUCKETS.ID_DOCUMENTS, fileKey);
     }),
 
   /**
@@ -70,8 +70,6 @@ export const verificationRouter = router({
       mimeType: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = await requireDb();
-
       // Verify ownership: documentKey must start with user's private path
       const expectedPrefix = `private/${ctx.user.id}/`;
       if (!input.documentKey.startsWith(expectedPrefix)) {
@@ -121,7 +119,7 @@ export const verificationRouter = router({
             const signedUrl = await createSignedUrl(BUCKETS.ID_DOCUMENTS, input.documentKey, 300); // 5 min
 
             // Get artist profile for cross-referencing
-            const artist = await db.getArtistByUserId(ctx.user.id);
+            const artist = await dbFns.getArtistByUserId(ctx.user.id);
 
             const artistProfile = {
               name: ctx.user.name || null,
@@ -137,7 +135,7 @@ export const verificationRouter = router({
             );
 
             // Store OCR results on the document
-            await db.updateVerificationDocumentOCR(newDocument.id, {
+            await dbFns.updateVerificationDocumentOCR(newDocument.id, {
               ocrDocumentType: verification.documentType,
               ocrExtractedName: verification.extractedName,
               ocrExtractedBusinessName: verification.extractedBusinessName,
@@ -170,7 +168,7 @@ export const verificationRouter = router({
    */
   getPending: adminProcedure
     .query(async () => {
-      return await db.getPendingVerificationDocuments();
+      return await dbFns.getPendingVerificationDocuments();
     }),
 
   /**
@@ -183,7 +181,11 @@ export const verificationRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      return await db.reviewVerificationDocument(input.documentId, {
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication required" });
+      }
+
+      return await dbFns.reviewVerificationDocument(input.documentId, {
         status: input.decision,
         reviewedBy: ctx.user.id,
         reviewNotes: input.notes,
@@ -196,7 +198,7 @@ export const verificationRouter = router({
   getDocument: adminProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const doc = await db.getVerificationDocumentById(input.id);
+      const doc = await dbFns.getVerificationDocumentById(input.id);
       if (!doc) {
         throw new TRPCError({
           code: "NOT_FOUND",

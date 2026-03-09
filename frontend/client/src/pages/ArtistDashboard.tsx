@@ -18,6 +18,7 @@ import ArtistDashboardFeed from "@/components/ArtistDashboardFeed";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { Progress } from "@/components/ui/progress";
 import axios from "axios";
+import { isFreeArtistTier } from "@shared/tierCompat";
 
 export default function ArtistDashboard() {
   const [, setLocation] = useLocation();
@@ -304,7 +305,7 @@ export default function ArtistDashboard() {
           {/* Requests Tab */}
           <TabsContent value="requests" className="space-y-4">
              <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
-            {artist.subscriptionTier === 'free' ? (
+            {isFreeArtistTier(artist.subscriptionTier) ? (
               <UpgradePrompt 
                 feature="View & Bid on Requests"
                 description="Upgrade to a paid plan to view and bid on new tattoo requests from clients."

@@ -1,7 +1,6 @@
 import { createTRPCReact } from "@trpc/react-query";
 import type { AppRouter } from "../../../../backend/server/routers";
-import { httpBatchLink, loggerLink, TRPCClientError } from "@trpc/client";
-import { toast } from "sonner";
+import { httpBatchLink, loggerLink } from "@trpc/client";
 import superjson from "superjson";
 
 export const trpc = createTRPCReact<AppRouter>();
@@ -9,14 +8,7 @@ export const trpc = createTRPCReact<AppRouter>();
 export const trpcClient = trpc.createClient({
   links: [
     loggerLink({
-      enabled: (opts) =>
-        process.env.NODE_ENV === "development" ||
-        (opts.direction === "down" && opts.result && !opts.result.ok),
-      onError: ({ error }) => {
-        if (error instanceof TRPCClientError && error.cause instanceof TypeError) {
-          toast.error("Network error: Please check your internet connection.");
-        }
-      },
+      enabled: () => process.env.NODE_ENV === "development",
     }),
     httpBatchLink({
       url: "/api/trpc",

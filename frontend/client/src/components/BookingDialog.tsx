@@ -51,8 +51,9 @@ export default function BookingDialog({
       onOpenChange(false); // Close dialog on success
     },
     onError: (error) => {
-      if (error.data?.zodError?.fieldErrors) {
-        const errors = error.data.zodError.fieldErrors;
+      const zodError = (error.data as { zodError?: { fieldErrors?: Record<string, string[] | undefined> } } | undefined)?.zodError;
+      if (zodError?.fieldErrors) {
+        const errors = zodError.fieldErrors;
         for (const field in errors) {
           const messages = errors[field];
           if (messages) {

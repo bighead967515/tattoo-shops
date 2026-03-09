@@ -170,7 +170,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         // ── Tier Gatekeeper ──────────────────────────────────────
-        const tier = (ctx.user.subscriptionTier ?? "artist_free") as SubscriptionTier;
+        const tier = (ctx.user?.subscriptionTier ?? "artist_free") as SubscriptionTier;
         const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
         const currentCount = await db.getPortfolioCountByArtistId(input.artistId);
         if (currentCount >= limit) {
@@ -198,7 +198,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         // ── Tier Gatekeeper ──────────────────────────────────────
-        const tier = (ctx.user.subscriptionTier ?? "artist_free") as SubscriptionTier;
+        const tier = (ctx.user?.subscriptionTier ?? "artist_free") as SubscriptionTier;
         const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
         const currentCount = await db.getPortfolioCountByArtistId(input.artistId);
         if (currentCount >= limit) {

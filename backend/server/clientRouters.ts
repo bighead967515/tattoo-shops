@@ -18,6 +18,7 @@ import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
 import { createSubscriptionCheckout } from "./stripe";
 import { ENV } from "./_core/env";
 import { CLIENT_TIER_PRICING, type ClientSubscriptionTier } from "../shared/tierLimits";
+import { canUseAiBidAssistant, isFreeArtistTier } from "../shared/tierCompat";
 
 /**
  * Sanitize a filename to prevent path traversal attacks.
@@ -267,7 +268,7 @@ export const requestsRouter = router({
         .where(eq(artists.userId, ctx.user.id))
         .limit(1);
 
-      if (!artist || artist.subscriptionTier === 'free') {
+      if (!artist || isFreeArtistTier(artist.subscriptionTier)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "This feature is only available for paid artist plans.",
@@ -703,7 +704,7 @@ export const bidsRouter = router({
         });
       }
 
-      if (artist.subscriptionTier !== "professional" && artist.subscriptionTier !== "frontPage") {
+      if (!canUseAiBidAssistant(artist.subscriptionTier)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "AI Bid Assistant is available for Professional and Icon tier artists. Upgrade to access this feature.",
@@ -786,7 +787,7 @@ export const bidsRouter = router({
       }
       
       // Implement "First 5 Bids Free" logic
-      if (artist.subscriptionTier === 'free') {
+      if (isFreeArtistTier(artist.subscriptionTier)) {
         if (artist.bidsUsed >= 5) {
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -847,7 +848,7 @@ export const bidsRouter = router({
         .returning();
 
       // If user is on free tier, increment their bid count
-      if (artist.subscriptionTier === 'free') {
+      if (isFreeArtistTier(artist.subscriptionTier)) {
         await db
           .update(artists)
           .set({ bidsUsed: sql`${artists.bidsUsed} + 1` })

@@ -99,7 +99,7 @@ export async function generateTattooDesign(
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"] as any,
       },
-    });
+    } as any);
 
     // Extract image data from the response
     const response = result.response;

@@ -27,6 +27,7 @@ import {
   Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { isFreeClientTier } from "@shared/tierCompat";
 
 const STYLE_OPTIONS = [
   { value: "traditional", label: "Traditional (American)" },
@@ -111,7 +112,7 @@ function DesignLab() {
   }
 
   const credits = creditsQuery.data;
-  const isFreeTier = credits?.tier === "free";
+  const isFreeTier = isFreeClientTier(credits?.tier);
   const isGenerating = generateMutation.isPending;
 
   return (

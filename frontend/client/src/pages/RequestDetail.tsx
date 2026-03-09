@@ -29,6 +29,7 @@ import {
   Sparkles
 } from "lucide-react";
 import UpgradePrompt from "@/components/UpgradePrompt";
+import { canUseAiBidAssistant, isFreeArtistTier } from "@shared/tierCompat";
 
 export default function RequestDetail() {
   const [, params] = useRoute("/requests/:id");
@@ -140,10 +141,9 @@ export default function RequestDetail() {
   const isArtist = user?.role === "artist";
   const isOwner = request?.client.userId === user?.id;
   const hasAlreadyBid = request?.bids.some((b: BidType) => b.artist.userId === user?.id);
-
   // New logic for "5 free bids"
   const bidsRemaining = Math.max(0, 5 - (artistProfile?.bidsUsed ?? 0));
-  const isFreeTier = artistProfile?.subscriptionTier === 'free';
+  const isFreeTier = isFreeArtistTier(artistProfile?.subscriptionTier);
   const canBid = !isFreeTier || (isFreeTier && bidsRemaining > 0);
 
   if (isLoading) {
@@ -425,7 +425,7 @@ export default function RequestDetail() {
                       </DialogHeader>
 
                       {/* AI Bid Assistant — Professional/Icon tier only */}
-                      {artistProfile && (artistProfile.subscriptionTier === "professional" || artistProfile.subscriptionTier === "frontPage") && (
+                      {artistProfile && canUseAiBidAssistant(artistProfile.subscriptionTier) && (
                         <Button
                           type="button"
                           variant="outline"

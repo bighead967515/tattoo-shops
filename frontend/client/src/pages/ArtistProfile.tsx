@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import ReviewCard from "@/components/ReviewCard";
 import ReviewFilters from "@/components/ReviewFilters";
+import BookingDialog from "@/components/BookingDialog";
 
 export default function ArtistProfile() {
   const { id } = useParams();

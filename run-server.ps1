@@ -6,7 +6,7 @@
     if ($name) {
         [System.Environment]::SetEnvironmentVariable($name, $value)
         Set-Item "env:$name" -Value $value
-        Write-Host "Set $name = $value"
+        Write-Host "Set $name"
     }
 }
 
