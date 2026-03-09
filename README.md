@@ -125,6 +125,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | `/client/new-request` | New Tattoo Request | Client |
 | `/client/design-lab` | AI Design Lab | Client |
 | `/admin/moderation` | Admin Moderation | Admin |
+| `*` (fallback) | 404 Not Found | Public |
 
 ## Database Schema
 

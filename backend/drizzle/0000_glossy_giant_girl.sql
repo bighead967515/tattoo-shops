@@ -76,7 +76,7 @@ CREATE TABLE "clients" (
 	"state" varchar(50),
 	"phone" varchar(50),
 	"onboardingCompleted" boolean DEFAULT false,
-	"subscriptionTier" varchar(20) DEFAULT 'client_free' NOT NULL,
+	"subscriptionTier" varchar(30) DEFAULT 'client_free' NOT NULL,
 	"aiCredits" integer DEFAULT 0 NOT NULL,
 	"stripeSubscriptionId" varchar(255),
 	"createdAt" timestamp DEFAULT now() NOT NULL,
@@ -256,4 +256,6 @@ ALTER TABLE "reviews" ADD CONSTRAINT "reviews_artistId_artists_id_fk" FOREIGN KE
 ALTER TABLE "reviews" ADD CONSTRAINT "reviews_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tattooRequests" ADD CONSTRAINT "tattooRequests_clientId_clients_id_fk" FOREIGN KEY ("clientId") REFERENCES "public"."clients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "verificationDocuments" ADD CONSTRAINT "verificationDocuments_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "verificationDocuments" ADD CONSTRAINT "verificationDocuments_reviewedBy_users_id_fk" FOREIGN KEY ("reviewedBy") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+ALTER TABLE "verificationDocuments" ADD CONSTRAINT "verificationDocuments_reviewedBy_users_id_fk" FOREIGN KEY ("reviewedBy") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tattooRequests" ADD CONSTRAINT "tattooRequests_selectedBidId_bids_id_fk" FOREIGN KEY ("selectedBidId") REFERENCES "public"."bids"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_rating_check" CHECK ("rating" >= 1 AND "rating" <= 5);

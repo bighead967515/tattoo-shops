@@ -521,7 +521,7 @@
         },
         "subscriptionTier": {
           "name": "subscriptionTier",
-          "type": "varchar(20)",
+          "type": "varchar(30)",
           "primaryKey": false,
           "notNull": true,
           "default": "'client_free'"
