@@ -4,7 +4,9 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
   OWNER_OPEN_ID: z.string().min(1, "OWNER_OPEN_ID is required"),
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
   STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
   STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
   // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
@@ -14,7 +16,13 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
   SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
-  GOOGLE_AI_API_KEY: z.string().min(1, "GOOGLE_AI_API_KEY is required for Smart Portfolio Tagging"),
+  GROQ_API_KEY: z.string().min(1, "GROQ_API_KEY is required"),
+  HUGGINGFACE_API_KEY: z.string().min(1, "HUGGINGFACE_API_KEY is required"),
+  GROQ_BASE_URL: z.string().url().optional(),
+  GROQ_MODEL: z.string().optional(),
+  HUGGINGFACE_IMAGE_MODEL: z.string().optional(),
+  HUGGINGFACE_CAPTION_MODEL: z.string().optional(),
+  HUGGINGFACE_OCR_MODEL: z.string().optional(),
   PORT: z.string().default("3000"),
 });
 
@@ -41,7 +49,13 @@ export const ENV = {
   supabaseUrl: parsed.data.SUPABASE_URL,
   supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,
   supabaseAnonKey: parsed.data.SUPABASE_ANON_KEY,
-  googleAiApiKey: parsed.data.GOOGLE_AI_API_KEY,
+  groqApiKey: parsed.data.GROQ_API_KEY,
+  huggingFaceApiKey: parsed.data.HUGGINGFACE_API_KEY,
+  groqBaseUrl: parsed.data.GROQ_BASE_URL,
+  groqModel: parsed.data.GROQ_MODEL,
+  huggingFaceImageModel: parsed.data.HUGGINGFACE_IMAGE_MODEL,
+  huggingFaceCaptionModel: parsed.data.HUGGINGFACE_CAPTION_MODEL,
+  huggingFaceOcrModel: parsed.data.HUGGINGFACE_OCR_MODEL,
   nodeEnv: parsed.data.NODE_ENV,
   port: parseInt(parsed.data.PORT, 10),
 };

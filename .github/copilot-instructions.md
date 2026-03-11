@@ -10,7 +10,7 @@ Full-stack web application for finding and booking tattoo artists with a client 
 - **Auth**: Supabase Auth (email/password + OAuth providers)
 - **Storage**: Supabase Storage (3 buckets: portfolio-images, request-images, id-documents)
 - **Payments**: Stripe (subscriptions, deposits, webhooks)
-- **AI**: Google Gemini (vision analysis, discovery, generation, safety moderation, bid optimization, OCR verification)
+- **AI**: Groq + Hugging Face (vision analysis, discovery, generation, safety moderation, bid optimization, OCR verification)
 - **Email**: Resend
 
 ---
@@ -41,7 +41,7 @@ backend/server/           Express + tRPC server
   webhookHandler.ts       Stripe webhook handler
   webhookQueue.ts         Webhook retry queue
   email.ts                Resend email integration
-  gemini*.ts              Gemini AI modules (Vision, Discovery, Generation, Safety, BidOptimizer)
+  gemini*.ts              AI modules (legacy filenames, now powered by Groq + Hugging Face)
   _core/
     trpc.ts               Procedure definitions (public, protected, artist, artistOwner, admin)
     context.ts            tRPC context creation (token → Supabase verify → DB user)
@@ -80,12 +80,14 @@ These rules prevent the frontend and backend from drifting out of sync. Follow t
 All types originate in `backend/drizzle/schema.ts` and are re-exported via `backend/shared/types.ts`. The frontend receives them through tRPC inference — **never duplicate or hand-write types that already exist in the schema**.
 
 **When adding or changing a DB column:**
+
 1. Update `backend/drizzle/schema.ts`
 2. Run `pnpm db:push` to generate and apply migration
 3. Update the relevant tRPC procedure input/output in the router
 4. Frontend automatically infers the new types via tRPC — no manual type updates needed
 
 **When adding a new table:**
+
 1. Add table to `backend/drizzle/schema.ts`
 2. Export select/insert types from `backend/shared/types.ts`
 3. Run `pnpm db:push`
@@ -95,6 +97,7 @@ All types originate in `backend/drizzle/schema.ts` and are re-exported via `back
 ### 2. tRPC is the only API contract
 
 All frontend → backend communication goes through tRPC (`/api/trpc`). The tRPC `AppRouter` type is the single source of truth for the API surface. Never create raw REST endpoints for features — use tRPC procedures. The only non-tRPC routes are:
+
 - `/api/auth/session` — Supabase token → backend cookie exchange
 - `/api/auth/signout` — clear session
 - `/api/auth/me` — get user from session
@@ -103,6 +106,7 @@ All frontend → backend communication goes through tRPC (`/api/trpc`). The tRPC
 ### 3. Auth state must stay synchronized
 
 Two auth systems work together:
+
 - **Supabase Auth** (frontend `useSupabaseAuth()`) — manages tokens, sign-in/sign-up/OAuth
 - **Backend session** (frontend `useAuth()`) — queries `trpc.auth.me` for the DB user record
 
@@ -111,6 +115,7 @@ After any Supabase auth action (sign-in, sign-up, OAuth callback), the frontend 
 ### 4. Subscription tiers use canonical values
 
 Canonical tier values are defined in `backend/shared/const.ts`:
+
 ```
 artist_free | artist_amateur | artist_pro | artist_icon
 client_free | client_plus | client_elite
@@ -137,6 +142,7 @@ client_free | client_plus | client_elite
 ### 6. Shared constants must be used consistently
 
 When referencing any of these across frontend and backend, import from `backend/shared/`:
+
 - Tier values and limits → `const.ts`, `tierLimits.ts`, `tierCompat.ts`
 - Cookie name (`app_session_id`) → `const.ts`
 - Error messages → `const.ts` and `_core/errors.ts`
@@ -211,7 +217,7 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 | imageKey | varchar(500) | Storage bucket path |
 | caption | text | |
 | style | varchar(100) | e.g., "Realism", "Traditional" |
-| aiStyles, aiTags, aiDescription | text | JSON from Gemini Vision analysis |
+| aiStyles, aiTags, aiDescription | text | JSON from AI vision analysis |
 | qualityScore | int | 1–100 |
 | qualityIssues | text | JSON array |
 | aiProcessedAt | timestamp | |
@@ -231,7 +237,7 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 | artistResponse | text | |
 | artistResponseDate | timestamp | |
 | moderationStatus | varchar(20) | "pending" / "approved" / "flagged" / "hidden" |
-| moderationFlags | text | JSON from Gemini Safety |
+| moderationFlags | text | JSON from AI safety moderation |
 | toxicityScore, spamScore, fraudScore | int | 0–100 |
 | moderationReason | text | |
 | moderatedAt | timestamp | |
@@ -319,7 +325,7 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 
 ### System Tables
 
-**`verificationDocuments`** — License/permit verification with Gemini OCR
+**`verificationDocuments`** — License/permit verification with AI OCR
 | Column | Type | Notes |
 |--------|------|-------|
 | id | serial PK | |
@@ -332,7 +338,7 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 | status | enum | "pending" / "verified" / "rejected" |
 | reviewedBy | int FK→users nullable | Admin reviewer |
 | reviewNotes | text | |
-| ocrDocumentType, ocrExtractedName, ocrExtractedBusinessName | varchar | Gemini OCR |
+| ocrDocumentType, ocrExtractedName, ocrExtractedBusinessName | varchar | AI OCR |
 | ocrLicenseNumber, ocrExpirationDate, ocrIssuingAuthority | varchar | |
 | ocrConfidence | int | 0–100 |
 | ocrNameMatch | varchar(20) | "exact" / "partial" / "mismatch" / "unavailable" |
@@ -355,6 +361,7 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 | createdAt, updatedAt | timestamp | |
 
 ### Key Relationships
+
 - `users` ↔ `artists` (one-to-one via userId)
 - `users` ↔ `clients` (one-to-one via userId)
 - `artists` ↔ `portfolioImages`, `reviews`, `bookings`, `bids` (one-to-many)
@@ -367,6 +374,7 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 ## tRPC API Reference
 
 ### Procedure Types (defined in `backend/server/_core/trpc.ts`)
+
 - **publicProcedure** — no auth required
 - **protectedProcedure** — requires `ctx.user`
 - **artistProcedure** — requires user with artist role
@@ -376,41 +384,48 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 ### Routers in `backend/server/routers.ts`
 
 **auth** — Authentication
+
 - `auth.me` (public query) — get current user
 - `auth.logout` (public mutation) — clear session
 
 **artists** — Artist profiles
+
 - `artists.getAll` (public query)
 - `artists.search` (public query) — filter by styles, rating, experience, city, state
-- `artists.discover` (protected query) — Gemini AI semantic search
+- `artists.discover` (protected query) — AI semantic search
 - `artists.getById` (public query)
 - `artists.getByUserId` (protected query) — current user's profile
 - `artists.create` (protected mutation)
 - `artists.update` (artistOwner mutation)
 
 **portfolio** — Portfolio images
+
 - `portfolio.get` (public query)
 - `portfolio.getUploadUrl` (artistOwner mutation) — signed URL, checks tier portfolio limit
-- `portfolio.add` (artistOwner mutation) — triggers async Gemini Vision analysis
+- `portfolio.add` (artistOwner mutation) — triggers async AI vision analysis
 - `portfolio.reanalyze` (artistOwner mutation) — re-run AI analysis
 - `portfolio.delete` (protected mutation)
 
 **reviews** — Reviews with AI moderation
+
 - `reviews.getByArtistId` (public query)
-- `reviews.create` (protected mutation) — triggers async Gemini Safety moderation
+- `reviews.create` (protected mutation) — triggers async AI safety moderation
 
 **bookings** — Appointments
+
 - `bookings.create` (protected mutation) — with input sanitization
 - `bookings.getByUserId` (protected query)
 - `bookings.getByArtistId` (artistOwner query)
 - `bookings.updateStatus` (protected mutation)
 
 **favorites** — Saved artists
+
 - `favorites.add` / `favorites.remove` (protected mutation)
 - `favorites.getByUserId` (protected query)
 - `favorites.isFavorite` (protected query)
 
 **moderation** — Admin review moderation
+
 - `moderation.getFlaggedReviews` (admin query)
 - `moderation.updateReviewStatus` (admin mutation)
 - `moderation.reanalyzeReview` (admin mutation)
@@ -418,23 +433,26 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 ### Routers in `backend/server/clientRouters.ts`
 
 **clients** — Client profiles
+
 - `clients.getMyProfile` (protected query)
 - `clients.createProfile` (protected mutation) — sets role to "client"
 - `clients.updateProfile` (protected mutation)
 - `clients.createSubscriptionCheckout` (protected mutation) — Stripe checkout
 
 **requests** — Tattoo requests
+
 - `requests.getOpen` (public query) — with filtering
 - `requests.listForArtistDashboard` (protected query) — paid artists only
 - `requests.listForHomepage` (public query) — latest 8
 - `requests.getById` (public query) — includes bids, increments view count
 - `requests.getMyRequests` (protected query)
 - `requests.create` (protected mutation)
-- `requests.refineDescription` (protected mutation) — Gemini AI prompt refinement
+- `requests.refineDescription` (protected mutation) — AI prompt refinement
 - `requests.getUploadUrl` / `requests.addImage` (protected mutation)
 - `requests.updateStatus` (protected mutation)
 
 **bids** — Artist bids
+
 - `bids.getByRequestId` (public query)
 - `bids.getMyBids` (protected query)
 - `bids.draftBid` (protected mutation) — AI draft (Pro/Icon tier only)
@@ -445,14 +463,16 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 ### Routers in `backend/server/aiRouter.ts`
 
 **ai** — AI generation
+
 - `ai.generateDesign` (protected mutation) — checks credits, deducts atomically
 - `ai.getCredits` (protected query) — current credits + tier info
 
 ### Routers in `backend/server/verificationRouter.ts`
 
 **verification** — License verification
+
 - `verification.getUploadUrl` (protected mutation) — signed URL for ID document
-- `verification.addDocument` (protected mutation) — triggers async Gemini OCR
+- `verification.addDocument` (protected mutation) — triggers async AI OCR
 - `verification.getPending` (admin query) — pending docs with OCR results
 - `verification.review` (admin mutation) — approve/reject
 - `verification.getDocument` (admin query) — OCR details
@@ -463,29 +483,29 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 
 Defined in `frontend/client/src/App.tsx` using Wouter:
 
-| Path | Page | Notes |
-|------|------|-------|
-| `/` | Home | Landing page |
-| `/artist-finder` | ArtistFinder | AI discovery search |
-| `/artists` | ArtistBrowse | Browse/filter artists |
-| `/artist/:id` | ArtistProfile | Artist detail page |
-| `/for-artists` | ForArtists | Artist info/signup |
-| `/dashboard` | Dashboard | User dashboard |
-| `/artist-dashboard` | ArtistDashboard | Artist dashboard |
-| `/login` | Login | Login/signup |
-| `/auth/callback` | AuthCallback | OAuth callback handler |
-| `/help` | Help | Help page |
-| `/cancellation-policy` | CancellationPolicy | Policy page |
-| `/pricing` | Pricing | Subscription pricing |
-| `/license-upload` | LicenseUpload | License verification upload |
-| `/client/onboarding` | ClientOnboarding | Client onboarding flow |
-| `/client/dashboard` | ClientDashboard | Client dashboard |
-| `/client/new-request` | NewRequest | Create tattoo request |
-| `/requests` | RequestBoard | Browse open requests |
-| `/requests/:id` | RequestDetail | Request detail + bids |
-| `/client/design-lab` | DesignLab | AI design generation |
-| `/admin/moderation` | AdminModeration | Admin review moderation |
-| `/404` | NotFound | 404 page |
+| Path                   | Page               | Notes                       |
+| ---------------------- | ------------------ | --------------------------- |
+| `/`                    | Home               | Landing page                |
+| `/artist-finder`       | ArtistFinder       | AI discovery search         |
+| `/artists`             | ArtistBrowse       | Browse/filter artists       |
+| `/artist/:id`          | ArtistProfile      | Artist detail page          |
+| `/for-artists`         | ForArtists         | Artist info/signup          |
+| `/dashboard`           | Dashboard          | User dashboard              |
+| `/artist-dashboard`    | ArtistDashboard    | Artist dashboard            |
+| `/login`               | Login              | Login/signup                |
+| `/auth/callback`       | AuthCallback       | OAuth callback handler      |
+| `/help`                | Help               | Help page                   |
+| `/cancellation-policy` | CancellationPolicy | Policy page                 |
+| `/pricing`             | Pricing            | Subscription pricing        |
+| `/license-upload`      | LicenseUpload      | License verification upload |
+| `/client/onboarding`   | ClientOnboarding   | Client onboarding flow      |
+| `/client/dashboard`    | ClientDashboard    | Client dashboard            |
+| `/client/new-request`  | NewRequest         | Create tattoo request       |
+| `/requests`            | RequestBoard       | Browse open requests        |
+| `/requests/:id`        | RequestDetail      | Request detail + bids       |
+| `/client/design-lab`   | DesignLab          | AI design generation        |
+| `/admin/moderation`    | AdminModeration    | Admin review moderation     |
+| `/404`                 | NotFound           | 404 page                    |
 
 ---
 
@@ -516,6 +536,7 @@ Frontend                          Backend                         Supabase
 ```
 
 **Frontend hooks:**
+
 - `useSupabaseAuth()` — Supabase auth actions (signIn, signUp, signOut, OAuth, resetPassword, syncSessionWithBackend)
 - `useAuth()` — backend user state via `trpc.auth.me` (user, loading, isAuthenticated, logout, refresh)
 
@@ -524,26 +545,30 @@ Frontend                          Backend                         Supabase
 ## Tier System
 
 ### Artist Tiers
-| Canonical Value | Name | Portfolio | Bookings | Contact | Reviews | Analytics | Featured |
-|----------------|------|-----------|----------|---------|---------|-----------|----------|
-| artist_free | Apprentice | 3 | No | No | No | No | No |
-| artist_amateur | Artist | 15 | Yes | Yes | No | No | No |
-| artist_pro | Professional | Unlimited | Yes | Yes | Yes | Yes | No |
-| artist_icon | Icon | Unlimited | Yes | Yes | Yes | Yes | Yes |
+
+| Canonical Value | Name         | Portfolio | Bookings | Contact | Reviews | Analytics | Featured |
+| --------------- | ------------ | --------- | -------- | ------- | ------- | --------- | -------- |
+| artist_free     | Apprentice   | 3         | No       | No      | No      | No        | No       |
+| artist_amateur  | Artist       | 15        | Yes      | Yes     | No      | No        | No       |
+| artist_pro      | Professional | Unlimited | Yes      | Yes     | Yes     | Yes       | No       |
+| artist_icon     | Icon         | Unlimited | Yes      | Yes     | Yes     | Yes       | Yes      |
 
 **Pricing**: Free / $9 mo ($90/yr) / $19 mo ($190/yr) / $39 mo ($390/yr)
 
 ### Client Tiers
-| Canonical Value | Name | Requests/mo | AI Gens/mo | Direct Chat | Priority | Deposit |
-|----------------|------|-------------|-----------|-------------|----------|---------|
-| client_free | Collector | 1 | 0 | No | No | No |
-| client_plus | Enthusiast | 10 | 10 | No | Yes | No |
-| client_elite | Elite Ink | Unlimited | Unlimited | Yes | Yes | Yes |
+
+| Canonical Value | Name       | Requests/mo | AI Gens/mo | Direct Chat | Priority | Deposit |
+| --------------- | ---------- | ----------- | ---------- | ----------- | -------- | ------- |
+| client_free     | Collector  | 1           | 0          | No          | No       | No      |
+| client_plus     | Enthusiast | 10          | 10         | No          | Yes      | No      |
+| client_elite    | Elite Ink  | Unlimited   | Unlimited  | Yes         | Yes      | Yes     |
 
 **Pricing**: Free / $9 mo / $19 mo
 
 ### Legacy Compatibility
+
 Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in some code. Use helpers from `backend/shared/tierCompat.ts`:
+
 - `isFreeArtistTier(tier)` — checks "artist_free" or "free"
 - `canUseAiBidAssistant(tier)` — true for Pro/Icon (canonical or legacy)
 - `isFreeClientTier(tier)` — checks "client_free" or "free"
@@ -564,24 +589,29 @@ Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in 
 ## External Integrations
 
 ### Supabase
+
 - **Auth**: `backend/server/_core/supabaseAuth.ts` — token exchange, session management, `requireAuth` middleware
 - **Storage**: `backend/server/_core/supabaseStorage.ts` — bucket management, signed URLs, upload/delete
 - **Admin client**: `backend/server/_core/supabase.ts` — service role client (bypasses RLS)
 - **Frontend client**: `frontend/client/src/lib/supabase.ts` — browser client with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 
 ### Stripe
+
 - **Checkout**: `backend/server/stripe.ts` — subscription checkout sessions
 - **Webhooks**: `backend/server/webhookHandler.ts` — processes subscription events, updates `users.subscriptionTier`
 - **Retry queue**: `backend/server/webhookQueue.ts` — failed webhook retry with backoff
 
-### Google Gemini AI
-- **Vision**: `backend/server/geminiVision.ts` — portfolio image analysis (styles, tags, quality) and license OCR
-- **Discovery**: `backend/server/geminiDiscovery.ts` — natural language artist search
-- **Generation**: `backend/server/geminiGeneration.ts` — AI tattoo design generation
-- **Safety**: `backend/server/geminiSafety.ts` — review moderation (toxicity, spam, fraud scoring)
-- **Bid Optimizer**: `backend/server/geminiBidOptimizer.ts` — AI-drafted bid responses
+### Groq + Hugging Face AI
+
+- **Provider helpers**: `backend/server/_core/aiProviders.ts` — shared Groq/Hugging Face calls and JSON parsing
+- **Vision**: `backend/server/geminiVision.ts` — Hugging Face captioning + Groq structuring for portfolio analysis
+- **Discovery**: `backend/server/geminiDiscovery.ts` — Groq natural language artist search parsing
+- **Generation**: `backend/server/geminiGeneration.ts` — Hugging Face image generation
+- **Safety**: `backend/server/geminiSafety.ts` — Hugging Face OCR + Groq moderation/verification logic
+- **Bid Optimizer**: `backend/server/geminiBidOptimizer.ts` — Groq-powered prompt refinement and bid drafting
 
 ### Email
+
 - **Resend**: `backend/server/email.ts` — transactional emails
 
 ---
@@ -599,15 +629,18 @@ Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in 
 ## Common Tasks
 
 ### Add a new feature to an existing entity
+
 1. If schema change needed: update `backend/drizzle/schema.ts`, run `pnpm db:push`
 2. Add/update tRPC procedure in the appropriate router file
 3. Use the new procedure in frontend with tRPC hook — types are inferred automatically
 
 ### Add a new page
+
 1. Create component in `frontend/client/src/pages/`
 2. Add route in `frontend/client/src/App.tsx`
 
 ### Add a new entity (table + API + UI)
+
 1. Add table to `backend/drizzle/schema.ts`
 2. Export types from `backend/shared/types.ts`
 3. Run `pnpm db:push`
@@ -617,6 +650,7 @@ Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in 
 7. Add route in `frontend/client/src/App.tsx`
 
 ### Change subscription tier logic
+
 1. Update tier values in `backend/shared/const.ts` (Zod enum + TIER_LIMITS)
 2. Update feature limits in `backend/shared/tierLimits.ts`
 3. Update compatibility helpers in `backend/shared/tierCompat.ts` if needed

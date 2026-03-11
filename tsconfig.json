@@ -1,5 +1,9 @@
 {
-  "include": ["frontend/client/src/**/*", "backend/shared/**/*", "backend/server/**/*"],
+  "include": [
+    "frontend/client/src/**/*",
+    "backend/shared/**/*",
+    "backend/server/**/*"
+  ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,

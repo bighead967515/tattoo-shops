@@ -6,7 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Users, Calendar, TrendingUp, MapPin } from "lucide-react";
+import {
+  CheckCircle2,
+  Users,
+  Calendar,
+  TrendingUp,
+  MapPin,
+} from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -16,7 +22,7 @@ export default function ForArtists() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const createArtistMutation = trpc.artists.create.useMutation();
-  
+
   const [formData, setFormData] = useState({
     artistName: "",
     shopName: "",
@@ -36,20 +42,22 @@ export default function ForArtists() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Check if user is logged in
     if (!user) {
       toast.error("Please sign in to register as an artist");
       window.location.href = getLoginUrl();
       return;
     }
-    
+
     try {
       await createArtistMutation.mutateAsync({
         shopName: formData.shopName,
         bio: formData.bio,
         specialties: formData.specialties,
-        experience: formData.experience ? parseInt(formData.experience) : undefined,
+        experience: formData.experience
+          ? parseInt(formData.experience)
+          : undefined,
         address: formData.address,
         city: formData.city,
         state: formData.state,
@@ -58,9 +66,11 @@ export default function ForArtists() {
         website: formData.website,
         instagram: formData.instagram,
       });
-      
-      toast.success("Application submitted successfully! We'll review your information and get back to you within 2-3 business days.");
-      
+
+      toast.success(
+        "Application submitted successfully! We'll review your information and get back to you within 2-3 business days.",
+      );
+
       // Reset form
       setFormData({
         artistName: "",
@@ -78,15 +88,19 @@ export default function ForArtists() {
         portfolio: "",
         bio: "",
       });
-      
+
       // Redirect to dashboard after successful submission
       setTimeout(() => setLocation("/dashboard"), 2000);
     } catch (error: any) {
-      toast.error(error.message || "Failed to submit application. Please try again.");
+      toast.error(
+        error.message || "Failed to submit application. Please try again.",
+      );
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
@@ -105,7 +119,8 @@ export default function ForArtists() {
               Join Universal Inc
             </h1>
             <p className="text-xl text-muted-foreground">
-              Connect with thousands of clients looking for talented tattoo artists like you
+              Connect with thousands of clients looking for talented tattoo
+              artists like you
             </p>
           </div>
         </div>
@@ -118,7 +133,7 @@ export default function ForArtists() {
             <h2 className="text-3xl font-bold text-center text-foreground mb-12">
               Why Join Our Platform?
             </h2>
-            
+
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="p-6 bg-background border-border text-center">
                 <div className="flex justify-center mb-4">
@@ -126,9 +141,12 @@ export default function ForArtists() {
                     <Users className="h-8 w-8 text-primary" />
                   </div>
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">Reach More Clients</h3>
+                <h3 className="font-semibold text-foreground mb-2">
+                  Reach More Clients
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Get discovered by people actively searching for tattoo artists in your area
+                  Get discovered by people actively searching for tattoo artists
+                  in your area
                 </p>
               </Card>
 
@@ -138,7 +156,9 @@ export default function ForArtists() {
                     <Calendar className="h-8 w-8 text-primary" />
                   </div>
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">Easy Booking</h3>
+                <h3 className="font-semibold text-foreground mb-2">
+                  Easy Booking
+                </h3>
                 <p className="text-sm text-muted-foreground">
                   Manage appointments and bookings directly through our platform
                 </p>
@@ -150,7 +170,9 @@ export default function ForArtists() {
                     <TrendingUp className="h-8 w-8 text-primary" />
                   </div>
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">Grow Your Business</h3>
+                <h3 className="font-semibold text-foreground mb-2">
+                  Grow Your Business
+                </h3>
                 <p className="text-sm text-muted-foreground">
                   Build your reputation with reviews and showcase your portfolio
                 </p>
@@ -162,7 +184,9 @@ export default function ForArtists() {
                     <MapPin className="h-8 w-8 text-primary" />
                   </div>
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">Local Visibility</h3>
+                <h3 className="font-semibold text-foreground mb-2">
+                  Local Visibility
+                </h3>
                 <p className="text-sm text-muted-foreground">
                   Appear on our interactive map and location-based searches
                 </p>
@@ -181,7 +205,8 @@ export default function ForArtists() {
                 Register Your Studio
               </h2>
               <p className="text-muted-foreground">
-                Fill out the form below to get started. We'll review your application and contact you within 2-3 business days.
+                Fill out the form below to get started. We'll review your
+                application and contact you within 2-3 business days.
               </p>
             </div>
 
@@ -189,8 +214,10 @@ export default function ForArtists() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-foreground">Basic Information</h3>
-                  
+                  <h3 className="text-xl font-semibold text-foreground">
+                    Basic Information
+                  </h3>
+
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="artistName">Artist/Owner Name *</Label>
@@ -248,8 +275,10 @@ export default function ForArtists() {
 
                 {/* Location */}
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-foreground">Location</h3>
-                  
+                  <h3 className="text-xl font-semibold text-foreground">
+                    Location
+                  </h3>
+
                   <div className="space-y-2">
                     <Label htmlFor="address">Street Address *</Label>
                     <Input
@@ -303,8 +332,10 @@ export default function ForArtists() {
 
                 {/* Online Presence */}
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-foreground">Online Presence</h3>
-                  
+                  <h3 className="text-xl font-semibold text-foreground">
+                    Online Presence
+                  </h3>
+
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="website">Website</Label>
@@ -335,8 +366,10 @@ export default function ForArtists() {
 
                 {/* Professional Details */}
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-foreground">Professional Details</h3>
-                  
+                  <h3 className="text-xl font-semibold text-foreground">
+                    Professional Details
+                  </h3>
+
                   <div className="space-y-2">
                     <Label htmlFor="specialties">Specialties *</Label>
                     <Input
@@ -348,7 +381,9 @@ export default function ForArtists() {
                       required
                       className="bg-background border-border"
                     />
-                    <p className="text-xs text-muted-foreground">Separate multiple specialties with commas</p>
+                    <p className="text-xs text-muted-foreground">
+                      Separate multiple specialties with commas
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -376,7 +411,9 @@ export default function ForArtists() {
                       onChange={handleChange}
                       className="bg-background border-border"
                     />
-                    <p className="text-xs text-muted-foreground">Link to your online portfolio or gallery</p>
+                    <p className="text-xs text-muted-foreground">
+                      Link to your online portfolio or gallery
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -399,14 +436,23 @@ export default function ForArtists() {
                   <div className="text-sm text-foreground">
                     <p className="font-medium mb-1">What happens next?</p>
                     <p className="text-muted-foreground">
-                      Our team will review your application within 2-3 business days. Once approved, 
-                      you'll receive login credentials and instructions to set up your profile and start accepting bookings.
+                      Our team will review your application within 2-3 business
+                      days. Once approved, you'll receive login credentials and
+                      instructions to set up your profile and start accepting
+                      bookings.
                     </p>
                   </div>
                 </div>
 
-                <Button type="submit" size="lg" className="w-full" disabled={createArtistMutation.isPending}>
-                  {createArtistMutation.isPending ? "Submitting..." : "Submit Application"}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full"
+                  disabled={createArtistMutation.isPending}
+                >
+                  {createArtistMutation.isPending
+                    ? "Submitting..."
+                    : "Submit Application"}
                 </Button>
               </form>
             </Card>
@@ -418,7 +464,17 @@ export default function ForArtists() {
       <footer className="border-t border-border py-8">
         <div className="container">
           <div className="text-center text-sm text-muted-foreground">
-            <p>© 2024 Universal Inc. All rights reserved.</p>
+            <p className="mb-2">
+              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+            </p>
+            <div className="flex justify-center gap-4">
+              <a href="/terms-of-service" className="hover:text-primary">
+                Terms of Service
+              </a>
+              <a href="/cancellation-policy" className="hover:text-primary">
+                Cancellation Policy
+              </a>
+            </div>
           </div>
         </div>
       </footer>

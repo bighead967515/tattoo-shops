@@ -15,6 +15,7 @@ import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import Help from "./pages/Help";
 import CancellationPolicy from "./pages/CancellationPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import Pricing from "./pages/Pricing";
 import LicenseUpload from "./pages/LicenseUpload";
 // Client marketplace pages
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/help" component={Help} />
       <Route path="/cancellation-policy" component={CancellationPolicy} />
+      <Route path="/terms-of-service" component={TermsOfService} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/license-upload" component={LicenseUpload} />
       {/* Client marketplace routes */}
@@ -67,10 +69,7 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="dark"
-        switchable
-      >
+      <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
           <Router />

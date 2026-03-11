@@ -6,7 +6,11 @@ import { getDb } from "./db";
 import { clients, users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "./_core/logger";
-import { queueWebhookForRetry, startQueueProcessor, getQueueStats } from "./webhookQueue";
+import {
+  queueWebhookForRetry,
+  startQueueProcessor,
+  getQueueStats,
+} from "./webhookQueue";
 import { CLIENT_TIER_LIMITS } from "../shared/tierLimits";
 
 // Flag to track if processor is started
@@ -18,12 +22,12 @@ let processorStarted = false;
  */
 export function initWebhookProcessor(): void {
   if (processorStarted) return;
-  
+
   startQueueProcessor(async (eventType, payload) => {
     // Re-process the webhook event
     await processWebhookEvent(eventType, payload as Stripe.Event);
   }, 60000); // Check every minute
-  
+
   processorStarted = true;
   logger.info("Webhook retry processor initialized");
 }
@@ -31,30 +35,44 @@ export function initWebhookProcessor(): void {
 /**
  * Process a webhook event (used by both direct handler and retry queue)
  */
-async function processWebhookEvent(eventType: string, event: Stripe.Event): Promise<void> {
+async function processWebhookEvent(
+  eventType: string,
+  event: Stripe.Event,
+): Promise<void> {
   switch (eventType) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
       if (!bookingId || isNaN(bookingId) || bookingId <= 0) {
-        logger.warn("Webhook received checkout.session.completed with invalid bookingId", {
-          sessionId: session.id,
-          hasPaymentIntent: !!session.payment_intent,
-        });
+        logger.warn(
+          "Webhook received checkout.session.completed with invalid bookingId",
+          {
+            sessionId: session.id,
+            hasPaymentIntent: !!session.payment_intent,
+          },
+        );
         return; // Don't retry for invalid data
       }
-      
+
       // Check if already processed (idempotency)
       const existingBooking = await db.getBookingById(bookingId);
-      if (existingBooking && (Boolean(existingBooking.depositPaid) || existingBooking.status === "confirmed")) {
-        logger.debug("Webhook duplicate detected - booking already processed", { bookingId });
+      if (
+        existingBooking &&
+        (Boolean(existingBooking.depositPaid) ||
+          existingBooking.status === "confirmed")
+      ) {
+        logger.debug("Webhook duplicate detected - booking already processed", {
+          bookingId,
+        });
         return;
       }
 
       // Guard against null amount_total
-      const depositAmount = session.amount_total ? Number(session.amount_total) : 0;
-      
+      const depositAmount = session.amount_total
+        ? Number(session.amount_total)
+        : 0;
+
       // Update booking with payment information - use transaction for atomicity
       await db.withTransaction(async () => {
         await db.updateBooking(bookingId, {
@@ -81,19 +99,21 @@ async function processWebhookEvent(eventType: string, event: Stripe.Event): Prom
         stripeId: paymentIntent.id,
         amount: paymentIntent.amount,
       });
-      
+
       // Try to find and update the booking
-      const bookingId = paymentIntent.metadata?.bookingId 
-        ? parseInt(paymentIntent.metadata.bookingId, 10) 
+      const bookingId = paymentIntent.metadata?.bookingId
+        ? parseInt(paymentIntent.metadata.bookingId, 10)
         : null;
-      
+
       if (bookingId && !isNaN(bookingId) && bookingId > 0) {
         await db.updateBooking(bookingId, {
           status: "cancelled",
           stripePaymentIntentId: paymentIntent.id,
         });
       } else {
-        logger.warn("Could not update booking for failed payment - missing or invalid bookingId");
+        logger.warn(
+          "Could not update booking for failed payment - missing or invalid bookingId",
+        );
       }
       break;
     }
@@ -128,11 +148,12 @@ async function processWebhookEvent(eventType: string, event: Stripe.Event): Prom
  */
 async function handleSubscriptionChange(
   subscription: Stripe.Subscription,
-  eventType: string
+  eventType: string,
 ): Promise<void> {
-  const stripeCustomerId = typeof subscription.customer === "string"
-    ? subscription.customer
-    : subscription.customer.id;
+  const stripeCustomerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
 
   const priceId = subscription.items.data[0]?.plan?.id;
   if (!priceId) {
@@ -145,10 +166,13 @@ async function handleSubscriptionChange(
 
   const tier = stripePriceToClientTier(priceId);
   if (!tier) {
-    logger.debug("Subscription price does not match a client tier — may be an artist subscription", {
-      priceId,
-      subscriptionId: subscription.id,
-    });
+    logger.debug(
+      "Subscription price does not match a client tier — may be an artist subscription",
+      {
+        priceId,
+        subscriptionId: subscription.id,
+      },
+    );
     return;
   }
 
@@ -165,17 +189,21 @@ async function handleSubscriptionChange(
     .limit(1);
 
   if (!user) {
-    logger.warn("No user found for stripeCustomerId during subscription change", {
-      stripeCustomerId,
-      subscriptionId: subscription.id,
-    });
+    logger.warn(
+      "No user found for stripeCustomerId during subscription change",
+      {
+        stripeCustomerId,
+        subscriptionId: subscription.id,
+      },
+    );
     return;
   }
 
   const tierLimits = CLIENT_TIER_LIMITS[tier];
-  const aiCredits = tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
-    ? 999
-    : tierLimits.aiGenerationsPerMonth;
+  const aiCredits =
+    tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+      ? 999
+      : tierLimits.aiGenerationsPerMonth;
 
   // Atomically update users (source of truth) and clients (legacy copy)
   await database.transaction(async (tx) => {
@@ -215,15 +243,18 @@ async function handleSubscriptionChange(
  * Downgrades the client back to the free tier.
  */
 async function handleSubscriptionCancelled(
-  subscription: Stripe.Subscription
+  subscription: Stripe.Subscription,
 ): Promise<void> {
-  const stripeCustomerId = typeof subscription.customer === "string"
-    ? subscription.customer
-    : subscription.customer.id;
+  const stripeCustomerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
 
   const database = await getDb();
   if (!database) {
-    throw new Error("Database not available for subscription cancellation webhook");
+    throw new Error(
+      "Database not available for subscription cancellation webhook",
+    );
   }
 
   const [user] = await database
@@ -233,10 +264,13 @@ async function handleSubscriptionCancelled(
     .limit(1);
 
   if (!user) {
-    logger.warn("No user found for stripeCustomerId during subscription cancellation", {
-      stripeCustomerId,
-      subscriptionId: subscription.id,
-    });
+    logger.warn(
+      "No user found for stripeCustomerId during subscription cancellation",
+      {
+        stripeCustomerId,
+        subscriptionId: subscription.id,
+      },
+    );
     return;
   }
 
@@ -276,15 +310,22 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   }
 
   let event: Stripe.Event;
-  
+
   try {
     event = await constructWebhookEvent(req.body, signature);
-    logger.debug("Processing webhook event", { eventType: event.type, eventId: event.id });
+    logger.debug("Processing webhook event", {
+      eventType: event.type,
+      eventId: event.id,
+    });
   } catch (error) {
     logger.error("Webhook signature verification failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return res.status(400).send(`Webhook Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+    return res
+      .status(400)
+      .send(
+        `Webhook Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
   }
 
   // Handle test events
@@ -301,7 +342,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     res.json({ received: true });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     logger.error("Webhook processing failed, queueing for retry", {
       eventId: event.id,
       eventType: event.type,

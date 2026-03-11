@@ -12,12 +12,19 @@ import { eq, sql, and, gt } from "drizzle-orm";
 import { getDb } from "./db";
 import { clients } from "../drizzle/schema";
 import { generateTattooDesign } from "./geminiGeneration";
-import { getClientTierLimits, type ClientSubscriptionTier } from "../shared/tierLimits";
+import {
+  getClientTierLimits,
+  type ClientSubscriptionTier,
+} from "../shared/tierLimits";
 import { logger } from "./_core/logger";
 
 async function requireDb() {
   const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  if (!db)
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Database not available",
+    });
   return db;
 }
 
@@ -28,10 +35,18 @@ export const aiRouter = router({
    * or available AI credits.
    */
   generateDesign: protectedProcedure
-    .input(z.object({
-      prompt: z.string().min(10, "Please provide at least 10 characters describing your tattoo").max(2000),
-      style: z.string().max(50).optional(),
-    }))
+    .input(
+      z.object({
+        prompt: z
+          .string()
+          .min(
+            10,
+            "Please provide at least 10 characters describing your tattoo",
+          )
+          .max(2000),
+        style: z.string().max(50).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
 
@@ -45,18 +60,21 @@ export const aiRouter = router({
       if (!clientProfile) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You need a client profile to use AI Generation. Complete client onboarding first.",
+          message:
+            "You need a client profile to use AI Generation. Complete client onboarding first.",
         });
       }
 
       // 2. Check subscription tier and AI credits
-      const tier = (clientProfile.subscriptionTier || "client_free") as ClientSubscriptionTier;
+      const tier = (clientProfile.subscriptionTier ||
+        "client_free") as ClientSubscriptionTier;
       const tierLimits = getClientTierLimits(tier);
 
       if (tierLimits.aiGenerationsPerMonth === 0) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "AI Generation is a premium feature. Upgrade to Enthusiast ($9/mo) or Elite Ink ($19/mo) to unlock tattoo design generation.",
+          message:
+            "AI Generation is a premium feature. Upgrade to Enthusiast ($9/mo) or Elite Ink ($19/mo) to unlock tattoo design generation.",
         });
       }
 
@@ -70,10 +88,7 @@ export const aiRouter = router({
             updatedAt: new Date(),
           })
           .where(
-            and(
-              eq(clients.id, clientProfile.id),
-              gt(clients.aiCredits, 0)
-            )
+            and(eq(clients.id, clientProfile.id), gt(clients.aiCredits, 0)),
           )
           .returning({ aiCredits: clients.aiCredits });
 
@@ -93,21 +108,24 @@ export const aiRouter = router({
         const result = await generateTattooDesign(
           input.prompt,
           input.style,
-          ctx.user.id
+          ctx.user.id,
         );
 
-        logger.info(`AI tattoo generated for client #${clientProfile.id} (user #${ctx.user.id}), credits remaining: ${
-          tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
-            ? "unlimited"
-            : clientProfile.aiCredits
-        }`);
+        logger.info(
+          `AI tattoo generated for client #${clientProfile.id} (user #${ctx.user.id}), credits remaining: ${
+            tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+              ? "unlimited"
+              : clientProfile.aiCredits
+          }`,
+        );
 
         return {
           imageUrl: result.imageUrl,
           imageKey: result.imageKey,
-          creditsRemaining: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
-            ? null
-            : clientProfile.aiCredits,
+          creditsRemaining:
+            tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+              ? null
+              : clientProfile.aiCredits,
         };
       } catch (error) {
         logger.error("AI tattoo generation failed:", error);
@@ -140,7 +158,8 @@ export const aiRouter = router({
       };
     }
 
-    const tier = (clientProfile.subscriptionTier || "client_free") as ClientSubscriptionTier;
+    const tier = (clientProfile.subscriptionTier ||
+      "client_free") as ClientSubscriptionTier;
     const tierLimits = getClientTierLimits(tier);
 
     return {

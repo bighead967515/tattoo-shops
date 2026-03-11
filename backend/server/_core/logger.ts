@@ -8,11 +8,11 @@ const transports: winston.transport[] = [
     format: isDev
       ? winston.format.combine(
           winston.format.colorize(),
-          winston.format.simple()
+          winston.format.simple(),
         )
       : winston.format.combine(
           winston.format.timestamp(),
-          winston.format.json()
+          winston.format.json(),
         ),
   }),
 ];
@@ -25,9 +25,9 @@ if (ENV.isProduction) {
       level: "error",
       format: winston.format.combine(
         winston.format.timestamp(),
-        winston.format.json()
+        winston.format.json(),
       ),
-    })
+    }),
   );
 }
 
@@ -35,7 +35,7 @@ export const logger = winston.createLogger({
   level: isDev ? "debug" : "info",
   format: winston.format.combine(
     winston.format.timestamp(),
-    winston.format.errors({ stack: true })
+    winston.format.errors({ stack: true }),
   ),
   defaultMeta: { service: "tattoo-shops-api" },
   transports,

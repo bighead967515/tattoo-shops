@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, User, MapPin, Phone, Palette } from "lucide-react";
 
@@ -31,7 +37,7 @@ export default function ClientOnboarding() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
-  
+
   const [formData, setFormData] = useState({
     displayName: "",
     bio: "",
@@ -52,9 +58,7 @@ export default function ClientOnboarding() {
 
   const handleStyleToggle = (style: string) => {
     setSelectedStyles((prev) =>
-      prev.includes(style)
-        ? prev.filter((s) => s !== style)
-        : [...prev, style]
+      prev.includes(style) ? prev.filter((s) => s !== style) : [...prev, style],
     );
   };
 
@@ -87,9 +91,7 @@ export default function ClientOnboarding() {
               </div>
               {s < 3 && (
                 <div
-                  className={`w-16 h-1 ${
-                    step > s ? "bg-primary" : "bg-muted"
-                  }`}
+                  className={`w-16 h-1 ${step > s ? "bg-primary" : "bg-muted"}`}
                 />
               )}
             </div>
@@ -105,7 +107,8 @@ export default function ClientOnboarding() {
                 Welcome! Let's get to know you
               </CardTitle>
               <CardDescription>
-                Tell us a bit about yourself so artists can better understand your needs.
+                Tell us a bit about yourself so artists can better understand
+                your needs.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -120,7 +123,7 @@ export default function ClientOnboarding() {
                   }
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="bio">About You</Label>
                 <Textarea
@@ -135,10 +138,7 @@ export default function ClientOnboarding() {
               </div>
 
               <div className="flex justify-end">
-                <Button
-                  onClick={() => setStep(2)}
-                  disabled={!canProceedStep1}
-                >
+                <Button onClick={() => setStep(2)} disabled={!canProceedStep1}>
                   Next
                 </Button>
               </div>
@@ -204,9 +204,7 @@ export default function ClientOnboarding() {
                 <Button variant="outline" onClick={() => setStep(1)}>
                   Back
                 </Button>
-                <Button onClick={() => setStep(3)}>
-                  Next
-                </Button>
+                <Button onClick={() => setStep(3)}>Next</Button>
               </div>
             </CardContent>
           </Card>
@@ -221,7 +219,8 @@ export default function ClientOnboarding() {
                 Your Tattoo Style Preferences
               </CardTitle>
               <CardDescription>
-                Select the styles you're interested in. This helps us match you with the right artists.
+                Select the styles you're interested in. This helps us match you
+                with the right artists.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -229,7 +228,9 @@ export default function ClientOnboarding() {
                 {TATTOO_STYLES.map((style) => (
                   <Button
                     key={style}
-                    variant={selectedStyles.includes(style) ? "default" : "outline"}
+                    variant={
+                      selectedStyles.includes(style) ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() => handleStyleToggle(style)}
                   >

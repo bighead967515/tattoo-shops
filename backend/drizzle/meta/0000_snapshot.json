@@ -165,12 +165,8 @@
           "name": "artists_userId_users_id_fk",
           "tableFrom": "artists",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -180,9 +176,7 @@
         "artists_userId_unique": {
           "name": "artists_userId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "userId"
-          ]
+          "columns": ["userId"]
         }
       },
       "policies": {},
@@ -270,12 +264,8 @@
           "name": "bids_requestId_tattooRequests_id_fk",
           "tableFrom": "bids",
           "tableTo": "tattooRequests",
-          "columnsFrom": [
-            "requestId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requestId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -283,12 +273,8 @@
           "name": "bids_artistId_artists_id_fk",
           "tableFrom": "bids",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artistId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -298,10 +284,7 @@
         "bids_artistId_requestId_unique": {
           "name": "bids_artistId_requestId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "artistId",
-            "requestId"
-          ]
+          "columns": ["artistId", "requestId"]
         }
       },
       "policies": {},
@@ -431,12 +414,8 @@
           "name": "bookings_artistId_artists_id_fk",
           "tableFrom": "bookings",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artistId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -444,12 +423,8 @@
           "name": "bookings_userId_users_id_fk",
           "tableFrom": "bookings",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -560,12 +535,8 @@
           "name": "clients_userId_users_id_fk",
           "tableFrom": "clients",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -575,9 +546,7 @@
         "clients_userId_unique": {
           "name": "clients_userId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "userId"
-          ]
+          "columns": ["userId"]
         }
       },
       "policies": {},
@@ -620,12 +589,8 @@
           "name": "favorites_userId_users_id_fk",
           "tableFrom": "favorites",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -633,12 +598,8 @@
           "name": "favorites_artistId_artists_id_fk",
           "tableFrom": "favorites",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artistId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -648,10 +609,7 @@
         "favorites_userId_artistId_unique": {
           "name": "favorites_userId_artistId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "userId",
-            "artistId"
-          ]
+          "columns": ["userId", "artistId"]
         }
       },
       "policies": {},
@@ -748,12 +706,8 @@
           "name": "portfolioImages_artistId_artists_id_fk",
           "tableFrom": "portfolioImages",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artistId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -819,12 +773,8 @@
           "name": "requestImages_requestId_tattooRequests_id_fk",
           "tableFrom": "requestImages",
           "tableTo": "tattooRequests",
-          "columnsFrom": [
-            "requestId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requestId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -890,12 +840,8 @@
           "name": "requestMessages_requestId_tattooRequests_id_fk",
           "tableFrom": "requestMessages",
           "tableTo": "tattooRequests",
-          "columnsFrom": [
-            "requestId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requestId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -903,12 +849,8 @@
           "name": "requestMessages_bidId_bids_id_fk",
           "tableFrom": "requestMessages",
           "tableTo": "bids",
-          "columnsFrom": [
-            "bidId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bidId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -916,12 +858,8 @@
           "name": "requestMessages_senderId_users_id_fk",
           "tableFrom": "requestMessages",
           "tableTo": "users",
-          "columnsFrom": [
-            "senderId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["senderId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1062,12 +1000,8 @@
           "name": "reviews_artistId_artists_id_fk",
           "tableFrom": "reviews",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artistId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1075,12 +1009,8 @@
           "name": "reviews_userId_users_id_fk",
           "tableFrom": "reviews",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1228,12 +1158,8 @@
           "name": "tattooRequests_clientId_clients_id_fk",
           "tableFrom": "tattooRequests",
           "tableTo": "clients",
-          "columnsFrom": [
-            "clientId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clientId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1372,9 +1298,7 @@
         "users_openId_unique": {
           "name": "users_openId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "openId"
-          ]
+          "columns": ["openId"]
         }
       },
       "policies": {},
@@ -1553,12 +1477,8 @@
           "name": "verificationDocuments_userId_users_id_fk",
           "tableFrom": "verificationDocuments",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1566,12 +1486,8 @@
           "name": "verificationDocuments_reviewedBy_users_id_fk",
           "tableFrom": "verificationDocuments",
           "tableTo": "users",
-          "columnsFrom": [
-            "reviewedBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reviewedBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1665,9 +1581,7 @@
         "webhookQueue_eventId_unique": {
           "name": "webhookQueue_eventId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "eventId"
-          ]
+          "columns": ["eventId"]
         }
       },
       "policies": {},
@@ -1679,42 +1593,22 @@
     "public.bid_status": {
       "name": "bid_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "accepted",
-        "rejected",
-        "withdrawn"
-      ]
+      "values": ["pending", "accepted", "rejected", "withdrawn"]
     },
     "public.request_status": {
       "name": "request_status",
       "schema": "public",
-      "values": [
-        "open",
-        "in_progress",
-        "completed",
-        "cancelled"
-      ]
+      "values": ["open", "in_progress", "completed", "cancelled"]
     },
     "public.role": {
       "name": "role",
       "schema": "public",
-      "values": [
-        "user",
-        "admin",
-        "artist",
-        "client"
-      ]
+      "values": ["user", "admin", "artist", "client"]
     },
     "public.verification_status": {
       "name": "verification_status",
       "schema": "public",
-      "values": [
-        "unverified",
-        "pending",
-        "verified",
-        "rejected"
-      ]
+      "values": ["unverified", "pending", "verified", "rejected"]
     }
   },
   "schemas": {},

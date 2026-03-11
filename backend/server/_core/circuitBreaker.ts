@@ -6,16 +6,16 @@
 import { logger } from "./logger";
 
 export enum CircuitState {
-  CLOSED = "CLOSED",     // Normal operation
-  OPEN = "OPEN",         // Failing, reject requests immediately
-  HALF_OPEN = "HALF_OPEN" // Testing if service recovered
+  CLOSED = "CLOSED", // Normal operation
+  OPEN = "OPEN", // Failing, reject requests immediately
+  HALF_OPEN = "HALF_OPEN", // Testing if service recovered
 }
 
 interface CircuitBreakerOptions {
   name: string;
-  failureThreshold?: number;    // Number of failures before opening
-  successThreshold?: number;    // Successes needed to close from half-open
-  timeout?: number;             // Time in ms before trying again (half-open)
+  failureThreshold?: number; // Number of failures before opening
+  successThreshold?: number; // Successes needed to close from half-open
+  timeout?: number; // Time in ms before trying again (half-open)
 }
 
 interface CircuitBreakerState {
@@ -106,7 +106,9 @@ export class CircuitBreaker {
     } else if (circuit.failures >= this.failureThreshold) {
       circuit.state = CircuitState.OPEN;
       circuit.nextAttemptTime = Date.now() + this.timeout;
-      logger.warn(`Circuit ${this.name} OPEN - threshold reached (${circuit.failures} failures)`);
+      logger.warn(
+        `Circuit ${this.name} OPEN - threshold reached (${circuit.failures} failures)`,
+      );
     }
   }
 

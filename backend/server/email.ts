@@ -18,29 +18,35 @@ export interface EmailOptions {
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function sanitizeErrorForLogging(error: any): any {
   if (!error) return error;
-  
+
   const sanitized = { ...error };
-  const sensitiveKeys = ['to', 'from', 'email', 'recipient', 'address'];
-  
+  const sensitiveKeys = ["to", "from", "email", "recipient", "address"];
+
   for (const key of sensitiveKeys) {
-    if (key in sanitized && typeof sanitized[key] === 'string') {
-      sanitized[key] = sanitized[key].replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[REDACTED]');
+    if (key in sanitized && typeof sanitized[key] === "string") {
+      sanitized[key] = sanitized[key].replace(
+        /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+        "[REDACTED]",
+      );
     }
   }
-  
+
   if (error.message) {
-    sanitized.message = error.message.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[REDACTED]');
+    sanitized.message = error.message.replace(
+      /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+      "[REDACTED]",
+    );
   }
-  
+
   return sanitized;
 }
 
@@ -48,18 +54,23 @@ function sanitizeErrorForLogging(error: any): any {
  * Sleep utility for retry delays
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Send an email using Resend with retry logic and circuit breaker
  */
 export async function sendEmail(options: EmailOptions) {
-  const { to, subject, html, from = "Universal Inc <noreply@universalinc.com>" } = options;
+  const {
+    to,
+    subject,
+    html,
+    from = "Universal Inc <noreply@universalinc.com>",
+  } = options;
 
   return emailCircuit.execute(async () => {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const { data, error } = await resend.emails.send({
@@ -77,7 +88,7 @@ export async function sendEmail(options: EmailOptions) {
         return { success: true, id: data?.id };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // Don't retry on certain errors (invalid email, auth issues)
         const errorMessage = lastError.message.toLowerCase();
         if (
@@ -85,23 +96,29 @@ export async function sendEmail(options: EmailOptions) {
           errorMessage.includes("unauthorized") ||
           errorMessage.includes("forbidden")
         ) {
-          logger.error("Email send failed (non-retryable)", sanitizeErrorForLogging({ error: lastError.message }));
+          logger.error(
+            "Email send failed (non-retryable)",
+            sanitizeErrorForLogging({ error: lastError.message }),
+          );
           throw lastError;
         }
-        
+
         if (attempt < MAX_RETRIES) {
           const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
-          logger.warn(`Email send failed, retrying in ${delay}ms`, { 
-            attempt, 
+          logger.warn(`Email send failed, retrying in ${delay}ms`, {
+            attempt,
             maxRetries: MAX_RETRIES,
-            error: sanitizeErrorForLogging({ message: lastError.message })
+            error: sanitizeErrorForLogging({ message: lastError.message }),
           });
           await sleep(delay);
         }
       }
     }
 
-    logger.error("Email send failed after all retries", sanitizeErrorForLogging({ error: lastError?.message }));
+    logger.error(
+      "Email send failed after all retries",
+      sanitizeErrorForLogging({ error: lastError?.message }),
+    );
     throw lastError;
   });
 }
@@ -206,20 +223,22 @@ export async function sendBookingConfirmation(
     shopName: string;
     appointmentDate: string;
     depositAmount: number;
-  }
+  },
 ) {
-  const { customerName, artistName, shopName, appointmentDate, depositAmount } = bookingDetails;
-  
+  const { customerName, artistName, shopName, appointmentDate, depositAmount } =
+    bookingDetails;
+
   // Escape all user-provided inputs
   const escapedCustomerName = escapeHtml(customerName);
   const escapedArtistName = escapeHtml(artistName);
   const escapedShopName = escapeHtml(shopName);
   const escapedAppointmentDate = escapeHtml(appointmentDate);
-  
+
   // Validate and sanitize depositAmount
-  const safeDepositAmount = (typeof depositAmount === 'number' && !isNaN(depositAmount)) 
-    ? depositAmount 
-    : 0;
+  const safeDepositAmount =
+    typeof depositAmount === "number" && !isNaN(depositAmount)
+      ? depositAmount
+      : 0;
 
   const html = `
 <!DOCTYPE html>

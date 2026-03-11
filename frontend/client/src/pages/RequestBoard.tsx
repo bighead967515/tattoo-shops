@@ -3,19 +3,32 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Search, 
-  MapPin, 
-  DollarSign, 
-  Clock, 
-  Eye, 
+import {
+  Search,
+  MapPin,
+  DollarSign,
+  Clock,
+  Eye,
   MessageSquare,
   Filter,
-  Plus
+  Plus,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -48,18 +61,19 @@ export default function RequestBoard() {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
-      (request.title || '').toLowerCase().includes(query) ||
-      (request.description || '').toLowerCase().includes(query) ||
-      (request.placement || '').toLowerCase().includes(query)
+      (request.title || "").toLowerCase().includes(query) ||
+      (request.description || "").toLowerCase().includes(query) ||
+      (request.placement || "").toLowerCase().includes(query)
     );
   });
 
   const formatBudget = (min?: number | null, max?: number | null) => {
     const hasMin = min != null;
     const hasMax = max != null;
-    
+
     if (!hasMin && !hasMax) return "Flexible";
-    if (hasMin && hasMax) return `$${(min / 100).toFixed(2)} - $${(max / 100).toFixed(2)}`;
+    if (hasMin && hasMax)
+      return `$${(min / 100).toFixed(2)} - $${(max / 100).toFixed(2)}`;
     if (hasMin) return `From $${(min / 100).toFixed(2)}`;
     return `Up to $${(max! / 100).toFixed(2)}`;
   };
@@ -74,7 +88,7 @@ export default function RequestBoard() {
             Browse tattoo requests from clients looking for artists
           </p>
         </div>
-        
+
         {user?.role === "client" && (
           <Link href="/client/new-request">
             <Button>
@@ -83,12 +97,10 @@ export default function RequestBoard() {
             </Button>
           </Link>
         )}
-        
+
         {!user && (
           <Link href="/login">
-            <Button variant="outline">
-              Sign in to post a request
-            </Button>
+            <Button variant="outline">Sign in to post a request</Button>
           </Link>
         )}
       </div>
@@ -107,7 +119,7 @@ export default function RequestBoard() {
                 aria-label="Search requests"
               />
             </div>
-            
+
             <Select value={styleFilter} onValueChange={setStyleFilter}>
               <SelectTrigger className="w-full md:w-[200px]">
                 <Filter className="mr-2 h-4 w-4" />
@@ -143,7 +155,9 @@ export default function RequestBoard() {
       ) : filteredRequests?.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No requests found matching your criteria.</p>
+            <p className="text-muted-foreground">
+              No requests found matching your criteria.
+            </p>
             {user?.role === "client" && (
               <Link href="/client/new-request">
                 <Button className="mt-4">
@@ -163,13 +177,17 @@ export default function RequestBoard() {
                 {request.images?.[0] && (
                   <div className="aspect-video relative overflow-hidden rounded-t-lg">
                     <img
-                      src={request.images.find((i: { isMainImage: boolean }) => i.isMainImage)?.imageUrl || request.images[0].imageUrl}
+                      src={
+                        request.images.find(
+                          (i: { isMainImage: boolean }) => i.isMainImage,
+                        )?.imageUrl || request.images[0].imageUrl
+                      }
                       alt={request.title}
                       className="object-cover w-full h-full"
                     />
                   </div>
                 )}
-                
+
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg line-clamp-1">
@@ -183,7 +201,7 @@ export default function RequestBoard() {
                     {request.description}
                   </CardDescription>
                 </CardHeader>
-                
+
                 <CardContent className="space-y-2">
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
@@ -194,15 +212,17 @@ export default function RequestBoard() {
                       {request.placement}
                     </span>
                   </div>
-                  
+
                   {(request.preferredCity || request.preferredState) && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="h-4 w-4" />
-                      {[request.preferredCity, request.preferredState].filter(Boolean).join(", ")}
+                      {[request.preferredCity, request.preferredState]
+                        .filter(Boolean)
+                        .join(", ")}
                       {request.willingToTravel && " (willing to travel)"}
                     </div>
                   )}
-                  
+
                   {request.desiredTimeframe && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
@@ -210,7 +230,7 @@ export default function RequestBoard() {
                     </div>
                   )}
                 </CardContent>
-                
+
                 <CardFooter className="border-t pt-4">
                   <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">

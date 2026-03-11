@@ -6,7 +6,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Heart, User, CreditCard, MapPin, Clock, LayoutDashboard, Sparkles } from "lucide-react";
+import {
+  Calendar,
+  Heart,
+  User,
+  CreditCard,
+  MapPin,
+  Clock,
+  LayoutDashboard,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
@@ -14,20 +23,20 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, loading } = useAuth();
 
-  const { data: artist } = trpc.artists.getByUserId.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: artist } = trpc.artists.getByUserId.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
-  const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.getByUserId.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: bookings, isLoading: bookingsLoading } =
+    trpc.bookings.getByUserId.useQuery(undefined, { enabled: isAuthenticated });
 
-  const { data: favorites, isLoading: favoritesLoading, refetch: refetchFavorites } = trpc.favorites.getByUserId.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const {
+    data: favorites,
+    isLoading: favoritesLoading,
+    refetch: refetchFavorites,
+  } = trpc.favorites.getByUserId.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   const removeFavoriteMutation = trpc.favorites.remove.useMutation({
     onSuccess: () => {
@@ -93,7 +102,10 @@ export default function Dashboard() {
           )}
           {!artist && (
             <Link href="/for-artists">
-              <Button variant="outline" className="w-full md:w-auto border-dashed border-primary/50 text-primary hover:bg-primary/5">
+              <Button
+                variant="outline"
+                className="w-full md:w-auto border-dashed border-primary/50 text-primary hover:bg-primary/5"
+              >
                 <Sparkles className="w-4 h-4 mr-2" />
                 Register as Tattoo Artist
               </Button>
@@ -140,7 +152,9 @@ export default function Dashboard() {
                           <h3 className="text-xl font-semibold">
                             {item.artist?.shopName || "Unknown Artist"}
                           </h3>
-                          <Badge className={getStatusColor(item.booking.status)}>
+                          <Badge
+                            className={getStatusColor(item.booking.status)}
+                          >
                             {item.booking.status}
                           </Badge>
                         </div>
@@ -149,31 +163,42 @@ export default function Dashboard() {
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4" />
                             <span>
-                              {new Date(item.booking.preferredDate).toLocaleString()}
+                              {new Date(
+                                item.booking.preferredDate,
+                              ).toLocaleString()}
                             </span>
                           </div>
-                          
+
                           {item.artist?.address && (
                             <div className="flex items-center gap-2">
                               <MapPin className="w-4 h-4" />
                               <span>
-                                {item.artist.address}, {item.artist.city}, {item.artist.state}
+                                {item.artist.address}, {item.artist.city},{" "}
+                                {item.artist.state}
                               </span>
                             </div>
                           )}
 
                           <div className="mt-3">
-                            <p className="font-medium text-foreground">Tattoo Description:</p>
-                            <p className="mt-1">{item.booking.tattooDescription}</p>
+                            <p className="font-medium text-foreground">
+                              Tattoo Description:
+                            </p>
+                            <p className="mt-1">
+                              {item.booking.tattooDescription}
+                            </p>
                           </div>
 
                           <div className="flex gap-4 mt-2">
                             <div>
-                              <span className="font-medium text-foreground">Placement:</span>{" "}
+                              <span className="font-medium text-foreground">
+                                Placement:
+                              </span>{" "}
                               {item.booking.placement}
                             </div>
                             <div>
-                              <span className="font-medium text-foreground">Size:</span>{" "}
+                              <span className="font-medium text-foreground">
+                                Size:
+                              </span>{" "}
                               {item.booking.size}
                             </div>
                           </div>
@@ -181,7 +206,10 @@ export default function Dashboard() {
                           {item.booking.depositPaid && (
                             <div className="flex items-center gap-2 text-green-600 mt-2">
                               <CreditCard className="w-4 h-4" />
-                              <span className="font-medium">Deposit Paid: ${(item.booking.depositAmount || 0) / 100}</span>
+                              <span className="font-medium">
+                                Deposit Paid: $
+                                {(item.booking.depositAmount || 0) / 100}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -192,7 +220,9 @@ export default function Dashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setLocation(`/artist/${item.artist!.id}`)}
+                            onClick={() =>
+                              setLocation(`/artist/${item.artist!.id}`)
+                            }
                           >
                             View Artist
                           </Button>
@@ -226,11 +256,12 @@ export default function Dashboard() {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {favorites.map((item) => {
                   if (!item.artist) return null;
-                  
+
                   let avgRating = 0;
                   if (item.artist.averageRating) {
                     const parsed = parseFloat(item.artist.averageRating);
-                    avgRating = Number.isNaN(parsed) || !isFinite(parsed) ? 0 : parsed;
+                    avgRating =
+                      Number.isNaN(parsed) || !isFinite(parsed) ? 0 : parsed;
                   }
 
                   return (
@@ -238,7 +269,7 @@ export default function Dashboard() {
                       <h3 className="text-lg font-semibold mb-2">
                         {item.artist.shopName}
                       </h3>
-                      
+
                       {item.artist.city && (
                         <p className="text-sm text-muted-foreground mb-3">
                           <MapPin className="w-3 h-3 inline mr-1" />
@@ -252,7 +283,9 @@ export default function Dashboard() {
                             <span
                               key={star}
                               className={`text-sm ${
-                                star <= avgRating ? "text-primary" : "text-muted-foreground"
+                                star <= avgRating
+                                  ? "text-primary"
+                                  : "text-muted-foreground"
                               }`}
                             >
                               ★
@@ -268,14 +301,20 @@ export default function Dashboard() {
                         <Button
                           size="sm"
                           className="flex-1"
-                          onClick={() => setLocation(`/artist/${item.artist!.id}`)}
+                          onClick={() =>
+                            setLocation(`/artist/${item.artist!.id}`)
+                          }
                         >
                           View Profile
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => removeFavoriteMutation.mutate({ artistId: item.artist!.id })}
+                          onClick={() =>
+                            removeFavoriteMutation.mutate({
+                              artistId: item.artist!.id,
+                            })
+                          }
                         >
                           <Heart className="w-4 h-4 fill-red-500 text-red-500" />
                         </Button>
@@ -287,7 +326,9 @@ export default function Dashboard() {
             ) : (
               <Card className="p-12 text-center">
                 <Heart className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No favorite artists yet</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  No favorite artists yet
+                </h3>
                 <p className="text-muted-foreground mb-4">
                   Save your favorite artists to quickly access them later
                 </p>
@@ -305,22 +346,30 @@ export default function Dashboard() {
             <Card className="p-6">
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Name</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Name
+                  </label>
                   <p className="text-lg">{user.name || "Not set"}</p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Email</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Email
+                  </label>
                   <p className="text-lg">{user.email || "Not set"}</p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Role</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Role
+                  </label>
                   <Badge>{user.role}</Badge>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Member Since</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Member Since
+                  </label>
                   <p className="text-lg">
                     {new Date(user.createdAt).toLocaleDateString()}
                   </p>

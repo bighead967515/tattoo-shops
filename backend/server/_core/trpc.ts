@@ -1,4 +1,4 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -11,7 +11,7 @@ const t = initTRPC.context<TrpcContext>().create({
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-const requireUser = t.middleware(async opts => {
+const requireUser = t.middleware(async (opts) => {
   const { ctx } = opts;
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
@@ -34,8 +34,8 @@ export const artistProcedure = protectedProcedure.use(
     }
 
     const artist = await getArtistByUserId(ctx.user.id);
-    
-    if (!artist && ctx.user.role !== 'admin') {
+
+    if (!artist && ctx.user.role !== "admin") {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You must have an artist profile to perform this action",
@@ -43,7 +43,7 @@ export const artistProcedure = protectedProcedure.use(
     }
 
     return next({ ctx });
-  })
+  }),
 );
 
 /**
@@ -56,7 +56,7 @@ export const artistOwnerProcedure = artistProcedure.use(
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
 
-    if (ctx.user.role === 'admin') return next({ ctx });
+    if (ctx.user.role === "admin") return next({ ctx });
 
     const artist = await getArtistByUserId(ctx.user.id);
     const parsedInput = input as { artistId?: number; id?: number } | undefined;
@@ -70,7 +70,7 @@ export const artistOwnerProcedure = artistProcedure.use(
     }
 
     return next({ ctx });
-  })
+  }),
 );
 
 export const adminProcedure = protectedProcedure.use(
@@ -79,7 +79,7 @@ export const adminProcedure = protectedProcedure.use(
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
 
-    if (ctx.user.role !== 'admin') {
+    if (ctx.user.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 

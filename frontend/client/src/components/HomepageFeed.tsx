@@ -23,7 +23,12 @@ function FeedSkeleton() {
 
 export default function HomepageFeed() {
   const [, setLocation] = useLocation();
-  const { data: requests, isLoading, isError, error } = trpc.requests.listForHomepage.useQuery();
+  const {
+    data: requests,
+    isLoading,
+    isError,
+    error,
+  } = trpc.requests.listForHomepage.useQuery();
 
   if (isLoading) {
     return <FeedSkeleton />;
@@ -38,15 +43,19 @@ export default function HomepageFeed() {
       </div>
     );
   }
-  
+
   if (!requests || requests.length === 0) {
-      return (
-        <div className="text-center py-10 px-4 border-2 border-dashed rounded-md">
-            <h3 className="text-xl font-semibold mb-2">No open requests yet!</h3>
-            <p className="text-muted-foreground mb-6">Be the first one to post a public request and get bids from artists.</p>
-            <Button onClick={() => setLocation('/client/new-request')}>Post a Request</Button>
-        </div>
-      )
+    return (
+      <div className="text-center py-10 px-4 border-2 border-dashed rounded-md">
+        <h3 className="text-xl font-semibold mb-2">No open requests yet!</h3>
+        <p className="text-muted-foreground mb-6">
+          Be the first one to post a public request and get bids from artists.
+        </p>
+        <Button onClick={() => setLocation("/client/new-request")}>
+          Post a Request
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -57,7 +66,11 @@ export default function HomepageFeed() {
         ))}
       </div>
       <div className="text-center mt-12">
-        <Button size="lg" onClick={() => setLocation("/requests")} className="px-8">
+        <Button
+          size="lg"
+          onClick={() => setLocation("/requests")}
+          className="px-8"
+        >
           View All Requests
         </Button>
       </div>

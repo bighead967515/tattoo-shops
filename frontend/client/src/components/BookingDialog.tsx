@@ -29,7 +29,7 @@ export default function BookingDialog({
   artistName,
 }: BookingDialogProps) {
   const { user } = useAuth();
-  
+
   const initialFormData = {
     customerName: user?.name || "",
     customerEmail: user?.email || "",
@@ -51,7 +51,13 @@ export default function BookingDialog({
       onOpenChange(false); // Close dialog on success
     },
     onError: (error) => {
-      const zodError = (error.data as { zodError?: { fieldErrors?: Record<string, string[] | undefined> } } | undefined)?.zodError;
+      const zodError = (
+        error.data as
+          | {
+              zodError?: { fieldErrors?: Record<string, string[] | undefined> };
+            }
+          | undefined
+      )?.zodError;
       if (zodError?.fieldErrors) {
         const errors = zodError.fieldErrors;
         for (const field in errors) {
@@ -61,7 +67,10 @@ export default function BookingDialog({
           }
         }
       } else {
-        toast.error(error.message || "Failed to send booking request. Please try again later.");
+        toast.error(
+          error.message ||
+            "Failed to send booking request. Please try again later.",
+        );
       }
     },
   });
@@ -79,7 +88,11 @@ export default function BookingDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.customerName || !formData.customerEmail || !formData.customerPhone) {
+    if (
+      !formData.customerName ||
+      !formData.customerEmail ||
+      !formData.customerPhone
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -126,7 +139,8 @@ export default function BookingDialog({
         <DialogHeader>
           <DialogTitle>Book Appointment with {artistName}</DialogTitle>
           <DialogDescription>
-            Fill out the form below to request an appointment. The artist will contact you to confirm details.
+            Fill out the form below to request an appointment. The artist will
+            contact you to confirm details.
           </DialogDescription>
         </DialogHeader>
 
@@ -134,7 +148,7 @@ export default function BookingDialog({
           {/* Contact Information */}
           <div className="space-y-4">
             <h3 className="font-semibold">Contact Information</h3>
-            
+
             <div>
               <Label htmlFor="customerName">Full Name *</Label>
               <Input
@@ -171,7 +185,7 @@ export default function BookingDialog({
           {/* Appointment Details */}
           <div className="space-y-4">
             <h3 className="font-semibold">Appointment Details</h3>
-            
+
             <div>
               <Label htmlFor="preferredDate">Preferred Date *</Label>
               <Input
@@ -187,13 +201,15 @@ export default function BookingDialog({
           {/* Tattoo Details */}
           <div className="space-y-4">
             <h3 className="font-semibold">Tattoo Details</h3>
-            
+
             <div>
               <Label htmlFor="tattooDescription">Tattoo Description *</Label>
               <Textarea
                 id="tattooDescription"
                 value={formData.tattooDescription}
-                onChange={(e) => handleChange("tattooDescription", e.target.value)}
+                onChange={(e) =>
+                  handleChange("tattooDescription", e.target.value)
+                }
                 placeholder="Describe your tattoo idea in detail..."
                 rows={4}
                 required
@@ -242,7 +258,9 @@ export default function BookingDialog({
               <Textarea
                 id="additionalNotes"
                 value={formData.additionalNotes}
-                onChange={(e) => handleChange("additionalNotes", e.target.value)}
+                onChange={(e) =>
+                  handleChange("additionalNotes", e.target.value)
+                }
                 placeholder="Any other details or questions..."
                 rows={3}
               />
@@ -260,7 +278,11 @@ export default function BookingDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="flex-1 h-12 text-base">
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 h-12 text-base"
+            >
               {isLoading ? (
                 "Sending..."
               ) : (
@@ -271,9 +293,10 @@ export default function BookingDialog({
               )}
             </Button>
           </div>
-          
+
           <p className="text-xs text-center text-muted-foreground">
-            The artist will receive your request and contact you to confirm the appointment and discuss payment.
+            The artist will receive your request and contact you to confirm the
+            appointment and discuss payment.
           </p>
         </form>
       </DialogContent>

@@ -104,7 +104,7 @@ export async function createSubscriptionCheckout({
  * Returns null if the Price ID doesn't match a known client tier.
  */
 export function stripePriceToClientTier(
-  priceId: string
+  priceId: string,
 ): "client_plus" | "client_elite" | null {
   if (priceId === ENV.stripeClientPlusPriceId) return "client_plus";
   if (priceId === ENV.stripeClientElitePriceId) return "client_elite";
@@ -113,7 +113,7 @@ export function stripePriceToClientTier(
 
 export async function constructWebhookEvent(
   payload: string | Buffer,
-  signature: string
+  signature: string,
 ): Promise<Stripe.Event> {
   if (!ENV.stripeWebhookSecret) {
     throw new Error("STRIPE_WEBHOOK_SECRET is required");
@@ -122,6 +122,6 @@ export async function constructWebhookEvent(
   return stripe.webhooks.constructEvent(
     payload,
     signature,
-    ENV.stripeWebhookSecret
+    ENV.stripeWebhookSecret,
   );
 }

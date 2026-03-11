@@ -36,22 +36,29 @@ export default function TattooCard({
           <Heart className="h-4 w-4" />
         </Button>
       </div>
-      
+
       <div className="p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm">
             {artistInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm text-foreground truncate">{artistName}</h3>
+            <h3 className="font-semibold text-sm text-foreground truncate">
+              {artistName}
+            </h3>
             <p className="text-xs text-muted-foreground truncate">{location}</p>
           </div>
         </div>
-        
+
         <div className="mt-3 flex items-center gap-1">
           <div className="flex gap-0.5">
             {[...Array(5)].map((_, i) => (
-              <span key={i} className={i < Math.floor(rating) ? "text-primary" : "text-muted"}>
+              <span
+                key={i}
+                className={
+                  i < Math.floor(rating) ? "text-primary" : "text-muted"
+                }
+              >
                 ★
               </span>
             ))}

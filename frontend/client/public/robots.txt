@@ -11,6 +11,7 @@ Allow: /for-artists
 Allow: /pricing
 Allow: /help
 Allow: /cancellation-policy
+Allow: /terms-of-service
 
 # Disallow private/authenticated pages
 Disallow: /dashboard

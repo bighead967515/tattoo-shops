@@ -1,5 +1,5 @@
 /**
- * Request-to-Bid Optimization — Gemini AI Services
+ * Request-to-Bid Optimization — Groq AI Services
  *
  * 1. Prompt Refiner: Analyzes client tattoo request descriptions and suggests
  *    clarifying questions when the request is too vague.
@@ -8,11 +8,8 @@
  *    artists based on the artist's profile, pricing patterns, and tone.
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ENV } from "./_core/env";
+import { groqGenerateJson } from "./_core/aiProviders";
 import { logger } from "./_core/logger";
-
-const genAI = new GoogleGenerativeAI(ENV.googleAiApiKey);
 
 // ============================================
 // PROMPT REFINER (Client Side)
@@ -65,44 +62,40 @@ export async function refineRequestPrompt(
     placement?: string;
     size?: string;
     colorPreference?: string;
-  }
+  },
 ): Promise<PromptRefinerResult> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     // Build context string from form fields already filled
     const contextParts: string[] = [];
     if (context?.title) contextParts.push(`Title: "${context.title}"`);
     if (context?.style) contextParts.push(`Style: ${context.style}`);
-    if (context?.placement) contextParts.push(`Placement: ${context.placement}`);
+    if (context?.placement)
+      contextParts.push(`Placement: ${context.placement}`);
     if (context?.size) contextParts.push(`Size: ${context.size}`);
-    if (context?.colorPreference) contextParts.push(`Color: ${context.colorPreference}`);
+    if (context?.colorPreference)
+      contextParts.push(`Color: ${context.colorPreference}`);
 
-    const contextStr = contextParts.length > 0
-      ? `\n\nThe client has also filled in these form fields:\n${contextParts.join("\n")}`
-      : "";
+    const contextStr =
+      contextParts.length > 0
+        ? `\n\nThe client has also filled in these form fields:\n${contextParts.join("\n")}`
+        : "";
 
-    const result = await model.generateContent([
+    const parsed = await groqGenerateJson<Partial<PromptRefinerResult>>(
       REFINER_PROMPT,
       `Client's description: "${description}"${contextStr}`,
-    ]);
-
-    const text = result.response.text().trim();
-
-    let jsonText = text;
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(jsonText);
+      { maxTokens: 1200 },
+    );
 
     const analysis: PromptRefinerResult = {
-      isComplete: typeof parsed.isComplete === "boolean" ? parsed.isComplete : false,
+      isComplete:
+        typeof parsed.isComplete === "boolean" ? parsed.isComplete : false,
       completenessScore:
         typeof parsed.completenessScore === "number"
           ? Math.max(1, Math.min(10, Math.round(parsed.completenessScore)))
           : 5,
-      missingAspects: Array.isArray(parsed.missingAspects) ? parsed.missingAspects.slice(0, 10) : [],
+      missingAspects: Array.isArray(parsed.missingAspects)
+        ? parsed.missingAspects.slice(0, 10)
+        : [],
       suggestedQuestions: Array.isArray(parsed.suggestedQuestions)
         ? parsed.suggestedQuestions.slice(0, 5)
         : [],
@@ -114,12 +107,12 @@ export async function refineRequestPrompt(
     };
 
     logger.info(
-      `Prompt refiner: score=${analysis.completenessScore}/10, questions=${analysis.suggestedQuestions.length}, complete=${analysis.isComplete}`
+      `Prompt refiner: score=${analysis.completenessScore}/10, questions=${analysis.suggestedQuestions.length}, complete=${analysis.isComplete}`,
     );
 
     return analysis;
   } catch (error) {
-    logger.error("Gemini Prompt Refiner failed:", error);
+    logger.error("Groq prompt refiner failed:", error);
     return {
       isComplete: true, // Don't block submission on AI failure
       completenessScore: 5,
@@ -210,11 +203,9 @@ export async function draftBidResponse(
     experience?: number | null;
     city?: string | null;
     state?: string | null;
-  }
+  },
 ): Promise<BidAssistantResult> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     // Build request context
     const requestContext = [
       `Title: "${request.title}"`,
@@ -222,12 +213,18 @@ export async function draftBidResponse(
       request.style ? `Style: ${request.style}` : null,
       `Placement: ${request.placement}`,
       `Size: ${request.size}`,
-      request.colorPreference ? `Color Preference: ${request.colorPreference.replace(/_/g, " & ")}` : null,
+      request.colorPreference
+        ? `Color Preference: ${request.colorPreference.replace(/_/g, " & ")}`
+        : null,
       request.budgetMin || request.budgetMax
         ? `Budget: ${request.budgetMin ? `$${(request.budgetMin / 100).toFixed(0)}` : "?"} - ${request.budgetMax ? `$${(request.budgetMax / 100).toFixed(0)}` : "?"}`
         : null,
-      request.desiredTimeframe ? `Timeframe: ${request.desiredTimeframe}` : null,
-    ].filter(Boolean).join("\n");
+      request.desiredTimeframe
+        ? `Timeframe: ${request.desiredTimeframe}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     // Build artist context
     const artistContext = [
@@ -235,48 +232,54 @@ export async function draftBidResponse(
       artist.styles ? `Specializes in: ${artist.styles}` : null,
       artist.specialties ? `Known for: ${artist.specialties}` : null,
       artist.experience ? `${artist.experience} years of experience` : null,
-      artist.city && artist.state ? `Based in ${artist.city}, ${artist.state}` : null,
+      artist.city && artist.state
+        ? `Based in ${artist.city}, ${artist.state}`
+        : null,
       artist.bio ? `Bio: ${artist.bio}` : null,
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-    const result = await model.generateContent([
+    const parsed = await groqGenerateJson<Partial<BidAssistantResult>>(
       BID_ASSISTANT_PROMPT,
       `CLIENT'S REQUEST:\n${requestContext}\n\nARTIST PROFILE:\n${artistContext}`,
-    ]);
-
-    const text = result.response.text().trim();
-
-    let jsonText = text;
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(jsonText);
+      { maxTokens: 1600 },
+    );
 
     const draft: BidAssistantResult = {
-      message: typeof parsed.message === "string" ? parsed.message.slice(0, 2000) : "",
+      message:
+        typeof parsed.message === "string" ? parsed.message.slice(0, 2000) : "",
       suggestedPrice:
-        typeof parsed.suggestedPrice === "number" ? Math.max(50, Math.round(parsed.suggestedPrice)) : 200,
+        typeof parsed.suggestedPrice === "number"
+          ? Math.max(50, Math.round(parsed.suggestedPrice))
+          : 200,
       suggestedHours:
-        typeof parsed.suggestedHours === "number" ? Math.max(1, Math.round(parsed.suggestedHours)) : 2,
+        typeof parsed.suggestedHours === "number"
+          ? Math.max(1, Math.round(parsed.suggestedHours))
+          : 2,
       pricingRationale:
-        typeof parsed.pricingRationale === "string" ? parsed.pricingRationale.slice(0, 500) : "",
+        typeof parsed.pricingRationale === "string"
+          ? parsed.pricingRationale.slice(0, 500)
+          : "",
       toneNotes:
-        typeof parsed.toneNotes === "string" ? parsed.toneNotes.slice(0, 300) : "",
+        typeof parsed.toneNotes === "string"
+          ? parsed.toneNotes.slice(0, 300)
+          : "",
     };
 
     logger.info(
-      `Bid assistant draft: $${draft.suggestedPrice}, ${draft.suggestedHours}hrs for "${request.title}"`
+      `Bid assistant draft: $${draft.suggestedPrice}, ${draft.suggestedHours}hrs for "${request.title}"`,
     );
 
     return draft;
   } catch (error) {
-    logger.error("Gemini Bid Assistant failed:", error);
+    logger.error("Groq bid assistant failed:", error);
     return {
       message: "",
       suggestedPrice: 50,
       suggestedHours: 1,
-      pricingRationale: "AI draft generation failed — please write your bid manually.",
+      pricingRationale:
+        "AI draft generation failed — please write your bid manually.",
       toneNotes: "",
     };
   }

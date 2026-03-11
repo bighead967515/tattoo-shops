@@ -18,10 +18,9 @@ import {
 export { SubscriptionTiers, UNIFIED_TIER_LIMITS };
 export type { SubscriptionTier };
 
-
 export const TIER_LIMITS = {
   free: {
-    name: 'Apprentice', // "Free"
+    name: "Apprentice", // "Free"
     portfolioPhotos: 3,
     canAcceptBookings: false,
     canShowDirectContact: false,
@@ -32,7 +31,7 @@ export const TIER_LIMITS = {
     isVerifiedBadge: false,
   },
   amateur: {
-    name: 'Artist', // "Amateur"
+    name: "Artist", // "Amateur"
     portfolioPhotos: 15,
     canAcceptBookings: true, // Unlocks booking
     canShowDirectContact: true, // Unlocks social links
@@ -43,7 +42,7 @@ export const TIER_LIMITS = {
     isVerifiedBadge: true, // Must be verified to pay
   },
   professional: {
-    name: 'Professional',
+    name: "Professional",
     portfolioPhotos: Number.MAX_SAFE_INTEGER, // Unlimited
     canAcceptBookings: true,
     canShowDirectContact: true,
@@ -54,7 +53,7 @@ export const TIER_LIMITS = {
     isVerifiedBadge: true,
   },
   frontPage: {
-    name: 'Icon', // "Front Page"
+    name: "Icon", // "Front Page"
     portfolioPhotos: Number.MAX_SAFE_INTEGER,
     canAcceptBookings: true,
     canShowDirectContact: true,
@@ -77,20 +76,20 @@ export const TIER_PRICING = {
   amateur: {
     monthly: 900, // $9.00 (Stored in cents usually)
     yearly: 9000, // $90.00
-    stripePriceIdMonth: 'price_amateur_mo_123', // Placeholder for Stripe ID
-    stripePriceIdYear: 'price_amateur_yr_123',
+    stripePriceIdMonth: "price_amateur_mo_123", // Placeholder for Stripe ID
+    stripePriceIdYear: "price_amateur_yr_123",
   },
   professional: {
     monthly: 1900,
     yearly: 19000,
-    stripePriceIdMonth: 'price_pro_mo_123',
-    stripePriceIdYear: 'price_pro_yr_123',
+    stripePriceIdMonth: "price_pro_mo_123",
+    stripePriceIdYear: "price_pro_yr_123",
   },
   frontPage: {
     monthly: 3900,
     yearly: 39000,
-    stripePriceIdMonth: 'price_icon_mo_123',
-    stripePriceIdYear: 'price_icon_yr_123',
+    stripePriceIdMonth: "price_icon_mo_123",
+    stripePriceIdYear: "price_icon_yr_123",
   },
 } as const;
 
@@ -106,7 +105,10 @@ export function getTierPricing(tier: ArtistTierKey) {
   return TIER_PRICING[tier] || TIER_PRICING.free;
 }
 
-export function canUploadMorePhotos(tier: ArtistTierKey, currentCount: number): boolean {
+export function canUploadMorePhotos(
+  tier: ArtistTierKey,
+  currentCount: number,
+): boolean {
   const limits = getTierLimits(tier);
   return currentCount < limits.portfolioPhotos;
 }
@@ -117,7 +119,7 @@ export function canUploadMorePhotos(tier: ArtistTierKey, currentCount: number): 
 
 export const CLIENT_TIER_LIMITS = {
   client_free: {
-    name: 'Collector',
+    name: "Collector",
     requestsPerMonth: 1,
     aiGenerationsPerMonth: 0,
     directChatWithArtists: false,
@@ -125,7 +127,7 @@ export const CLIENT_TIER_LIMITS = {
     depositFeeWaived: false,
   },
   client_plus: {
-    name: 'Enthusiast',
+    name: "Enthusiast",
     requestsPerMonth: 10,
     aiGenerationsPerMonth: 10,
     directChatWithArtists: false,
@@ -133,7 +135,7 @@ export const CLIENT_TIER_LIMITS = {
     depositFeeWaived: false,
   },
   client_elite: {
-    name: 'Elite Ink',
+    name: "Elite Ink",
     requestsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
     aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
     directChatWithArtists: true,
@@ -149,11 +151,11 @@ export const CLIENT_TIER_PRICING = {
   },
   client_plus: {
     monthly: 900, // $9.00
-    stripePriceIdMonth: 'price_client_enthusiast_mo', // Placeholder — set in Stripe Dashboard
+    stripePriceIdMonth: "price_client_enthusiast_mo", // Placeholder — set in Stripe Dashboard
   },
   client_elite: {
     monthly: 1900, // $19.00
-    stripePriceIdMonth: 'price_client_elite_mo', // Placeholder — set in Stripe Dashboard
+    stripePriceIdMonth: "price_client_elite_mo", // Placeholder — set in Stripe Dashboard
   },
 } as const;
 

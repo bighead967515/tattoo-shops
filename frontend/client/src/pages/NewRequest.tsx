@@ -5,12 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Upload, X, Sparkles, MessageCircleQuestion, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  Upload,
+  X,
+  Sparkles,
+  MessageCircleQuestion,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const TATTOO_STYLES = [
@@ -71,7 +92,7 @@ export default function NewRequest() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -87,7 +108,9 @@ export default function NewRequest() {
     desiredTimeframe: "",
   });
 
-  const [uploadedImages, setUploadedImages] = useState<{ file: File; preview: string }[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<
+    { file: File; preview: string }[]
+  >([]);
   const blobUrlsRef = useRef<string[]>([]);
 
   // Cleanup blob URLs on unmount
@@ -114,7 +137,7 @@ export default function NewRequest() {
 
     // Only process up to availableSlots files
     const filesToProcess = Array.from(files).slice(0, availableSlots);
-    
+
     const newImages = filesToProcess.map((file) => {
       const preview = URL.createObjectURL(file);
       blobUrlsRef.current.push(preview);
@@ -128,7 +151,9 @@ export default function NewRequest() {
     setUploadedImages((prev) => {
       const urlToRevoke = prev[index].preview;
       URL.revokeObjectURL(urlToRevoke);
-      blobUrlsRef.current = blobUrlsRef.current.filter((url) => url !== urlToRevoke);
+      blobUrlsRef.current = blobUrlsRef.current.filter(
+        (url) => url !== urlToRevoke,
+      );
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -145,9 +170,17 @@ export default function NewRequest() {
         style: formData.style || undefined,
         placement: formData.placement,
         size: formData.size,
-        colorPreference: formData.colorPreference as "color" | "black_and_grey" | "either" | undefined,
-        budgetMin: formData.budgetMin ? Math.round(parseFloat(formData.budgetMin) * 100) : undefined,
-        budgetMax: formData.budgetMax ? Math.round(parseFloat(formData.budgetMax) * 100) : undefined,
+        colorPreference: formData.colorPreference as
+          | "color"
+          | "black_and_grey"
+          | "either"
+          | undefined,
+        budgetMin: formData.budgetMin
+          ? Math.round(parseFloat(formData.budgetMin) * 100)
+          : undefined,
+        budgetMax: formData.budgetMax
+          ? Math.round(parseFloat(formData.budgetMax) * 100)
+          : undefined,
         preferredCity: formData.preferredCity || undefined,
         preferredState: formData.preferredState || undefined,
         willingToTravel: formData.willingToTravel,
@@ -170,35 +203,47 @@ export default function NewRequest() {
               headers: { "Content-Type": img.file.type },
             });
 
-            if (!response.ok) throw new Error(`Failed to upload ${img.file.name}`);
+            if (!response.ok)
+              throw new Error(`Failed to upload ${img.file.name}`);
 
             await addImageToRequest.mutateAsync({
               requestId: newRequest.id,
               imageKey: path,
               isMainImage: index === 0, // Set the first image as the main one
             });
-            
+
             return img.file.name;
-          })
+          }),
         );
 
         const failedUploads = uploadResults
-          .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+          .filter(
+            (result): result is PromiseRejectedResult =>
+              result.status === "rejected",
+          )
           .map((result) => result.reason?.message || "Unknown error");
 
-        if (failedUploads.length > 0 && failedUploads.length === uploadedImages.length) {
+        if (
+          failedUploads.length > 0 &&
+          failedUploads.length === uploadedImages.length
+        ) {
           // All uploads failed - still redirect but show warning
-          toast.warning(`Request created, but image uploads failed: ${failedUploads.join(", ")}`);
+          toast.warning(
+            `Request created, but image uploads failed: ${failedUploads.join(", ")}`,
+          );
         } else if (failedUploads.length > 0) {
-          toast.warning(`Some images failed to upload: ${failedUploads.join(", ")}`);
+          toast.warning(
+            `Some images failed to upload: ${failedUploads.join(", ")}`,
+          );
         }
       }
 
       toast.success("Request posted successfully!");
       setLocation(`/requests/${newRequest.id}`);
-
     } catch (error: any) {
-      toast.error(error.message || "An error occurred while posting your request.");
+      toast.error(
+        error.message || "An error occurred while posting your request.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -233,7 +278,7 @@ export default function NewRequest() {
     );
   }
 
-  const isValid = 
+  const isValid =
     formData.title.length >= 5 &&
     formData.description.length >= 20 &&
     formData.placement &&
@@ -264,7 +309,9 @@ export default function NewRequest() {
                 id="title"
                 placeholder="E.g., Realistic lion portrait on forearm"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
               />
               <p className="text-sm text-muted-foreground mt-1">
                 A short, descriptive title for your request
@@ -279,7 +326,9 @@ export default function NewRequest() {
                 placeholder="Describe your tattoo idea in detail. Include any specific elements, meaning, or references you want the artist to incorporate..."
                 rows={5}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
               <p className="text-sm text-muted-foreground mt-1">
                 {formData.description.length}/5000 characters (minimum 20)
@@ -325,7 +374,7 @@ export default function NewRequest() {
                     ))}
                   </div>
                 )}
-                
+
                 {uploadedImages.length < 5 && (
                   <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50">
                     <Upload className="h-8 w-8 text-muted-foreground mb-2" />
@@ -356,7 +405,9 @@ export default function NewRequest() {
                 <Label htmlFor="style">Tattoo Style</Label>
                 <Select
                   value={formData.style}
-                  onValueChange={(value) => setFormData({ ...formData, style: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, style: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a style" />
@@ -375,7 +426,9 @@ export default function NewRequest() {
                 <Label htmlFor="size">Size *</Label>
                 <Select
                   value={formData.size}
-                  onValueChange={(value) => setFormData({ ...formData, size: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, size: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select size" />
@@ -396,7 +449,9 @@ export default function NewRequest() {
               <Label htmlFor="placement">Placement *</Label>
               <Select
                 value={formData.placement}
-                onValueChange={(value) => setFormData({ ...formData, placement: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, placement: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Where on your body?" />
@@ -416,7 +471,9 @@ export default function NewRequest() {
               <Label htmlFor="color">Color Preference</Label>
               <Select
                 value={formData.colorPreference}
-                onValueChange={(value) => setFormData({ ...formData, colorPreference: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, colorPreference: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Color or black & grey?" />
@@ -438,7 +495,9 @@ export default function NewRequest() {
                     type="number"
                     placeholder="Min (e.g., 200)"
                     value={formData.budgetMin}
-                    onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, budgetMin: e.target.value })
+                    }
                   />
                 </div>
                 <div>
@@ -446,7 +505,9 @@ export default function NewRequest() {
                     type="number"
                     placeholder="Max (e.g., 500)"
                     value={formData.budgetMax}
-                    onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, budgetMax: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -459,12 +520,16 @@ export default function NewRequest() {
                 <Input
                   placeholder="City"
                   value={formData.preferredCity}
-                  onChange={(e) => setFormData({ ...formData, preferredCity: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, preferredCity: e.target.value })
+                  }
                 />
                 <Input
                   placeholder="State"
                   value={formData.preferredState}
-                  onChange={(e) => setFormData({ ...formData, preferredState: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, preferredState: e.target.value })
+                  }
                 />
               </div>
               <div className="flex items-center space-x-2 mt-2">
@@ -472,7 +537,10 @@ export default function NewRequest() {
                   id="travel"
                   checked={formData.willingToTravel}
                   onCheckedChange={(checked) =>
-                    setFormData({ ...formData, willingToTravel: checked as boolean })
+                    setFormData({
+                      ...formData,
+                      willingToTravel: checked as boolean,
+                    })
                   }
                 />
                 <label
@@ -489,7 +557,9 @@ export default function NewRequest() {
               <Label htmlFor="timeframe">Desired Timeframe</Label>
               <Select
                 value={formData.desiredTimeframe}
-                onValueChange={(value) => setFormData({ ...formData, desiredTimeframe: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, desiredTimeframe: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="When do you want this done?" />
@@ -548,7 +618,9 @@ function PromptRefinerSection({
 
   const handleRefine = () => {
     if (description.length < 10) {
-      toast.error("Write at least a short description before getting AI feedback.");
+      toast.error(
+        "Write at least a short description before getting AI feedback.",
+      );
       return;
     }
     setLastRefinedDesc(description);
@@ -591,7 +663,13 @@ function PromptRefinerSection({
     return (
       <div className="mt-3 text-sm text-destructive">
         AI analysis failed. You can still submit your request.
-        <Button type="button" variant="ghost" size="sm" onClick={handleRefine} className="ml-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleRefine}
+          className="ml-2"
+        >
           Retry
         </Button>
       </div>
@@ -605,21 +683,33 @@ function PromptRefinerSection({
     data.completenessScore >= 7
       ? "text-green-600 dark:text-green-400"
       : data.completenessScore >= 4
-      ? "text-yellow-600 dark:text-yellow-400"
-      : "text-red-500";
+        ? "text-yellow-600 dark:text-yellow-400"
+        : "text-red-500";
 
   const ScoreIcon =
-    data.completenessScore >= 7 ? CheckCircle2 : data.completenessScore >= 4 ? MessageCircleQuestion : AlertTriangle;
+    data.completenessScore >= 7
+      ? CheckCircle2
+      : data.completenessScore >= 4
+        ? MessageCircleQuestion
+        : AlertTriangle;
 
   return (
-    <Card className={`mt-3 bg-primary/5 border-primary/20 ${isStale ? "opacity-60" : ""}`}>
+    <Card
+      className={`mt-3 bg-primary/5 border-primary/20 ${isStale ? "opacity-60" : ""}`}
+    >
       <CardContent className="pt-4 pb-3 space-y-3">
         {/* Stale warning */}
         {isStale && (
           <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle className="w-3.5 h-3.5" />
             Description changed since last analysis.
-            <Button type="button" variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={handleRefine}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={handleRefine}
+            >
               Re-analyze
             </Button>
           </div>
@@ -652,7 +742,10 @@ function PromptRefinerSection({
             </p>
             <ul className="space-y-1">
               {data.suggestedQuestions.map((q, i) => (
-                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                <li
+                  key={i}
+                  className="text-sm text-muted-foreground flex items-start gap-2"
+                >
                   <MessageCircleQuestion className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
                   {q}
                 </li>
@@ -675,7 +768,9 @@ function PromptRefinerSection({
         {/* Improved description suggestion */}
         {data.improvedDescription && (
           <div className="bg-background/60 rounded-md p-3 border">
-            <p className="text-xs font-medium mb-1">Suggested improved description:</p>
+            <p className="text-xs font-medium mb-1">
+              Suggested improved description:
+            </p>
             <p className="text-sm text-muted-foreground italic mb-2">
               "{data.improvedDescription}"
             </p>

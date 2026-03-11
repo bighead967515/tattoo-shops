@@ -2,7 +2,13 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,10 +65,10 @@ function getBidStatusColor(status: string) {
 export default function ClientDashboard() {
   const { user, loading: authLoading } = useAuth();
 
-  const { data: myRequests, isLoading: requestsLoading } = trpc.requests.getMyRequests.useQuery(
-    undefined,
-    { enabled: user?.role === "client" }
-  );
+  const { data: myRequests, isLoading: requestsLoading } =
+    trpc.requests.getMyRequests.useQuery(undefined, {
+      enabled: user?.role === "client",
+    });
 
   if (authLoading) {
     return <DashboardSkeleton />;
@@ -97,15 +103,23 @@ export default function ClientDashboard() {
   }
 
   type RequestType = NonNullable<typeof myRequests>[number];
-  
-  const processRequests = (requests: RequestType[] | undefined) => 
-    requests?.map(r => ({ ...r, viewCount: r.viewCount ?? 0 })) ?? [];
+
+  const processRequests = (requests: RequestType[] | undefined) =>
+    requests?.map((r) => ({ ...r, viewCount: r.viewCount ?? 0 })) ?? [];
 
   const allProcessedRequests = processRequests(myRequests);
   const openRequests = allProcessedRequests.filter((r) => r.status === "open");
-  const inProgressRequests = allProcessedRequests.filter((r) => r.status === "in_progress");
-  const completedRequests = allProcessedRequests.filter((r) => r.status === "completed");
-  const totalBids = myRequests?.reduce((sum: number, r: RequestType) => sum + (r.bidCount ?? 0), 0) ?? 0;
+  const inProgressRequests = allProcessedRequests.filter(
+    (r) => r.status === "in_progress",
+  );
+  const completedRequests = allProcessedRequests.filter(
+    (r) => r.status === "completed",
+  );
+  const totalBids =
+    myRequests?.reduce(
+      (sum: number, r: RequestType) => sum + (r.bidCount ?? 0),
+      0,
+    ) ?? 0;
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -147,7 +161,7 @@ export default function ClientDashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -155,13 +169,15 @@ export default function ClientDashboard() {
                 <Clock className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{inProgressRequests.length}</p>
+                <p className="text-2xl font-bold">
+                  {inProgressRequests.length}
+                </p>
                 <p className="text-sm text-muted-foreground">In Progress</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -175,7 +191,7 @@ export default function ClientDashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -214,17 +230,23 @@ export default function ClientDashboard() {
         <TabsContent value="open">
           <RequestList requests={openRequests} loading={requestsLoading} />
         </TabsContent>
-        
+
         <TabsContent value="in_progress">
-          <RequestList requests={inProgressRequests} loading={requestsLoading} />
+          <RequestList
+            requests={inProgressRequests}
+            loading={requestsLoading}
+          />
         </TabsContent>
-        
+
         <TabsContent value="completed">
           <RequestList requests={completedRequests} loading={requestsLoading} />
         </TabsContent>
-        
+
         <TabsContent value="all">
-          <RequestList requests={allProcessedRequests} loading={requestsLoading} />
+          <RequestList
+            requests={allProcessedRequests}
+            loading={requestsLoading}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -298,81 +320,90 @@ function RequestList({ requests, loading }: RequestListProps) {
   return (
     <div className="space-y-4">
       {requests.map((request) => {
-        const pendingBids = request.bids?.filter(b => b.status === "pending") ?? [];
+        const pendingBids =
+          request.bids?.filter((b) => b.status === "pending") ?? [];
         return (
-        <Link key={request.id} href={`/requests/${request.id}`}>
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold truncate">{request.title}</h3>
-                    <Badge variant="outline" className={getStatusColor(request.status)}>
-                      {request.status.replace("_", " ")}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                    {request.description}
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {request.style && (
-                      <Badge variant="secondary">{request.style}</Badge>
-                    )}
-                    <Badge variant="secondary">{request.placement}</Badge>
-                    <Badge variant="secondary">{request.size}</Badge>
-                    {request.budgetMax && (
-                      <Badge variant="outline">
-                        <DollarSign className="h-3 w-3 mr-1" />
-                        {request.budgetMin ? formatCurrency(request.budgetMin) + " - " : "Up to "}
-                        {formatCurrency(request.budgetMax)}
+          <Link key={request.id} href={`/requests/${request.id}`}>
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold truncate">
+                        {request.title}
+                      </h3>
+                      <Badge
+                        variant="outline"
+                        className={getStatusColor(request.status)}
+                      >
+                        {request.status.replace("_", " ")}
                       </Badge>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex md:flex-col items-center md:items-end gap-4 md:gap-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Eye className="h-4 w-4" />
-                    <span>{request.viewCount} views</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Gavel className="h-4 w-4" />
-                    <span className="font-medium text-foreground">{request.bidCount} bids</span>
-                  </div>
-                  <p className="text-xs">
-                    {new Date(request.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
+                    </div>
 
-              {/* Show pending bids preview */}
-              {pendingBids.length > 0 && (
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm font-medium mb-2">
-                    Pending Bids ({pendingBids.length})
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {pendingBids
-                      .slice(0, 3)
-                      .map((bid) => (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                      {request.description}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {request.style && (
+                        <Badge variant="secondary">{request.style}</Badge>
+                      )}
+                      <Badge variant="secondary">{request.placement}</Badge>
+                      <Badge variant="secondary">{request.size}</Badge>
+                      {request.budgetMax && (
+                        <Badge variant="outline">
+                          <DollarSign className="h-3 w-3 mr-1" />
+                          {request.budgetMin
+                            ? formatCurrency(request.budgetMin) + " - "
+                            : "Up to "}
+                          {formatCurrency(request.budgetMax)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex md:flex-col items-center md:items-end gap-4 md:gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-4 w-4" />
+                      <span>{request.viewCount} views</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Gavel className="h-4 w-4" />
+                      <span className="font-medium text-foreground">
+                        {request.bidCount} bids
+                      </span>
+                    </div>
+                    <p className="text-xs">
+                      {new Date(request.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Show pending bids preview */}
+                {pendingBids.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm font-medium mb-2">
+                      Pending Bids ({pendingBids.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {pendingBids.slice(0, 3).map((bid) => (
                         <Badge key={bid.id} variant="outline" className="gap-1">
-                          {bid.artist?.displayName ?? "Artist"} - {formatCurrency(bid.proposedPrice)}
+                          {bid.artist?.displayName ?? "Artist"} -{" "}
+                          {formatCurrency(bid.proposedPrice)}
                         </Badge>
                       ))}
-                    {pendingBids.length > 3 && (
-                      <Badge variant="outline">
-                        +{pendingBids.length - 3} more
-                      </Badge>
-                    )}
+                      {pendingBids.length > 3 && (
+                        <Badge variant="outline">
+                          +{pendingBids.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </Link>
-      );
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+        );
       })}
     </div>
   );
@@ -388,7 +419,7 @@ function DashboardSkeleton() {
         </div>
         <Skeleton className="h-10 w-32" />
       </div>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[1, 2, 3, 4].map((i) => (
           <Card key={i}>
@@ -398,9 +429,9 @@ function DashboardSkeleton() {
           </Card>
         ))}
       </div>
-      
+
       <Skeleton className="h-10 w-96 mb-4" />
-      
+
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
           <Card key={i}>

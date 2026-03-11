@@ -1,22 +1,23 @@
 /**
- * Smart Portfolio Tagging — Gemini Vision Service
+ * Smart Portfolio Tagging — Hugging Face + Groq Service
  *
- * Analyzes uploaded portfolio images using Google Gemini to:
+ * Analyzes uploaded portfolio images using Hugging Face image captioning and
+ * Groq JSON extraction to:
  * 1. Detect tattoo styles (Traditional, Biomechanical, Fine-line, etc.)
  * 2. Tag content/subjects (floral, skulls, geometric, etc.)
  * 3. Generate SEO descriptions
  * 4. Score image quality and flag issues (blurry, low-res, etc.)
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import dns from "dns";
 import { isIPv4, isIPv6 } from "net";
-import { ENV } from "./_core/env";
+import {
+  groqGenerateJson,
+  imageToTextWithHuggingFace,
+} from "./_core/aiProviders";
 import { logger } from "./_core/logger";
 
-const genAI = new GoogleGenerativeAI(ENV.googleAiApiKey);
-
-const ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. Analyze this tattoo portfolio image and return a JSON object with the following fields. Be precise and concise.
+const ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. You will receive an image caption and technical metadata produced by an upstream vision model. Infer likely tattoo attributes and return a JSON object with the following fields. Be precise and concise.
 
 {
   "styles": string[],         // Detected tattoo styles. Pick from: "Traditional", "Neo-Traditional", "Realism", "Hyperrealism", "Watercolor", "Tribal", "Japanese", "Biomechanical", "Geometric", "Dotwork", "Pointillism", "Fine-line", "Minimalist", "Blackwork", "Trash Polka", "New School", "Old School", "Illustrative", "Surrealism", "Lettering", "Chicano", "Ornamental", "Abstract", "Sketch", "Portrait". Return 1-4 styles max.
@@ -28,7 +29,7 @@ const ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. Ana
 
 IMPORTANT:
 - Return ONLY the raw JSON object, no markdown code fences, no explanation.
-- If the image is not a tattoo, still analyze it but include "not-a-tattoo" in qualityIssues and give qualityScore below 30.
+ - If the caption suggests this is not a tattoo, include "not-a-tattoo" in qualityIssues and give qualityScore below 30.
 - Be conservative with quality scores — most phone photos of tattoos score 60-85.`;
 
 export interface PortfolioAnalysis {
@@ -73,22 +74,22 @@ function isPrivateOrReservedIp(ip: string): boolean {
     if (parts.some((p) => isNaN(p))) return true; // Malformed
     const [a, b] = parts;
     if (ip === "0.0.0.0") return true;
-    if (a === 127) return true;                          // 127.0.0.0/8 loopback
-    if (a === 10) return true;                           // 10.0.0.0/8
-    if (a === 172 && b >= 16 && b <= 31) return true;    // 172.16.0.0/12
-    if (a === 192 && b === 168) return true;              // 192.168.0.0/16
-    if (a === 169 && b === 254) return true;              // 169.254.0.0/16 link-local
-    if (a === 100 && b >= 64 && b <= 127) return true;   // 100.64.0.0/10 CGN
+    if (a === 127) return true; // 127.0.0.0/8 loopback
+    if (a === 10) return true; // 10.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    if (a === 169 && b === 254) return true; // 169.254.0.0/16 link-local
+    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CGN
     return false;
   }
 
   if (isIPv6(ip)) {
     const lower = ip.toLowerCase();
-    if (lower === "::1") return true;                     // IPv6 loopback
-    if (lower === "::") return true;                      // Unspecified
-    if (/^f[cd]/i.test(lower)) return true;               // fc00::/7 unique-local
-    if (/^fe[89ab]/i.test(lower)) return true;            // fe80::/10 link-local
-    if (lower.startsWith("::ffff:")) return true;         // IPv4-mapped (caught above, safety net)
+    if (lower === "::1") return true; // IPv6 loopback
+    if (lower === "::") return true; // Unspecified
+    if (/^f[cd]/i.test(lower)) return true; // fc00::/7 unique-local
+    if (/^fe[89ab]/i.test(lower)) return true; // fe80::/10 link-local
+    if (lower.startsWith("::ffff:")) return true; // IPv4-mapped (caught above, safety net)
     return false;
   }
 
@@ -97,14 +98,14 @@ function isPrivateOrReservedIp(ip: string): boolean {
 }
 
 /**
- * Analyze a portfolio image using Gemini Vision.
- * Fetches the image from its public URL and sends it to Gemini for analysis.
+ * Analyze a portfolio image using Hugging Face captioning + Groq extraction.
+ * Fetches the image from its public URL and derives structured metadata.
  *
  * @param imageUrl - The public URL of the uploaded image
  * @returns Analysis result with styles, tags, description, quality score, and issues
  */
 export async function analyzePortfolioImage(
-  imageUrl: string
+  imageUrl: string,
 ): Promise<PortfolioAnalysis> {
   try {
     // Validate URL to prevent SSRF — only allow HTTPS and block private/reserved IPs
@@ -112,7 +113,9 @@ export async function analyzePortfolioImage(
     try {
       parsedUrl = new URL(imageUrl);
     } catch {
-      logger.warn(`Invalid image URL for analysis: ${sanitizeUrlForLogging(imageUrl)}`);
+      logger.warn(
+        `Invalid image URL for analysis: ${sanitizeUrlForLogging(imageUrl)}`,
+      );
       return DEFAULT_ANALYSIS;
     }
     if (parsedUrl.protocol !== "https:") {
@@ -123,10 +126,14 @@ export async function analyzePortfolioImage(
     // Resolve hostname to IP addresses and validate against private/reserved ranges
     const hostname = parsedUrl.hostname.toLowerCase();
     try {
-      const resolvedAddresses = await dns.promises.lookup(hostname, { all: true });
+      const resolvedAddresses = await dns.promises.lookup(hostname, {
+        all: true,
+      });
       for (const { address } of resolvedAddresses) {
         if (isPrivateOrReservedIp(address)) {
-          logger.warn(`Rejected image URL resolving to private/reserved IP: ${hostname} → ${address}`);
+          logger.warn(
+            `Rejected image URL resolving to private/reserved IP: ${hostname} → ${address}`,
+          );
           return DEFAULT_ANALYSIS;
         }
       }
@@ -145,56 +152,58 @@ export async function analyzePortfolioImage(
       clearTimeout(timeoutId);
     }
     if (!response.ok) {
-      logger.warn(`Failed to fetch image for analysis: ${response.status} ${sanitizeUrlForLogging(imageUrl)}`);
+      logger.warn(
+        `Failed to fetch image for analysis: ${response.status} ${sanitizeUrlForLogging(imageUrl)}`,
+      );
       return DEFAULT_ANALYSIS;
     }
 
     const contentType = response.headers.get("content-type") || "image/jpeg";
     const arrayBuffer = await response.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+    const imageBuffer = Buffer.from(arrayBuffer);
 
-    // Call Gemini Vision
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // Step 1: Hugging Face captioning for image understanding
+    const caption = await imageToTextWithHuggingFace(
+      imageBuffer,
+      contentType,
+      "caption",
+    );
 
-    const result = await model.generateContent([
+    // Step 2: Groq structured extraction from caption + metadata
+    const parsed = await groqGenerateJson<Partial<PortfolioAnalysis>>(
       ANALYSIS_PROMPT,
-      {
-        inlineData: {
-          mimeType: contentType,
-          data: base64Data,
-        },
-      },
-    ]);
+      `Image caption: "${caption.slice(0, 1200)}"
+Content-Type: ${contentType}
+ByteLength: ${imageBuffer.length}
 
-    const text = result.response.text().trim();
-
-    // Parse JSON response — strip markdown fences if present
-    let jsonText = text;
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(jsonText);
+Return the JSON object only.`,
+      { maxTokens: 1200 },
+    );
 
     // Validate and normalize the response
     const analysis: PortfolioAnalysis = {
       styles: Array.isArray(parsed.styles) ? parsed.styles.slice(0, 4) : [],
       tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 8) : [],
-      description: typeof parsed.description === "string" ? parsed.description.slice(0, 500) : "",
+      description:
+        typeof parsed.description === "string"
+          ? parsed.description.slice(0, 500)
+          : "",
       qualityScore:
         typeof parsed.qualityScore === "number"
           ? Math.max(1, Math.min(100, Math.round(parsed.qualityScore)))
-          : 0,
-      qualityIssues: Array.isArray(parsed.qualityIssues) ? parsed.qualityIssues : [],
+          : 65,
+      qualityIssues: Array.isArray(parsed.qualityIssues)
+        ? parsed.qualityIssues
+        : [],
     };
 
     logger.info(
-      `Portfolio image analyzed: ${analysis.styles.join(", ")} | quality=${analysis.qualityScore} | tags=${analysis.tags.length}`
+      `Portfolio image analyzed: ${analysis.styles.join(", ")} | quality=${analysis.qualityScore} | tags=${analysis.tags.length}`,
     );
 
     return analysis;
   } catch (error) {
-    logger.error("Gemini Vision analysis failed:", error);
+    logger.error("Hugging Face/Groq portfolio analysis failed:", error);
     return DEFAULT_ANALYSIS;
   }
 }

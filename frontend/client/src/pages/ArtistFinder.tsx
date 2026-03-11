@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { MapPin, Star, ExternalLink, Phone, Mail } from "lucide-react";
-import { loadTattooShops, parseRating, getInitials, type TattooShop } from "@/lib/tattooShops";
+import {
+  loadTattooShops,
+  parseRating,
+  getInitials,
+  type TattooShop,
+} from "@/lib/tattooShops";
 import BookingDialog from "@/components/BookingDialog";
 
 export default function ArtistFinder() {
@@ -22,7 +27,7 @@ export default function ArtistFinder() {
         setShops(loadedShops);
         setFilteredShops(loadedShops);
       } catch (error) {
-        console.error('Error loading tattoo shops:', error);
+        console.error("Error loading tattoo shops:", error);
       } finally {
         setLoading(false);
       }
@@ -36,11 +41,12 @@ export default function ArtistFinder() {
       return;
     }
 
-    const filtered = shops.filter(shop => 
-      shop.city.toLowerCase().includes(searchCity.toLowerCase()) ||
-      shop.name.toLowerCase().includes(searchCity.toLowerCase())
+    const filtered = shops.filter(
+      (shop) =>
+        shop.city.toLowerCase().includes(searchCity.toLowerCase()) ||
+        shop.name.toLowerCase().includes(searchCity.toLowerCase()),
     );
-    
+
     setFilteredShops(filtered);
   };
 
@@ -50,7 +56,9 @@ export default function ArtistFinder() {
 
       <div className="container py-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Find Tattoo Artists Near You</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">
+            Find Tattoo Artists Near You
+          </h1>
           <p className="text-muted-foreground mb-8">
             Discover talented tattoo artists and shops across Louisiana
           </p>
@@ -64,11 +72,13 @@ export default function ArtistFinder() {
                 placeholder="Search by city or shop name (e.g., New Orleans, Baton Rouge)"
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 className="pl-10 h-12 bg-card border-border text-foreground"
               />
             </div>
-            <Button onClick={handleSearch} className="h-12 px-8">Search</Button>
+            <Button onClick={handleSearch} className="h-12 px-8">
+              Search
+            </Button>
           </div>
 
           {loading ? (
@@ -81,7 +91,8 @@ export default function ArtistFinder() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-foreground">
-                    {filteredShops.length} Shop{filteredShops.length !== 1 ? 's' : ''} Found
+                    {filteredShops.length} Shop
+                    {filteredShops.length !== 1 ? "s" : ""} Found
                   </h2>
                 </div>
 
@@ -91,7 +102,10 @@ export default function ArtistFinder() {
                     const initials = getInitials(shop.name);
 
                     return (
-                      <Card key={index} className="p-4 bg-card border-border hover:border-primary/50 transition-colors">
+                      <Card
+                        key={index}
+                        className="p-4 bg-card border-border hover:border-primary/50 transition-colors"
+                      >
                         <div className="flex gap-4">
                           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-lg flex-shrink-0">
                             {initials}
@@ -100,8 +114,12 @@ export default function ArtistFinder() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <div>
-                                <h3 className="font-semibold text-foreground">{shop.name}</h3>
-                                <p className="text-sm text-muted-foreground">{shop.city}</p>
+                                <h3 className="font-semibold text-foreground">
+                                  {shop.name}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {shop.city}
+                                </p>
                               </div>
                             </div>
 
@@ -134,18 +152,21 @@ export default function ArtistFinder() {
 
                             {shop.specialties && (
                               <div className="flex flex-wrap gap-1 mb-3">
-                                {shop.specialties.split(',').slice(0, 3).map((specialty, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground"
-                                  >
-                                    {specialty.trim()}
-                                  </span>
-                                ))}
+                                {shop.specialties
+                                  .split(",")
+                                  .slice(0, 3)
+                                  .map((specialty, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground"
+                                    >
+                                      {specialty.trim()}
+                                    </span>
+                                  ))}
                               </div>
                             )}
 
-                                   <div className="flex flex-wrap gap-2 mb-3">
+                            <div className="flex flex-wrap gap-2 mb-3">
                               {shop.phone && (
                                 <a
                                   href={`tel:${shop.phone}`}
@@ -213,7 +234,17 @@ export default function ArtistFinder() {
       <footer className="border-t border-border py-8 mt-16">
         <div className="container">
           <div className="text-center text-sm text-muted-foreground">
-            <p>© 2024 Universal Inc. All rights reserved.</p>
+            <p className="mb-2">
+              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+            </p>
+            <div className="flex justify-center gap-4">
+              <a href="/terms-of-service" className="hover:text-primary">
+                Terms of Service
+              </a>
+              <a href="/cancellation-policy" className="hover:text-primary">
+                Cancellation Policy
+              </a>
+            </div>
           </div>
         </div>
       </footer>

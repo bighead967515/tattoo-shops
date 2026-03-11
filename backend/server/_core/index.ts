@@ -9,14 +9,18 @@ import { registerSupabaseAuthRoutes } from "./supabaseAuth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { handleStripeWebhook, initWebhookProcessor, getWebhookQueueStats } from "../webhookHandler";
+import {
+  handleStripeWebhook,
+  initWebhookProcessor,
+  getWebhookQueueStats,
+} from "../webhookHandler";
 import { ENV } from "./env";
 import { logger } from "./logger";
 import { initializeBuckets } from "./supabaseStorage";
 import { initSentry, sentryErrorHandler, captureException } from "./sentry";
 
 function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const server = net.createServer();
     server.listen(port, () => {
       server.close(() => resolve(true));
@@ -42,12 +46,12 @@ initSentry();
 // CORS configuration
 app.use(
   cors({
-    origin: ENV.isProduction 
+    origin: ENV.isProduction
       ? ["https://universalinc.com", "https://www.universalinc.com"]
       : ["http://localhost:3000", "http://localhost:5173"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  })
+  }),
 );
 
 // Rate limiting: 100 requests per 15 minutes per IP
@@ -72,7 +76,11 @@ app.use("/api/auth/", authLimiter);
 
 // Stripe webhook needs raw body for signature verification
 // MUST be registered BEFORE express.json()
-app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
+);
 
 // Configure body parser with larger size limit for file uploads
 app.use(cookieParser());
@@ -85,33 +93,33 @@ registerSupabaseAuthRoutes(app);
 app.get("/api/health", async (_req, res) => {
   try {
     // Test database connection with a simple query
-    const db = await import("../db").then(m => m.getDb());
+    const db = await import("../db").then((m) => m.getDb());
     let dbStatus = "disconnected";
-    
+
     if (db) {
       // Execute a simple query to verify connection
       const { sql } = await import("drizzle-orm");
       await db.execute(sql`SELECT 1`);
       dbStatus = "connected";
     }
-    
+
     // Get webhook queue stats
     const webhookStats = await getWebhookQueueStats();
-    
+
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
       environment: ENV.nodeEnv,
       database: dbStatus,
       webhookQueue: webhookStats,
-      version: process.env.npm_package_version || "unknown"
+      version: process.env.npm_package_version || "unknown",
     });
   } catch (error) {
     logger.error("Health check failed", { error });
     res.status(503).json({
       status: "error",
       timestamp: new Date().toISOString(),
-      error: "Health check failed"
+      error: "Health check failed",
     });
   }
 });
@@ -122,7 +130,7 @@ app.get("/sitemap.xml", async (_req, res) => {
     const { getAllArtists } = await import("../db");
     const artists = await getAllArtists();
     const baseUrl = "https://universalinc.com";
-    
+
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },
       { loc: "/artists", changefreq: "daily", priority: "0.9" },
@@ -131,10 +139,10 @@ app.get("/sitemap.xml", async (_req, res) => {
       { loc: "/pricing", changefreq: "monthly", priority: "0.6" },
       { loc: "/help", changefreq: "monthly", priority: "0.5" },
     ];
-    
+
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
-    
+
     // Add static pages
     for (const page of staticPages) {
       xml += `
@@ -144,10 +152,10 @@ app.get("/sitemap.xml", async (_req, res) => {
     <priority>${page.priority}</priority>
   </url>`;
     }
-    
+
     // Add dynamic artist pages
     for (const artist of artists) {
-      const lastmod = artist.updatedAt.toISOString().split('T')[0];
+      const lastmod = artist.updatedAt.toISOString().split("T")[0];
       xml += `
   <url>
     <loc>${baseUrl}/artist/${artist.id}</loc>
@@ -156,10 +164,10 @@ app.get("/sitemap.xml", async (_req, res) => {
     <priority>0.8</priority>
   </url>`;
     }
-    
+
     xml += `
 </urlset>`;
-    
+
     res.set("Content-Type", "application/xml");
     res.set("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
     res.send(xml);
@@ -175,34 +183,41 @@ app.use(
   createExpressMiddleware({
     router: appRouter,
     createContext,
-  })
+  }),
 );
 
 // Global error handler - MUST be last middleware
 // Sentry error handler first to capture errors
 app.use(sentryErrorHandler());
 
-app.use((err: Error & { statusCode?: number; status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const statusCode = err.statusCode || err.status || 500;
-  
-  // Capture error in Sentry
-  captureException(err, {
-    statusCode,
-    url: _req.url,
-    method: _req.method,
-  });
-  
-  logger.error("Unhandled request error", {
-    message: err.message,
-    statusCode,
-    stack: err.stack,
-  });
-  const isDev = !ENV.isProduction;
-  res.status(statusCode).json({
-    error: "Internal server error",
-    ...(isDev && { details: err.message, stack: err.stack }),
-  });
-});
+app.use(
+  (
+    err: Error & { statusCode?: number; status?: number },
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    const statusCode = err.statusCode || err.status || 500;
+
+    // Capture error in Sentry
+    captureException(err, {
+      statusCode,
+      url: _req.url,
+      method: _req.method,
+    });
+
+    logger.error("Unhandled request error", {
+      message: err.message,
+      statusCode,
+      stack: err.stack,
+    });
+    const isDev = !ENV.isProduction;
+    res.status(statusCode).json({
+      error: "Internal server error",
+      ...(isDev && { details: err.message, stack: err.stack }),
+    });
+  },
+);
 
 // Start the server in both development and production.
 // In development, Vite provides HMR. In production, static files are served from dist/public.

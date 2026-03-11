@@ -2,22 +2,29 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import { getDb } from "./db";
-import { 
-  clients, 
-  tattooRequests, 
-  requestImages, 
-  bids, 
+import {
+  clients,
+  tattooRequests,
+  requestImages,
+  bids,
   users,
-  artists
+  artists,
 } from "../drizzle/schema";
-import { BUCKETS, createSignedUploadUrl, getPublicUrl } from "./_core/supabaseStorage";
+import {
+  BUCKETS,
+  createSignedUploadUrl,
+  getPublicUrl,
+} from "./_core/supabaseStorage";
 import { TRPCError } from "@trpc/server";
 import { logger } from "./_core/logger";
 import path from "path";
 import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
 import { createSubscriptionCheckout } from "./stripe";
 import { ENV } from "./_core/env";
-import { CLIENT_TIER_PRICING, type ClientSubscriptionTier } from "../shared/tierLimits";
+import {
+  CLIENT_TIER_PRICING,
+  type ClientSubscriptionTier,
+} from "../shared/tierLimits";
 import { canUseAiBidAssistant, isFreeArtistTier } from "../shared/tierCompat";
 
 /**
@@ -25,12 +32,12 @@ import { canUseAiBidAssistant, isFreeArtistTier } from "../shared/tierCompat";
  */
 function sanitizeFileName(fileName: string, maxLength = 100): string {
   let sanitized = path.basename(fileName);
-  sanitized = sanitized.replace(/[\\\0]/g, '');
-  sanitized = sanitized.replace(/\.\./g, '');
-  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_');
-  sanitized = sanitized.replace(/_+/g, '_');
+  sanitized = sanitized.replace(/[\\\0]/g, "");
+  sanitized = sanitized.replace(/\.\./g, "");
+  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, "_");
+  sanitized = sanitized.replace(/_+/g, "_");
   sanitized = sanitized.substring(0, maxLength);
-  if (!sanitized || sanitized === '.' || sanitized === '..') {
+  if (!sanitized || sanitized === "." || sanitized === "..") {
     sanitized = `upload_${Date.now()}`;
   }
   return sanitized;
@@ -65,14 +72,16 @@ export const clientsRouter = router({
 
   // Create client profile (onboarding)
   createProfile: protectedProcedure
-    .input(z.object({
-      displayName: z.string().min(2).max(255),
-      bio: z.string().max(1000).optional(),
-      preferredStyles: z.string().optional(),
-      city: z.string().max(100).optional(),
-      state: z.string().max(50).optional(),
-      phone: z.string().max(50).optional(),
-    }))
+    .input(
+      z.object({
+        displayName: z.string().min(2).max(255),
+        bio: z.string().max(1000).optional(),
+        preferredStyles: z.string().optional(),
+        city: z.string().max(100).optional(),
+        state: z.string().max(50).optional(),
+        phone: z.string().max(50).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       // Check if profile already exists
@@ -115,14 +124,16 @@ export const clientsRouter = router({
 
   // Update client profile
   updateProfile: protectedProcedure
-    .input(z.object({
-      displayName: z.string().min(2).max(255).optional(),
-      bio: z.string().max(1000).optional(),
-      preferredStyles: z.string().optional(),
-      city: z.string().max(100).optional(),
-      state: z.string().max(50).optional(),
-      phone: z.string().max(50).optional(),
-    }))
+    .input(
+      z.object({
+        displayName: z.string().min(2).max(255).optional(),
+        bio: z.string().max(1000).optional(),
+        preferredStyles: z.string().optional(),
+        city: z.string().max(100).optional(),
+        state: z.string().max(50).optional(),
+        phone: z.string().max(50).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const [updated] = await db
@@ -146,11 +157,13 @@ export const clientsRouter = router({
    * Returns the Checkout URL to redirect the user to.
    */
   createSubscriptionCheckout: protectedProcedure
-    .input(z.object({
-      tier: z.enum(["client_plus", "client_elite"]),
-      successUrl: z.string().url(),
-      cancelUrl: z.string().url(),
-    }))
+    .input(
+      z.object({
+        tier: z.enum(["client_plus", "client_elite"]),
+        successUrl: z.string().url(),
+        cancelUrl: z.string().url(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
 
@@ -169,9 +182,10 @@ export const clientsRouter = router({
       }
 
       // Resolve the Stripe Price ID for the requested tier
-      const priceId = input.tier === "client_plus"
-        ? ENV.stripeClientPlusPriceId
-        : ENV.stripeClientElitePriceId;
+      const priceId =
+        input.tier === "client_plus"
+          ? ENV.stripeClientPlusPriceId
+          : ENV.stripeClientElitePriceId;
 
       if (!priceId) {
         throw new TRPCError({
@@ -210,17 +224,21 @@ export const clientsRouter = router({
 export const requestsRouter = router({
   // Get all open requests (for artists to browse)
   getOpen: publicProcedure
-    .input(z.object({
-      style: z.string().optional(),
-      city: z.string().optional(),
-      state: z.string().optional(),
-      limit: z.number().min(1).max(50).default(20),
-      offset: z.number().min(0).default(0),
-    }).optional())
+    .input(
+      z
+        .object({
+          style: z.string().optional(),
+          city: z.string().optional(),
+          state: z.string().optional(),
+          limit: z.number().min(1).max(50).default(20),
+          offset: z.number().min(0).default(0),
+        })
+        .optional(),
+    )
     .query(async ({ input }) => {
       const db = await requireDb();
       const filters = input || { limit: 20, offset: 0 };
-      
+
       const results = await db
         .select({
           request: tattooRequests,
@@ -240,8 +258,8 @@ export const requestsRouter = router({
         .orderBy(desc(tattooRequests.createdAt))
         .limit(filters.limit ?? 20)
         .offset(filters.offset ?? 0);
-      
-      return results.map((r: typeof results[number]) => ({
+
+      return results.map((r: (typeof results)[number]) => ({
         ...r.request,
         client: r.client,
         images: r.images ? JSON.parse(r.images as unknown as string) : [],
@@ -251,16 +269,20 @@ export const requestsRouter = router({
 
   // Get open requests for paid artists' dashboard
   listForArtistDashboard: protectedProcedure
-    .input(z.object({
-      style: z.string().optional(),
-      city: z.string().optional(),
-      state: z.string().optional(),
-      limit: z.number().min(1).max(50).default(20),
-      offset: z.number().min(0).default(0),
-    }).optional())
+    .input(
+      z
+        .object({
+          style: z.string().optional(),
+          city: z.string().optional(),
+          state: z.string().optional(),
+          limit: z.number().min(1).max(50).default(20),
+          offset: z.number().min(0).default(0),
+        })
+        .optional(),
+    )
     .query(async ({ ctx, input }) => {
       const db = await requireDb();
-      
+
       // 1. Verify user is a paid artist
       const [artist] = await db
         .select({ subscriptionTier: artists.subscriptionTier })
@@ -296,8 +318,8 @@ export const requestsRouter = router({
         .orderBy(desc(tattooRequests.createdAt))
         .limit(filters.limit ?? 20)
         .offset(filters.offset ?? 0);
-      
-      return results.map((r: typeof results[number]) => ({
+
+      return results.map((r: (typeof results)[number]) => ({
         ...r.request,
         client: r.client,
         images: r.images ? JSON.parse(r.images as unknown as string) : [],
@@ -306,36 +328,35 @@ export const requestsRouter = router({
     }),
 
   // Get recent open requests for the homepage feed
-  listForHomepage: publicProcedure
-    .query(async () => {
-      const db = await requireDb();
-      
-      const results = await db
-        .select({
-          request: tattooRequests,
-          client: clients,
-          images: sql<string>`(
+  listForHomepage: publicProcedure.query(async () => {
+    const db = await requireDb();
+
+    const results = await db
+      .select({
+        request: tattooRequests,
+        client: clients,
+        images: sql<string>`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
             WHERE ri."requestId" = "tattooRequests".id
           )`.as("images"),
-          bidCount: sql<number>`(
+        bidCount: sql<number>`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
           )`.as("bidCount"),
-        })
-        .from(tattooRequests)
-        .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
-        .where(eq(tattooRequests.status, "open"))
-        .orderBy(desc(tattooRequests.createdAt))
-        .limit(8);
-      
-      return results.map((r: typeof results[number]) => ({
-        ...r.request,
-        client: r.client,
-        images: r.images ? JSON.parse(r.images as unknown as string) : [],
-        bidCount: Number(r.bidCount),
-      }));
-    }),
+      })
+      .from(tattooRequests)
+      .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
+      .where(eq(tattooRequests.status, "open"))
+      .orderBy(desc(tattooRequests.createdAt))
+      .limit(8);
+
+    return results.map((r: (typeof results)[number]) => ({
+      ...r.request,
+      client: r.client,
+      images: r.images ? JSON.parse(r.images as unknown as string) : [],
+      bidCount: Number(r.bidCount),
+    }));
+  }),
 
   // Get request by ID
   getById: publicProcedure
@@ -386,7 +407,10 @@ export const requestsRouter = router({
         ...result.request,
         client: result.client,
         images,
-        bids: requestBids.map((b: typeof requestBids[number]) => ({ ...b.bid, artist: b.artist })),
+        bids: requestBids.map((b: (typeof requestBids)[number]) => ({
+          ...b.bid,
+          artist: b.artist,
+        })),
       };
     }),
 
@@ -415,7 +439,7 @@ export const requestsRouter = router({
       .where(eq(tattooRequests.clientId, client.id))
       .orderBy(desc(tattooRequests.createdAt));
 
-    return results.map((r: typeof results[number]) => ({
+    return results.map((r: (typeof results)[number]) => ({
       ...r.request,
       bidCount: Number(r.bidCount),
     }));
@@ -423,20 +447,24 @@ export const requestsRouter = router({
 
   // Create a new tattoo request
   create: protectedProcedure
-    .input(z.object({
-      title: z.string().min(5).max(255),
-      description: z.string().min(20).max(5000),
-      style: z.string().max(100).optional(),
-      placement: z.string().max(100),
-      size: z.string().max(50),
-      colorPreference: z.enum(["color", "black_and_grey", "either"]).optional(),
-      budgetMin: z.number().min(0).optional(),
-      budgetMax: z.number().min(0).optional(),
-      preferredCity: z.string().max(100).optional(),
-      preferredState: z.string().max(50).optional(),
-      willingToTravel: z.boolean().default(false),
-      desiredTimeframe: z.string().max(100).optional(),
-    }))
+    .input(
+      z.object({
+        title: z.string().min(5).max(255),
+        description: z.string().min(20).max(5000),
+        style: z.string().max(100).optional(),
+        placement: z.string().max(100),
+        size: z.string().max(50),
+        colorPreference: z
+          .enum(["color", "black_and_grey", "either"])
+          .optional(),
+        budgetMin: z.number().min(0).optional(),
+        budgetMax: z.number().min(0).optional(),
+        preferredCity: z.string().max(100).optional(),
+        preferredState: z.string().max(50).optional(),
+        willingToTravel: z.boolean().default(false),
+        desiredTimeframe: z.string().max(100).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       // Get client ID
@@ -466,14 +494,16 @@ export const requestsRouter = router({
 
   // AI Prompt Refiner — analyze description completeness and suggest improvements
   refineDescription: protectedProcedure
-    .input(z.object({
-      description: z.string().min(1).max(5000),
-      title: z.string().max(255).optional(),
-      style: z.string().max(100).optional(),
-      placement: z.string().max(100).optional(),
-      size: z.string().max(50).optional(),
-      colorPreference: z.string().max(50).optional(),
-    }))
+    .input(
+      z.object({
+        description: z.string().min(1).max(5000),
+        title: z.string().max(255).optional(),
+        style: z.string().max(100).optional(),
+        placement: z.string().max(100).optional(),
+        size: z.string().max(50).optional(),
+        colorPreference: z.string().max(50).optional(),
+      }),
+    )
     .mutation(async ({ input }) => {
       const { description, ...context } = input;
       try {
@@ -482,17 +512,20 @@ export const requestsRouter = router({
         logger.error("AI prompt refinement failed:", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "AI refinement failed — please try again or submit your description as-is.",
+          message:
+            "AI refinement failed — please try again or submit your description as-is.",
         });
       }
     }),
 
   // Get a signed URL for uploading a request image
   getUploadUrl: protectedProcedure
-    .input(z.object({
-      fileName: z.string(),
-      contentType: z.string(),
-    }))
+    .input(
+      z.object({
+        fileName: z.string(),
+        contentType: z.string(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       // Get client ID to create a unique path
@@ -517,12 +550,14 @@ export const requestsRouter = router({
 
   // Add image to request
   addImage: protectedProcedure
-    .input(z.object({
-      requestId: z.number(),
-      imageKey: z.string(),
-      caption: z.string().max(500).optional(),
-      isMainImage: z.boolean().default(false),
-    }))
+    .input(
+      z.object({
+        requestId: z.number(),
+        imageKey: z.string(),
+        caption: z.string().max(500).optional(),
+        isMainImage: z.boolean().default(false),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       // Verify ownership
@@ -535,10 +570,12 @@ export const requestsRouter = router({
       const [request] = await db
         .select()
         .from(tattooRequests)
-        .where(and(
-          eq(tattooRequests.id, input.requestId),
-          eq(tattooRequests.clientId, client?.id ?? 0)
-        ))
+        .where(
+          and(
+            eq(tattooRequests.id, input.requestId),
+            eq(tattooRequests.clientId, client?.id ?? 0),
+          ),
+        )
         .limit(1);
 
       if (!request) {
@@ -575,10 +612,12 @@ export const requestsRouter = router({
 
   // Update request status
   updateStatus: protectedProcedure
-    .input(z.object({
-      requestId: z.number(),
-      status: z.enum(["open", "in_progress", "completed", "cancelled"]),
-    }))
+    .input(
+      z.object({
+        requestId: z.number(),
+        status: z.enum(["open", "in_progress", "completed", "cancelled"]),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const [client] = await db
@@ -590,10 +629,12 @@ export const requestsRouter = router({
       const [updated] = await db
         .update(tattooRequests)
         .set({ status: input.status, updatedAt: new Date() })
-        .where(and(
-          eq(tattooRequests.id, input.requestId),
-          eq(tattooRequests.clientId, client?.id ?? 0)
-        ))
+        .where(
+          and(
+            eq(tattooRequests.id, input.requestId),
+            eq(tattooRequests.clientId, client?.id ?? 0),
+          ),
+        )
         .returning();
 
       if (!updated) {
@@ -626,10 +667,12 @@ export const bidsRouter = router({
       const [request] = await db
         .select()
         .from(tattooRequests)
-        .where(and(
-          eq(tattooRequests.id, input.requestId),
-          eq(tattooRequests.clientId, client?.id ?? 0)
-        ))
+        .where(
+          and(
+            eq(tattooRequests.id, input.requestId),
+            eq(tattooRequests.clientId, client?.id ?? 0),
+          ),
+        )
         .limit(1);
 
       if (!request) {
@@ -649,7 +692,10 @@ export const bidsRouter = router({
         .where(eq(bids.requestId, input.requestId))
         .orderBy(desc(bids.createdAt));
 
-      return requestBids.map((b: typeof requestBids[number]) => ({ ...b.bid, artist: b.artist }));
+      return requestBids.map((b: (typeof requestBids)[number]) => ({
+        ...b.bid,
+        artist: b.artist,
+      }));
     }),
 
   // Get my bids (for artists)
@@ -677,7 +723,7 @@ export const bidsRouter = router({
       .where(eq(bids.artistId, artist.id))
       .orderBy(desc(bids.createdAt));
 
-    return myBids.map((b: typeof myBids[number]) => ({
+    return myBids.map((b: (typeof myBids)[number]) => ({
       ...b.bid,
       request: b.request,
       client: b.client,
@@ -707,7 +753,8 @@ export const bidsRouter = router({
       if (!canUseAiBidAssistant(artist.subscriptionTier)) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "AI Bid Assistant is available for Professional and Icon tier artists. Upgrade to access this feature.",
+          message:
+            "AI Bid Assistant is available for Professional and Icon tier artists. Upgrade to access this feature.",
         });
       }
 
@@ -754,7 +801,7 @@ export const bidsRouter = router({
           experience: artist.experience,
           city: artist.city,
           state: artist.state,
-        }
+        },
       );
 
       return draft;
@@ -762,14 +809,16 @@ export const bidsRouter = router({
 
   // Submit a bid (for artists)
   create: protectedProcedure
-    .input(z.object({
-      requestId: z.number(),
-      priceEstimate: z.number().min(100), // At least $1
-      estimatedHours: z.number().min(1).optional(),
-      message: z.string().min(20).max(2000),
-      availableDate: z.string().optional(),
-      portfolioLinks: z.string().max(1000).optional(),
-    }))
+    .input(
+      z.object({
+        requestId: z.number(),
+        priceEstimate: z.number().min(100), // At least $1
+        estimatedHours: z.number().min(1).optional(),
+        message: z.string().min(20).max(2000),
+        availableDate: z.string().optional(),
+        portfolioLinks: z.string().max(1000).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       // Get artist ID and check their subscription status
@@ -785,13 +834,14 @@ export const bidsRouter = router({
           message: "Only artists can submit bids",
         });
       }
-      
+
       // Implement "First 5 Bids Free" logic
       if (isFreeArtistTier(artist.subscriptionTier)) {
         if (artist.bidsUsed >= 5) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "You have used all 5 of your free bids. Please upgrade to a paid plan to continue bidding.",
+            message:
+              "You have used all 5 of your free bids. Please upgrade to a paid plan to continue bidding.",
           });
         }
       }
@@ -821,10 +871,12 @@ export const bidsRouter = router({
       const [existingBid] = await db
         .select()
         .from(bids)
-        .where(and(
-          eq(bids.requestId, input.requestId),
-          eq(bids.artistId, artist.id)
-        ))
+        .where(
+          and(
+            eq(bids.requestId, input.requestId),
+            eq(bids.artistId, artist.id),
+          ),
+        )
         .limit(1);
 
       if (existingBid) {
@@ -842,7 +894,9 @@ export const bidsRouter = router({
           priceEstimate: input.priceEstimate,
           estimatedHours: input.estimatedHours,
           message: input.message,
-          availableDate: input.availableDate ? new Date(input.availableDate) : null,
+          availableDate: input.availableDate
+            ? new Date(input.availableDate)
+            : null,
           portfolioLinks: input.portfolioLinks,
         })
         .returning();
@@ -885,10 +939,9 @@ export const bidsRouter = router({
         })
         .from(bids)
         .innerJoin(tattooRequests, eq(bids.requestId, tattooRequests.id))
-        .where(and(
-          eq(bids.id, input.bidId),
-          eq(tattooRequests.clientId, client.id)
-        ))
+        .where(
+          and(eq(bids.id, input.bidId), eq(tattooRequests.clientId, client.id)),
+        )
         .limit(1);
 
       if (!bid) {
@@ -910,18 +963,20 @@ export const bidsRouter = router({
         await tx
           .update(bids)
           .set({ status: "rejected", updatedAt: new Date() })
-          .where(and(
-            eq(bids.requestId, bid.request.id),
-            sql`${bids.id} != ${input.bidId}`
-          ));
+          .where(
+            and(
+              eq(bids.requestId, bid.request.id),
+              sql`${bids.id} != ${input.bidId}`,
+            ),
+          );
 
         // Update request status
         await tx
           .update(tattooRequests)
-          .set({ 
-            status: "in_progress", 
+          .set({
+            status: "in_progress",
             selectedBidId: input.bidId,
-            updatedAt: new Date() 
+            updatedAt: new Date(),
           })
           .where(eq(tattooRequests.id, bid.request.id));
       });
@@ -950,10 +1005,7 @@ export const bidsRouter = router({
       const [updated] = await db
         .update(bids)
         .set({ status: "withdrawn", updatedAt: new Date() })
-        .where(and(
-          eq(bids.id, input.bidId),
-          eq(bids.artistId, artist.id)
-        ))
+        .where(and(eq(bids.id, input.bidId), eq(bids.artistId, artist.id)))
         .returning();
 
       if (!updated) {

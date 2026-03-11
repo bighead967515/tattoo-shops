@@ -3,14 +3,33 @@ import { trpc } from "@/lib/trpc";
 import { safeJsonParse } from "@/lib/utils";
 import { useLocation } from "wouter";
 import Header from "@/components/Header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Image as ImageIcon, Settings, Plus, Trash2, Loader2, ExternalLink, Briefcase, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  Calendar,
+  User,
+  Image as ImageIcon,
+  Settings,
+  Plus,
+  Trash2,
+  Loader2,
+  ExternalLink,
+  Briefcase,
+  Sparkles,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
@@ -27,19 +46,25 @@ export default function ArtistDashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  const { data: artist, isLoading: artistLoading, refetch: refetchArtist } = trpc.artists.getByUserId.useQuery(
-    undefined, 
-    { enabled: !!user }
-  );
+  const {
+    data: artist,
+    isLoading: artistLoading,
+    refetch: refetchArtist,
+  } = trpc.artists.getByUserId.useQuery(undefined, { enabled: !!user });
 
-  const { data: bookings, isLoading: bookingsLoading } = trpc.bookings.getByArtistId.useQuery(
-    { artistId: artist?.id || 0 },
-    { enabled: !!artist }
-  );
+  const { data: bookings, isLoading: bookingsLoading } =
+    trpc.bookings.getByArtistId.useQuery(
+      { artistId: artist?.id || 0 },
+      { enabled: !!artist },
+    );
 
-  const { data: portfolio, isLoading: portfolioLoading, refetch: refetchPortfolio } = trpc.portfolio.get.useQuery(
+  const {
+    data: portfolio,
+    isLoading: portfolioLoading,
+    refetch: refetchPortfolio,
+  } = trpc.portfolio.get.useQuery(
     { artistId: artist?.id || 0 },
-    { enabled: !!artist }
+    { enabled: !!artist },
   );
 
   const updateArtistMutation = trpc.artists.update.useMutation({
@@ -95,8 +120,12 @@ export default function ArtistDashboard() {
         <Header />
         <div className="container py-20 text-center">
           <h1 className="text-3xl font-bold mb-4">No Artist Profile Found</h1>
-          <p className="text-muted-foreground mb-8">You need to register as an artist first.</p>
-          <Button onClick={() => setLocation("/for-artists")}>Register as Artist</Button>
+          <p className="text-muted-foreground mb-8">
+            You need to register as an artist first.
+          </p>
+          <Button onClick={() => setLocation("/for-artists")}>
+            Register as Artist
+          </Button>
         </div>
       </div>
     );
@@ -134,10 +163,15 @@ export default function ArtistDashboard() {
 
       // 2. Upload file directly to Supabase Storage using axios for progress
       await axios.put(signedUrl, file, {
-        headers: { 'Content-Type': file.type },
+        headers: { "Content-Type": file.type },
         onUploadProgress: (progressEvent) => {
-          if (typeof progressEvent.total === 'number' && progressEvent.total > 0) {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          if (
+            typeof progressEvent.total === "number" &&
+            progressEvent.total > 0
+          ) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
             setUploadProgress(percentCompleted);
           }
         },
@@ -166,10 +200,16 @@ export default function ArtistDashboard() {
           <div>
             <h1 className="text-4xl font-bold mb-2">Artist Dashboard</h1>
             <p className="text-muted-foreground">
-              Manage your profile, portfolio, and bookings for <span className="font-semibold text-foreground">{artist.shopName}</span>
+              Manage your profile, portfolio, and bookings for{" "}
+              <span className="font-semibold text-foreground">
+                {artist.shopName}
+              </span>
             </p>
           </div>
-          <Button variant="outline" onClick={() => setLocation(`/artist/${artist.id}`)}>
+          <Button
+            variant="outline"
+            onClick={() => setLocation(`/artist/${artist.id}`)}
+          >
             <ExternalLink className="w-4 h-4 mr-2" />
             View Public Profile
           </Button>
@@ -199,15 +239,22 @@ export default function ArtistDashboard() {
           <TabsContent value="portfolio" className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold">Your Portfolio</h2>
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
                 Add Image
               </Button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
                 onChange={handleFileUpload}
               />
             </div>
@@ -223,21 +270,37 @@ export default function ArtistDashboard() {
                 <p>Loading portfolio...</p>
               ) : portfolio?.length === 0 ? (
                 <div className="col-span-full py-12 text-center bg-muted/30 border border-dashed rounded-lg">
-                  <p className="text-muted-foreground">Your portfolio is empty. Add your best work!</p>
+                  <p className="text-muted-foreground">
+                    Your portfolio is empty. Add your best work!
+                  </p>
                 </div>
               ) : (
                 portfolio?.map((image) => {
-                  const aiStyles: string[] = safeJsonParse<string[]>(image.aiStyles, []);
-                  const aiTags: string[] = safeJsonParse<string[]>(image.aiTags, []);
-                  const qualityIssues: string[] = safeJsonParse<string[]>(image.qualityIssues, []);
-                  const hasQualityWarning = image.qualityScore !== null && image.qualityScore < 50;
-                  const isProcessing = image.aiProcessedAt === null && image.qualityScore === null;
+                  const aiStyles: string[] = safeJsonParse<string[]>(
+                    image.aiStyles,
+                    [],
+                  );
+                  const aiTags: string[] = safeJsonParse<string[]>(
+                    image.aiTags,
+                    [],
+                  );
+                  const qualityIssues: string[] = safeJsonParse<string[]>(
+                    image.qualityIssues,
+                    [],
+                  );
+                  const hasQualityWarning =
+                    image.qualityScore !== null && image.qualityScore < 50;
+                  const isProcessing =
+                    image.aiProcessedAt === null && image.qualityScore === null;
 
                   return (
-                    <Card key={image.id} className="overflow-hidden group relative">
-                      <img 
-                        src={image.imageUrl} 
-                        alt={image.aiDescription || image.caption || ""} 
+                    <Card
+                      key={image.id}
+                      className="overflow-hidden group relative"
+                    >
+                      <img
+                        src={image.imageUrl}
+                        alt={image.aiDescription || image.caption || ""}
                         className="w-full aspect-square object-cover"
                       />
                       {/* Quality warning overlay */}
@@ -260,7 +323,11 @@ export default function ArtistDashboard() {
                           {aiStyles.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aiStyles.map((style) => (
-                                <Badge key={`style-${style}`} variant="secondary" className="text-xs">
+                                <Badge
+                                  key={`style-${style}`}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
                                   {style}
                                 </Badge>
                               ))}
@@ -269,7 +336,11 @@ export default function ArtistDashboard() {
                           {aiTags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aiTags.slice(0, 3).map((tag) => (
-                                <Badge key={`tag-${tag}`} variant="outline" className="text-xs">
+                                <Badge
+                                  key={`tag-${tag}`}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
                                   {tag}
                                 </Badge>
                               ))}
@@ -278,19 +349,24 @@ export default function ArtistDashboard() {
                         </div>
                       )}
                       {/* Quality issues — shown independently of AI tag presence */}
-                      {qualityIssues.length > 0 && !qualityIssues.includes("analysis-failed") && (
-                        <div className="p-2 border-t">
-                          <p className="text-xs text-muted-foreground">
-                            Issues: {qualityIssues.join(", ")}
-                          </p>
-                        </div>
-                      )}
+                      {qualityIssues.length > 0 &&
+                        !qualityIssues.includes("analysis-failed") && (
+                          <div className="p-2 border-t">
+                            <p className="text-xs text-muted-foreground">
+                              Issues: {qualityIssues.join(", ")}
+                            </p>
+                          </div>
+                        )}
                       {/* Hover overlay with delete + re-analyze buttons */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <Button 
-                          variant="destructive" 
+                        <Button
+                          variant="destructive"
                           size="icon"
-                          onClick={() => deletePortfolioImageMutation.mutate({ id: image.id })}
+                          onClick={() =>
+                            deletePortfolioImageMutation.mutate({
+                              id: image.id,
+                            })
+                          }
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -304,9 +380,9 @@ export default function ArtistDashboard() {
 
           {/* Requests Tab */}
           <TabsContent value="requests" className="space-y-4">
-             <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
+            <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
             {isFreeArtistTier(artist.subscriptionTier) ? (
-              <UpgradePrompt 
+              <UpgradePrompt
                 feature="View & Bid on Requests"
                 description="Upgrade to a paid plan to view and bid on new tattoo requests from clients."
               />
@@ -322,49 +398,79 @@ export default function ArtistDashboard() {
               {bookingsLoading ? (
                 <p>Loading bookings...</p>
               ) : bookings?.length === 0 ? (
-                <p className="text-muted-foreground py-8 text-center bg-muted/30 rounded-lg">No bookings yet.</p>
+                <p className="text-muted-foreground py-8 text-center bg-muted/30 rounded-lg">
+                  No bookings yet.
+                </p>
               ) : (
                 bookings?.map((booking) => (
                   <Card key={booking.id}>
                     <CardHeader className="flex flex-row items-center justify-between py-4">
                       <div>
-                        <CardTitle className="text-lg">{booking.customerName}</CardTitle>
-                        <CardDescription>{booking.customerEmail} • {booking.customerPhone}</CardDescription>
+                        <CardTitle className="text-lg">
+                          {booking.customerName}
+                        </CardTitle>
+                        <CardDescription>
+                          {booking.customerEmail} • {booking.customerPhone}
+                        </CardDescription>
                       </div>
-                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'outline'}>
+                      <Badge
+                        variant={
+                          booking.status === "confirmed" ? "default" : "outline"
+                        }
+                      >
                         {booking.status}
                       </Badge>
                     </CardHeader>
                     <CardContent className="py-2">
                       <div className="grid md:grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="font-semibold text-muted-foreground mb-1">Preferred Date</p>
-                          <p>{format(new Date(booking.preferredDate), "PPP")}</p>
+                          <p className="font-semibold text-muted-foreground mb-1">
+                            Preferred Date
+                          </p>
+                          <p>
+                            {format(new Date(booking.preferredDate), "PPP")}
+                          </p>
                         </div>
                         <div>
-                          <p className="font-semibold text-muted-foreground mb-1">Tattoo Details</p>
-                          <p>{booking.size} • {booking.placement}</p>
+                          <p className="font-semibold text-muted-foreground mb-1">
+                            Tattoo Details
+                          </p>
+                          <p>
+                            {booking.size} • {booking.placement}
+                          </p>
                         </div>
                         <div className="md:col-span-2">
-                          <p className="font-semibold text-muted-foreground mb-1">Description</p>
+                          <p className="font-semibold text-muted-foreground mb-1">
+                            Description
+                          </p>
                           <p>{booking.tattooDescription}</p>
                         </div>
                       </div>
                       <div className="flex gap-2 mt-4 pt-4 border-t">
-                        {booking.status === 'pending' && (
-                          <Button 
-                            size="sm" 
+                        {booking.status === "pending" && (
+                          <Button
+                            size="sm"
                             variant="outline"
-                            onClick={() => updateBookingStatusMutation.mutate({ id: booking.id, status: 'confirmed' })}
+                            onClick={() =>
+                              updateBookingStatusMutation.mutate({
+                                id: booking.id,
+                                status: "confirmed",
+                              })
+                            }
                           >
                             Mark Confirmed
                           </Button>
                         )}
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => updateBookingStatusMutation.mutate({ id: booking.id, status: 'cancelled' })}
+                          onClick={() =>
+                            updateBookingStatusMutation.mutate({
+                              id: booking.id,
+                              status: "cancelled",
+                            })
+                          }
                         >
                           Cancel
                         </Button>
@@ -381,46 +487,91 @@ export default function ArtistDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Edit Artist Profile</CardTitle>
-                <CardDescription>Update your shop information and contact details.</CardDescription>
+                <CardDescription>
+                  Update your shop information and contact details.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="shopName">Shop Name</Label>
-                      <Input id="shopName" name="shopName" defaultValue={artist.shopName} required />
+                      <Input
+                        id="shopName"
+                        name="shopName"
+                        defaultValue={artist.shopName}
+                        required
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="experience">Years Experience</Label>
-                      <Input id="experience" name="experience" type="number" defaultValue={artist.experience || 0} />
+                      <Input
+                        id="experience"
+                        name="experience"
+                        type="number"
+                        defaultValue={artist.experience || 0}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="city">City</Label>
-                      <Input id="city" name="city" defaultValue={artist.city || ""} />
+                      <Input
+                        id="city"
+                        name="city"
+                        defaultValue={artist.city || ""}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State</Label>
-                      <Input id="state" name="state" defaultValue={artist.state || ""} />
+                      <Input
+                        id="state"
+                        name="state"
+                        defaultValue={artist.state || ""}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="website">Website</Label>
-                      <Input id="website" name="website" defaultValue={artist.website || ""} />
+                      <Input
+                        id="website"
+                        name="website"
+                        defaultValue={artist.website || ""}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="instagram">Instagram</Label>
-                      <Input id="instagram" name="instagram" defaultValue={artist.instagram || ""} />
+                      <Input
+                        id="instagram"
+                        name="instagram"
+                        defaultValue={artist.instagram || ""}
+                      />
                     </div>
                     <div className="md:col-span-2 space-y-2">
-                      <Label htmlFor="specialties">Specialties (comma separated)</Label>
-                      <Input id="specialties" name="specialties" defaultValue={artist.specialties || ""} />
+                      <Label htmlFor="specialties">
+                        Specialties (comma separated)
+                      </Label>
+                      <Input
+                        id="specialties"
+                        name="specialties"
+                        defaultValue={artist.specialties || ""}
+                      />
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <Label htmlFor="bio">Bio</Label>
-                      <Textarea id="bio" name="bio" defaultValue={artist.bio || ""} className="h-32" />
+                      <Textarea
+                        id="bio"
+                        name="bio"
+                        defaultValue={artist.bio || ""}
+                        className="h-32"
+                      />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full md:w-auto" disabled={updateArtistMutation.isPending}>
-                    {updateArtistMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  <Button
+                    type="submit"
+                    className="w-full md:w-auto"
+                    disabled={updateArtistMutation.isPending}
+                  >
+                    {updateArtistMutation.isPending && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
                     Save Changes
                   </Button>
                 </form>

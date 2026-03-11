@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { useLocation } from 'wouter';
-import { supabase } from '@/lib/supabase';
+import { useEffect } from "react";
+import { useLocation } from "wouter";
+import { supabase } from "@/lib/supabase";
 
 export default function AuthCallback() {
   const [, setLocation] = useLocation();
@@ -9,21 +9,24 @@ export default function AuthCallback() {
     const handleCallback = async () => {
       try {
         // Get the session from URL hash parameters
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) {
-          console.error('Auth callback error:', error);
-          setLocation('/login');
+          console.error("Auth callback error:", error);
+          setLocation("/login");
           return;
         }
 
         if (session) {
           // Exchange Supabase token for backend session cookie
           try {
-            const response = await fetch('/api/auth/session', {
-              method: 'POST',
+            const response = await fetch("/api/auth/session", {
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
               },
               body: JSON.stringify({
                 accessToken: session.access_token,
@@ -32,22 +35,22 @@ export default function AuthCallback() {
             });
 
             if (!response.ok) {
-              throw new Error('Failed to create session');
+              throw new Error("Failed to create session");
             }
 
             // Redirect to dashboard
-            setLocation('/dashboard');
+            setLocation("/dashboard");
           } catch (err) {
-            console.error('Session creation error:', err);
-            setLocation('/login');
+            console.error("Session creation error:", err);
+            setLocation("/login");
           }
         } else {
           // No session, redirect to login
-          setLocation('/login');
+          setLocation("/login");
         }
       } catch (err) {
-        console.error('Callback handling error:', err);
-        setLocation('/login');
+        console.error("Callback handling error:", err);
+        setLocation("/login");
       }
     };
 

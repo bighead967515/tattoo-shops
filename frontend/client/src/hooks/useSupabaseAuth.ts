@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthState {
   user: User | null;
@@ -45,15 +45,18 @@ export function useSupabaseAuth() {
       });
 
       // Sync session with backend on sign in
-      if (event === 'SIGNED_IN' && session?.access_token) {
-        await syncSessionWithBackend(session.access_token, session.refresh_token);
+      if (event === "SIGNED_IN" && session?.access_token) {
+        await syncSessionWithBackend(
+          session.access_token,
+          session.refresh_token,
+        );
       }
 
       // Clear backend cookie on sign out
-      if (event === 'SIGNED_OUT') {
-        await fetch('/api/auth/signout', {
-          method: 'POST',
-          credentials: 'include',
+      if (event === "SIGNED_OUT") {
+        await fetch("/api/auth/signout", {
+          method: "POST",
+          credentials: "include",
         });
       }
     });
@@ -66,19 +69,22 @@ export function useSupabaseAuth() {
   /**
    * Sync Supabase session with backend cookie
    */
-  async function syncSessionWithBackend(accessToken: string, refreshToken?: string) {
+  async function syncSessionWithBackend(
+    accessToken: string,
+    refreshToken?: string,
+  ) {
     try {
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           access_token: accessToken,
           refresh_token: refreshToken,
         }),
       });
     } catch (error) {
-      console.error('[Auth] Failed to sync session with backend:', error);
+      console.error("[Auth] Failed to sync session with backend:", error);
     }
   }
 
@@ -98,7 +104,11 @@ export function useSupabaseAuth() {
   /**
    * Sign up with email and password
    */
-  async function signUpWithEmail(email: string, password: string, metadata?: { name?: string }) {
+  async function signUpWithEmail(
+    email: string,
+    password: string,
+    metadata?: { name?: string },
+  ) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -114,7 +124,7 @@ export function useSupabaseAuth() {
   /**
    * Sign in with OAuth provider
    */
-  async function signInWithOAuth(provider: 'google' | 'github') {
+  async function signInWithOAuth(provider: "google" | "github") {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {

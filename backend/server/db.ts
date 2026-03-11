@@ -1,9 +1,24 @@
 import { eq, desc, and, sql, or, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, artists, portfolioImages, reviews, bookings, favorites, verificationDocuments, clients, InsertArtist, InsertPortfolioImage, InsertReview, InsertBooking, InsertFavorite } from "../drizzle/schema";
-import { ENV } from './_core/env';
-import { logger } from './_core/logger';
+import {
+  InsertUser,
+  users,
+  artists,
+  portfolioImages,
+  reviews,
+  bookings,
+  favorites,
+  verificationDocuments,
+  clients,
+  InsertArtist,
+  InsertPortfolioImage,
+  InsertReview,
+  InsertBooking,
+  InsertFavorite,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
+import { logger } from "./_core/logger";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _sqlClient: ReturnType<typeof postgres> | null = null;
@@ -62,9 +77,11 @@ export async function getDb() {
         },
       });
       _db = drizzle(_sqlClient);
-      
+
       // Log successful connection
-      logger.info("Database connection pool initialized", { maxConnections: 20 });
+      logger.info("Database connection pool initialized", {
+        maxConnections: 20,
+      });
     } catch (error) {
       logger.error("Database connection failed", { error });
       _db = null;
@@ -72,22 +89,22 @@ export async function getDb() {
   }
   return _db;
 }
-      
+
 // Run async function within a database transaction for atomicity
 export async function withTransaction<T>(
-  callback: (tx: ReturnType<typeof drizzle>) => Promise<T>
+  callback: (tx: ReturnType<typeof drizzle>) => Promise<T>,
 ): Promise<T> {
   const db = await getDb();
   if (!db || !_sqlClient) {
     throw new Error("Database not available for transactions");
   }
-  
+
   return _sqlClient.begin(async (sql) => {
     const txDb = drizzle(sql as any);
     return callback(txDb);
   }) as Promise<T>;
 }
-      
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
@@ -105,7 +122,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod", "stripeCustomerId"] as const;
+    const textFields = [
+      "name",
+      "email",
+      "loginMethod",
+      "stripeCustomerId",
+    ] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -126,8 +148,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -155,7 +177,11 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
@@ -164,7 +190,7 @@ export async function getUserByOpenId(openId: string) {
 export async function createArtist(artist: InsertArtist) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   const result = await db.insert(artists).values(artist);
   return result;
 }
@@ -172,23 +198,31 @@ export async function createArtist(artist: InsertArtist) {
 export async function getArtistByUserId(userId: number) {
   const db = await getDb();
   if (!db) return undefined;
-  
-  const result = await db.select().from(artists).where(eq(artists.userId, userId)).limit(1);
+
+  const result = await db
+    .select()
+    .from(artists)
+    .where(eq(artists.userId, userId))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getArtistById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  
-  const result = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
+
+  const result = await db
+    .select()
+    .from(artists)
+    .where(eq(artists.id, id))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getAllArtists() {
   const db = await getDb();
   if (!db) return [];
-  
+
   return await db.select().from(artists).where(eq(artists.isApproved, true));
 }
 
@@ -201,27 +235,29 @@ export async function searchArtists(filters: {
 }) {
   const db = await getDb();
   if (!db) return [];
-  
+
   const conditions: any[] = [eq(artists.isApproved, true)];
-  
+
   // Filter by styles
   if (filters.styles && filters.styles.length > 0) {
-    const styleConditions = filters.styles.map(style => 
-      sql`FIND_IN_SET(${style}, ${artists.styles}) > 0`
+    const styleConditions = filters.styles.map(
+      (style) => sql`FIND_IN_SET(${style}, ${artists.styles}) > 0`,
     );
     conditions.push(or(...styleConditions));
   }
-  
+
   // Filter by minimum rating
   if (filters.minRating && filters.minRating > 0) {
-    conditions.push(sql`CAST(${artists.averageRating} AS DECIMAL(3,2)) >= ${filters.minRating}`);
+    conditions.push(
+      sql`CAST(${artists.averageRating} AS DECIMAL(3,2)) >= ${filters.minRating}`,
+    );
   }
-  
+
   // Filter by minimum experience
   if (filters.minExperience && filters.minExperience > 0) {
     conditions.push(gte(artists.experience, filters.minExperience));
   }
-  
+
   // Filter by city
   if (filters.city) {
     conditions.push(eq(artists.city, filters.city));
@@ -229,16 +265,19 @@ export async function searchArtists(filters: {
 
   // Filter by state
   if (filters.state) {
-	conditions.push(eq(artists.state, filters.state));
+    conditions.push(eq(artists.state, filters.state));
   }
-  
-  return await db.select().from(artists).where(and(...conditions));
+
+  return await db
+    .select()
+    .from(artists)
+    .where(and(...conditions));
 }
 
 export async function updateArtist(id: number, data: Partial<InsertArtist>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   return await db.update(artists).set(data).where(eq(artists.id, id));
 }
 
@@ -246,7 +285,7 @@ export async function updateArtist(id: number, data: Partial<InsertArtist>) {
 export async function addPortfolioImage(image: InsertPortfolioImage) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   const [inserted] = await db.insert(portfolioImages).values(image).returning();
   return inserted;
 }
@@ -254,11 +293,17 @@ export async function addPortfolioImage(image: InsertPortfolioImage) {
 export async function getPortfolioByArtistId(artistId: number) {
   const db = await getDb();
   if (!db) return [];
-  
-  return await db.select().from(portfolioImages).where(eq(portfolioImages.artistId, artistId)).orderBy(desc(portfolioImages.createdAt));
+
+  return await db
+    .select()
+    .from(portfolioImages)
+    .where(eq(portfolioImages.artistId, artistId))
+    .orderBy(desc(portfolioImages.createdAt));
 }
 
-export async function getPortfolioCountByArtistId(artistId: number): Promise<number> {
+export async function getPortfolioCountByArtistId(
+  artistId: number,
+): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
 
@@ -272,15 +317,19 @@ export async function getPortfolioCountByArtistId(artistId: number): Promise<num
 export async function getPortfolioImageById(id: number) {
   const db = await getDb();
   if (!db) return null;
-  
-  const result = await db.select().from(portfolioImages).where(eq(portfolioImages.id, id)).limit(1);
+
+  const result = await db
+    .select()
+    .from(portfolioImages)
+    .where(eq(portfolioImages.id, id))
+    .limit(1);
   return result[0] || null;
 }
 
 export async function deletePortfolioImage(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   return await db.delete(portfolioImages).where(eq(portfolioImages.id, id));
 }
 
@@ -297,7 +346,7 @@ export async function updatePortfolioImageAI(
     qualityIssues?: string | null;
     aiProcessedAt?: Date | null;
     style?: string | null;
-  }
+  },
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -312,56 +361,63 @@ export async function updatePortfolioImageAI(
 export async function createReview(review: InsertReview) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   const [inserted] = await db.insert(reviews).values(review).returning();
-  
+
   // Update artist average rating
   await updateArtistRating(review.artistId);
-  
+
   return inserted;
 }
 
 export async function getReviewsByArtistId(artistId: number) {
   const db = await getDb();
   if (!db) return [];
-  
-  return await db.select({
-    id: reviews.id,
-    rating: reviews.rating,
-    comment: reviews.comment,
-    createdAt: reviews.createdAt,
-    userName: users.name,
-    helpfulVotes: reviews.helpfulVotes,
-    verifiedBooking: reviews.verifiedBooking,
-    photos: reviews.photos,
-    artistResponse: reviews.artistResponse,
-    artistResponseDate: reviews.artistResponseDate,
-  })
-  .from(reviews)
-  .leftJoin(users, eq(reviews.userId, users.id))
-  .where(eq(reviews.artistId, artistId))
-  .orderBy(desc(reviews.createdAt));
+
+  return await db
+    .select({
+      id: reviews.id,
+      rating: reviews.rating,
+      comment: reviews.comment,
+      createdAt: reviews.createdAt,
+      userName: users.name,
+      helpfulVotes: reviews.helpfulVotes,
+      verifiedBooking: reviews.verifiedBooking,
+      photos: reviews.photos,
+      artistResponse: reviews.artistResponse,
+      artistResponseDate: reviews.artistResponseDate,
+    })
+    .from(reviews)
+    .leftJoin(users, eq(reviews.userId, users.id))
+    .where(eq(reviews.artistId, artistId))
+    .orderBy(desc(reviews.createdAt));
 }
 
 async function updateArtistRating(artistId: number) {
   const db = await getDb();
   if (!db) return;
-  
-  const result = await db.select({
-    avgRating: sql<string>`AVG(${reviews.rating})`,
-    count: sql<number>`COUNT(*)`,
-  })
-  .from(reviews)
-  .where(eq(reviews.artistId, artistId));
-  
+
+  const result = await db
+    .select({
+      avgRating: sql<string>`AVG(${reviews.rating})`,
+      count: sql<number>`COUNT(*)`,
+    })
+    .from(reviews)
+    .where(eq(reviews.artistId, artistId));
+
   if (result.length > 0) {
-    const avgRating = result[0].avgRating ? parseFloat(result[0].avgRating).toFixed(2) : "0";
+    const avgRating = result[0].avgRating
+      ? parseFloat(result[0].avgRating).toFixed(2)
+      : "0";
     const count = result[0].count || 0;
-    
-    await db.update(artists).set({
-      averageRating: avgRating,
-      totalReviews: count,
-    }).where(eq(artists.id, artistId));
+
+    await db
+      .update(artists)
+      .set({
+        averageRating: avgRating,
+        totalReviews: count,
+      })
+      .where(eq(artists.id, artistId));
   }
 }
 
@@ -369,7 +425,7 @@ async function updateArtistRating(artistId: number) {
 export async function createBooking(booking: InsertBooking) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   const result = await db.insert(bookings).values(booking).returning();
   return result[0];
 }
@@ -377,36 +433,45 @@ export async function createBooking(booking: InsertBooking) {
 export async function getBookingById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  
-  const result = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
+
+  const result = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.id, id))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getBookingsByUserId(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  
-  return await db.select({
-    booking: bookings,
-    artist: artists,
-  })
-  .from(bookings)
-  .leftJoin(artists, eq(bookings.artistId, artists.id))
-  .where(eq(bookings.userId, userId))
-  .orderBy(desc(bookings.createdAt));
+
+  return await db
+    .select({
+      booking: bookings,
+      artist: artists,
+    })
+    .from(bookings)
+    .leftJoin(artists, eq(bookings.artistId, artists.id))
+    .where(eq(bookings.userId, userId))
+    .orderBy(desc(bookings.createdAt));
 }
 
 export async function getBookingsByArtistId(artistId: number) {
   const db = await getDb();
   if (!db) return [];
-  
-  return await db.select().from(bookings).where(eq(bookings.artistId, artistId)).orderBy(desc(bookings.createdAt));
+
+  return await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.artistId, artistId))
+    .orderBy(desc(bookings.createdAt));
 }
 
 export async function updateBooking(id: number, data: Partial<InsertBooking>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   return await db.update(bookings).set(data).where(eq(bookings.id, id));
 }
 
@@ -414,36 +479,43 @@ export async function updateBooking(id: number, data: Partial<InsertBooking>) {
 export async function addFavorite(favorite: InsertFavorite) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
+
   return await db.insert(favorites).values(favorite);
 }
 
 export async function removeFavorite(userId: number, artistId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  
-  return await db.delete(favorites).where(and(eq(favorites.userId, userId), eq(favorites.artistId, artistId)));
+
+  return await db
+    .delete(favorites)
+    .where(and(eq(favorites.userId, userId), eq(favorites.artistId, artistId)));
 }
 
 export async function getFavoritesByUserId(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  
-  return await db.select({
-    favorite: favorites,
-    artist: artists,
-  })
-  .from(favorites)
-  .leftJoin(artists, eq(favorites.artistId, artists.id))
-  .where(eq(favorites.userId, userId))
-  .orderBy(desc(favorites.createdAt));
+
+  return await db
+    .select({
+      favorite: favorites,
+      artist: artists,
+    })
+    .from(favorites)
+    .leftJoin(artists, eq(favorites.artistId, artists.id))
+    .where(eq(favorites.userId, userId))
+    .orderBy(desc(favorites.createdAt));
 }
 
 export async function isFavorite(userId: number, artistId: number) {
   const db = await getDb();
   if (!db) return false;
-  
-  const result = await db.select().from(favorites).where(and(eq(favorites.userId, userId), eq(favorites.artistId, artistId))).limit(1);
+
+  const result = await db
+    .select()
+    .from(favorites)
+    .where(and(eq(favorites.userId, userId), eq(favorites.artistId, artistId)))
+    .limit(1);
   return result.length > 0;
 }
 
@@ -473,7 +545,9 @@ export async function discoverArtists(intent: {
 
   if (allTerms.length === 0 && !intent.vibeDescription) {
     // No useful search terms — fall back to all approved artists
-    return (await db.select().from(artists).where(eq(artists.isApproved, true))).map(a => ({
+    return (
+      await db.select().from(artists).where(eq(artists.isApproved, true))
+    ).map((a) => ({
       ...a,
       matchedImages: [] as Array<typeof portfolioImages.$inferSelect>,
       relevanceScore: 0,
@@ -487,7 +561,9 @@ export async function discoverArtists(intent: {
     const likeTerm = `%${term}%`;
     imageConditions.push(sql`${portfolioImages.aiStyles} ILIKE ${likeTerm}`);
     imageConditions.push(sql`${portfolioImages.aiTags} ILIKE ${likeTerm}`);
-    imageConditions.push(sql`${portfolioImages.aiDescription} ILIKE ${likeTerm}`);
+    imageConditions.push(
+      sql`${portfolioImages.aiDescription} ILIKE ${likeTerm}`,
+    );
     imageConditions.push(sql`${portfolioImages.caption} ILIKE ${likeTerm}`);
     imageConditions.push(sql`${portfolioImages.style} ILIKE ${likeTerm}`);
   }
@@ -500,7 +576,9 @@ export async function discoverArtists(intent: {
       .slice(0, 8);
     for (const word of vibeWords) {
       const likeTerm = `%${word}%`;
-      imageConditions.push(sql`${portfolioImages.aiDescription} ILIKE ${likeTerm}`);
+      imageConditions.push(
+        sql`${portfolioImages.aiDescription} ILIKE ${likeTerm}`,
+      );
     }
   }
 
@@ -512,12 +590,7 @@ export async function discoverArtists(intent: {
     })
     .from(portfolioImages)
     .innerJoin(artists, eq(portfolioImages.artistId, artists.id))
-    .where(
-      and(
-        eq(artists.isApproved, true),
-        or(...imageConditions)
-      )
-    )
+    .where(and(eq(artists.isApproved, true), or(...imageConditions)))
     .orderBy(desc(portfolioImages.qualityScore));
 
   // Step 2: Also find artists matching at artist-level (styles, specialties, bio)
@@ -529,17 +602,13 @@ export async function discoverArtists(intent: {
     artistConditions.push(sql`${artists.bio} ILIKE ${likeTerm}`);
   }
 
-  const matchingArtistsDirect = artistConditions.length > 0
-    ? await db
-        .select()
-        .from(artists)
-        .where(
-          and(
-            eq(artists.isApproved, true),
-            or(...artistConditions)
-          )
-        )
-    : [];
+  const matchingArtistsDirect =
+    artistConditions.length > 0
+      ? await db
+          .select()
+          .from(artists)
+          .where(and(eq(artists.isApproved, true), or(...artistConditions)))
+      : [];
 
   // Step 3: Merge results — group by artist, calculate relevance score
   const artistMap = new Map<
@@ -614,7 +683,7 @@ export async function updateVerificationDocumentOCR(
     ocrVerdictReason?: string | null;
     ocrIssues?: string | null;
     ocrProcessedAt?: Date | null;
-  }
+  },
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -678,7 +747,7 @@ export async function reviewVerificationDocument(
     status: "verified" | "rejected";
     reviewedBy: number;
     reviewNotes?: string;
-  }
+  },
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -731,7 +800,7 @@ export async function updateReviewModeration(
     fraudScore?: number | null;
     moderationReason?: string | null;
     moderatedAt?: Date | null;
-  }
+  },
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -761,8 +830,8 @@ export async function getFlaggedReviews() {
     .where(
       or(
         eq(reviews.moderationStatus, "flagged"),
-        eq(reviews.moderationStatus, "hidden")
-      )
+        eq(reviews.moderationStatus, "hidden"),
+      ),
     )
     .orderBy(desc(reviews.createdAt));
 }

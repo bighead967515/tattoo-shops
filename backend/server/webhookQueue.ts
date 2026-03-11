@@ -5,7 +5,7 @@ import { logger } from "./_core/logger";
 
 /**
  * Webhook Retry Queue Processor
- * 
+ *
  * Implements exponential backoff for failed webhook events:
  * - Retry 1: 1 minute delay
  * - Retry 2: 5 minutes delay
@@ -17,10 +17,10 @@ import { logger } from "./_core/logger";
 
 // Exponential backoff delays in milliseconds
 const RETRY_DELAYS = [
-  1 * 60 * 1000,      // 1 minute
-  5 * 60 * 1000,      // 5 minutes
-  15 * 60 * 1000,     // 15 minutes
-  60 * 60 * 1000,     // 1 hour
+  1 * 60 * 1000, // 1 minute
+  5 * 60 * 1000, // 5 minutes
+  15 * 60 * 1000, // 15 minutes
+  60 * 60 * 1000, // 1 hour
   4 * 60 * 60 * 1000, // 4 hours
 ];
 
@@ -36,7 +36,7 @@ export async function queueWebhookForRetry(
   eventId: string,
   eventType: string,
   payload: unknown,
-  error?: string
+  error?: string,
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -67,7 +67,11 @@ export async function queueWebhookForRetry(
       lastError: error ?? null,
     });
 
-    logger.info("Webhook event queued for retry", { eventId, eventType, nextRetryAt });
+    logger.info("Webhook event queued for retry", {
+      eventId,
+      eventType,
+      nextRetryAt,
+    });
   } catch (err) {
     logger.error("Failed to queue webhook for retry", {
       eventId,
@@ -79,10 +83,12 @@ export async function queueWebhookForRetry(
 /**
  * Process pending webhook events from the queue
  */
-export async function processWebhookQueue(processor: WebhookProcessor): Promise<number> {
+export async function processWebhookQueue(
+  processor: WebhookProcessor,
+): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
-  
+
   const now = new Date();
   let processedCount = 0;
 
@@ -94,8 +100,8 @@ export async function processWebhookQueue(processor: WebhookProcessor): Promise<
       .where(
         and(
           eq(webhookQueue.status, "pending"),
-          lte(webhookQueue.nextRetryAt, now)
-        )
+          lte(webhookQueue.nextRetryAt, now),
+        ),
       )
       .limit(10); // Process in batches of 10
 
@@ -115,10 +121,13 @@ export async function processWebhookQueue(processor: WebhookProcessor): Promise<
 
         // Parse payload and process
         const payload = JSON.parse(event.payload);
-        
+
         // Add timeout to processing
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Processing timeout")), PROCESSING_TIMEOUT_MS);
+          setTimeout(
+            () => reject(new Error("Processing timeout")),
+            PROCESSING_TIMEOUT_MS,
+          );
         });
 
         await Promise.race([
@@ -208,12 +217,18 @@ export async function getQueueStats(): Promise<{
   total: number;
 }> {
   const db = await getDb();
-  const defaultStats = { pending: 0, processing: 0, completed: 0, failed: 0, total: 0 };
+  const defaultStats = {
+    pending: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    total: 0,
+  };
   if (!db) return defaultStats;
 
   try {
     const allItems = await db.select().from(webhookQueue);
-    
+
     const stats = {
       ...defaultStats,
       total: allItems.length,
@@ -246,10 +261,12 @@ export async function getQueueStats(): Promise<{
 /**
  * Clean up old completed and failed events
  */
-export async function cleanupOldEvents(olderThanDays: number = 30): Promise<number> {
+export async function cleanupOldEvents(
+  olderThanDays: number = 30,
+): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
-  
+
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
@@ -260,8 +277,8 @@ export async function cleanupOldEvents(olderThanDays: number = 30): Promise<numb
       .where(
         and(
           inArray(webhookQueue.status, ["completed", "failed"]),
-          lte(webhookQueue.updatedAt, cutoffDate)
-        )
+          lte(webhookQueue.updatedAt, cutoffDate),
+        ),
       );
 
     if (oldEvents.length === 0) {
@@ -301,17 +318,17 @@ export async function retryFailedEvent(eventId: string): Promise<boolean> {
       .where(
         and(
           eq(webhookQueue.eventId, eventId),
-          eq(webhookQueue.status, "failed")
-        )
+          eq(webhookQueue.status, "failed"),
+        ),
       );
 
     const updated = (result as unknown as { rowCount?: number }).rowCount ?? 0;
-    
+
     if (updated > 0) {
       logger.info("Failed webhook event reset for retry", { eventId });
       return true;
     }
-    
+
     return false;
   } catch (err) {
     logger.error("Failed to retry event", {
@@ -330,7 +347,7 @@ let processorInterval: ReturnType<typeof setInterval> | null = null;
  */
 export function startQueueProcessor(
   processor: WebhookProcessor,
-  intervalMs: number = 60000 // Check every minute
+  intervalMs: number = 60000, // Check every minute
 ): void {
   if (processorInterval) {
     logger.warn("Queue processor already running");

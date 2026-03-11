@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Star } from "lucide-react";
 
 interface ReviewFiltersProps {
@@ -38,15 +44,20 @@ export default function ReviewFilters({
           >
             <Star className="w-3 h-3 fill-current" />
             {rating}
-            {typeof ratingCounts[rating] === 'number' && (
-              <span className="text-xs opacity-70">({ratingCounts[rating]})</span>
+            {typeof ratingCounts[rating] === "number" && (
+              <span className="text-xs opacity-70">
+                ({ratingCounts[rating]})
+              </span>
             )}
           </Button>
         ))}
       </div>
 
       {/* Sort Dropdown */}
-      <Select value={sortBy} onValueChange={(value) => onSortChange(value as any)}>
+      <Select
+        value={sortBy}
+        onValueChange={(value) => onSortChange(value as any)}
+      >
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Sort by" />
         </SelectTrigger>

@@ -1,5 +1,5 @@
 import { trpc, trpcClient } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from '@shared/const';
+import { UNAUTHED_ERR_MSG } from "@shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { StrictMode } from "react";
@@ -23,7 +23,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 };
 
 // Subscribe to query cache errors with proper cleanup
-const unsubscribeQuery = queryClient.getQueryCache().subscribe(event => {
+const unsubscribeQuery = queryClient.getQueryCache().subscribe((event) => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
@@ -32,13 +32,15 @@ const unsubscribeQuery = queryClient.getQueryCache().subscribe(event => {
 });
 
 // Subscribe to mutation cache errors with proper cleanup
-const unsubscribeMutation = queryClient.getMutationCache().subscribe(event => {
-  if (event.type === "updated" && event.action.type === "error") {
-    const error = event.mutation.state.error;
-    redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
-  }
-});
+const unsubscribeMutation = queryClient
+  .getMutationCache()
+  .subscribe((event) => {
+    if (event.type === "updated" && event.action.type === "error") {
+      const error = event.mutation.state.error;
+      redirectToLoginIfUnauthorized(error);
+      console.error("[API Mutation Error]", error);
+    }
+  });
 
 // Cleanup subscriptions if module is reloaded (HMR)
 if (import.meta.hot) {
@@ -60,5 +62,5 @@ createRoot(rootElement).render(
         <App />
       </QueryClientProvider>
     </trpc.Provider>
-  </StrictMode>
+  </StrictMode>,
 );

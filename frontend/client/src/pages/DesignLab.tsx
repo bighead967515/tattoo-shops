@@ -3,7 +3,13 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,7 +86,9 @@ function DesignLab() {
 
   const handleGenerate = () => {
     if (prompt.trim().length < 10) {
-      toast.error("Please describe your tattoo idea in at least 10 characters.");
+      toast.error(
+        "Please describe your tattoo idea in at least 10 characters.",
+      );
       return;
     }
     generateMutation.mutate({
@@ -278,7 +286,9 @@ function DesignLab() {
             {/* Tips card */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Tips for Great Results</CardTitle>
+                <CardTitle className="text-sm">
+                  Tips for Great Results
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
@@ -380,7 +390,10 @@ function DesignLab() {
                           onClick={async () => {
                             try {
                               const res = await fetch(image.imageUrl);
-                              if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+                              if (!res.ok)
+                                throw new Error(
+                                  `Download failed: ${res.status}`,
+                                );
                               const blob = await res.blob();
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");

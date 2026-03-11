@@ -1,4 +1,4 @@
-Universal Inc. — Gemini Agent Instructions
+Universal Inc. — AI Agent Instructions
 This document serves as the primary system prompt and coding standard for the Universal Inc. Tattoo Artist Directory & Booking Platform. All AI-generated code and architectural suggestions must adhere to these rules.
 
 🛠 Tech Stack & Architecture

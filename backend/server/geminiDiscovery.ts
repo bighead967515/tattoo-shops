@@ -1,16 +1,13 @@
 /**
- * Tattoo Discovery — Gemini-powered Natural Language Search
+ * Tattoo Discovery — Groq-powered Natural Language Search
  *
  * Parses user queries like "I want a small, minimalist mountain range on my
  * inner forearm that looks like a sketch" into structured search criteria that
  * can be matched against AI-tagged portfolio data.
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ENV } from "./_core/env";
+import { groqGenerateJson } from "./_core/aiProviders";
 import { logger } from "./_core/logger";
-
-const genAI = new GoogleGenerativeAI(ENV.googleAiApiKey);
 
 const DISCOVERY_PROMPT = `You are a tattoo industry expert. A user is describing the tattoo they want. Parse their description and extract structured search criteria as a JSON object.
 
@@ -52,44 +49,28 @@ const DEFAULT_INTENT: DiscoveryIntent = {
 };
 
 /**
- * Parse a natural language tattoo query into structured search criteria using Gemini.
+ * Parse a natural language tattoo query into structured search criteria using Groq.
  *
  * @param query - The user's natural language description (e.g. "I want a small, minimalist mountain range on my inner forearm that looks like a sketch")
  * @returns Structured intent with styles, tags, keywords, placement, size, and a vibe description
  */
 export async function parseDiscoveryQuery(
-  query: string
+  query: string,
 ): Promise<DiscoveryIntent> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: DISCOVERY_PROMPT },
-            { text: `User query: "${query.slice(0, 500)}"` },
-          ],
-        },
-      ],
-    });
-
-    const text = result.response.text().trim();
-
-    // Strip markdown fences if present
-    let jsonText = text;
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(jsonText);
+    const parsed = await groqGenerateJson<Partial<DiscoveryIntent>>(
+      DISCOVERY_PROMPT,
+      `User query: "${query.slice(0, 500)}"`,
+      { maxTokens: 1200 },
+    );
 
     // Validate and normalize
     const intent: DiscoveryIntent = {
       styles: Array.isArray(parsed.styles) ? parsed.styles.slice(0, 5) : [],
       tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 8) : [],
-      keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 5) : [],
+      keywords: Array.isArray(parsed.keywords)
+        ? parsed.keywords.slice(0, 5)
+        : [],
       placement: typeof parsed.placement === "string" ? parsed.placement : null,
       size: typeof parsed.size === "string" ? parsed.size : null,
       vibeDescription:
@@ -99,12 +80,12 @@ export async function parseDiscoveryQuery(
     };
 
     logger.info(
-      `Discovery query parsed: "${query.slice(0, 80)}${query.length > 80 ? "..." : ""}" => styles=[${intent.styles.join(", ")}] tags=[${intent.tags.join(", ")}] placement=${intent.placement} size=${intent.size}`
+      `Discovery query parsed: "${query.slice(0, 80)}${query.length > 80 ? "..." : ""}" => styles=[${intent.styles.join(", ")}] tags=[${intent.tags.join(", ")}] placement=${intent.placement} size=${intent.size}`,
     );
 
     return intent;
   } catch (error) {
-    logger.error("Gemini Discovery query parsing failed:", error);
+    logger.error("Groq discovery query parsing failed:", error);
     return DEFAULT_INTENT;
   }
 }

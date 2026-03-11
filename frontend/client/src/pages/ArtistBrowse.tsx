@@ -7,7 +7,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MapPin, Star, Search, Sparkles, X, SlidersHorizontal, Loader2 } from "lucide-react";
+import {
+  MapPin,
+  Star,
+  Search,
+  Sparkles,
+  X,
+  SlidersHorizontal,
+  Loader2,
+} from "lucide-react";
 import ArtistCardSkeleton from "@/components/ArtistCardSkeleton";
 
 export default function ArtistBrowse() {
@@ -18,7 +26,9 @@ export default function ArtistBrowse() {
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
-  const [mode, setMode] = useState<"discover" | "filters">(initialQuery ? "discover" : "filters");
+  const [mode, setMode] = useState<"discover" | "filters">(
+    initialQuery ? "discover" : "filters",
+  );
 
   const [filters, setFilters] = useState<FilterState>({
     styles: [],
@@ -43,17 +53,18 @@ export default function ArtistBrowse() {
     {
       styles: filters.styles.length > 0 ? filters.styles : undefined,
       minRating: filters.minRating > 0 ? filters.minRating : undefined,
-      minExperience: filters.minExperience > 0 ? filters.minExperience : undefined,
+      minExperience:
+        filters.minExperience > 0 ? filters.minExperience : undefined,
       city: filters.city || undefined,
       state: filters.state || undefined,
     },
-    { enabled: mode === "filters" }
+    { enabled: mode === "filters" },
   );
 
   // AI-powered discovery search
   const discoverySearch = trpc.artists.discover.useQuery(
     { query: activeQuery },
-    { enabled: mode === "discover" && activeQuery.length > 0 }
+    { enabled: mode === "discover" && activeQuery.length > 0 },
   );
 
   const handleSearch = () => {
@@ -61,7 +72,9 @@ export default function ArtistBrowse() {
     if (q) {
       setActiveQuery(q);
       setMode("discover");
-      setLocation(`/artists?search=${encodeURIComponent(q)}`, { replace: true });
+      setLocation(`/artists?search=${encodeURIComponent(q)}`, {
+        replace: true,
+      });
     }
   };
 
@@ -83,8 +96,12 @@ export default function ArtistBrowse() {
   };
 
   const isDiscoveryMode = mode === "discover" && activeQuery.length > 0;
-  const isLoading = isDiscoveryMode ? discoverySearch.isLoading : filterSearch.isLoading;
-  const isError = isDiscoveryMode ? discoverySearch.isError : filterSearch.isError;
+  const isLoading = isDiscoveryMode
+    ? discoverySearch.isLoading
+    : filterSearch.isLoading;
+  const isError = isDiscoveryMode
+    ? discoverySearch.isError
+    : filterSearch.isError;
   const error = isDiscoveryMode ? discoverySearch.error : filterSearch.error;
 
   // Normalize results
@@ -157,50 +174,71 @@ export default function ArtistBrowse() {
         </div>
 
         {/* AI Intent Display (discovery mode only) */}
-        {isDiscoveryMode && intent && intent.styles.length > 0 && !isLoading && (
-          <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
-            <div className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-              <div className="space-y-2">
-                <p className="text-sm font-medium">AI understood your request:</p>
-                <div className="flex flex-wrap gap-2">
-                  {intent.styles.map((style) => (
-                    <Badge key={`style-${style}`} variant="default" className="text-xs">
-                      {style}
-                    </Badge>
-                  ))}
-                  {intent.tags.map((tag) => (
-                    <Badge key={`tag-${tag}`} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                  {intent.placement && (
-                    <Badge variant="outline" className="text-xs">
-                      📍 {intent.placement}
-                    </Badge>
-                  )}
-                  {intent.size && (
-                    <Badge variant="outline" className="text-xs">
-                      📐 {intent.size}
-                    </Badge>
-                  )}
-                  {intent.keywords.map((kw) => (
-                    <Badge key={`kw-${kw}`} variant="outline" className="text-xs">
-                      {kw}
-                    </Badge>
-                  ))}
-                </div>
-                {intent.vibeDescription && (
-                  <p className="text-xs text-muted-foreground italic">
-                    "{intent.vibeDescription}"
+        {isDiscoveryMode &&
+          intent &&
+          intent.styles.length > 0 &&
+          !isLoading && (
+            <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    AI understood your request:
                   </p>
-                )}
+                  <div className="flex flex-wrap gap-2">
+                    {intent.styles.map((style) => (
+                      <Badge
+                        key={`style-${style}`}
+                        variant="default"
+                        className="text-xs"
+                      >
+                        {style}
+                      </Badge>
+                    ))}
+                    {intent.tags.map((tag) => (
+                      <Badge
+                        key={`tag-${tag}`}
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {intent.placement && (
+                      <Badge variant="outline" className="text-xs">
+                        📍 {intent.placement}
+                      </Badge>
+                    )}
+                    {intent.size && (
+                      <Badge variant="outline" className="text-xs">
+                        📐 {intent.size}
+                      </Badge>
+                    )}
+                    {intent.keywords.map((kw) => (
+                      <Badge
+                        key={`kw-${kw}`}
+                        variant="outline"
+                        className="text-xs"
+                      >
+                        {kw}
+                      </Badge>
+                    ))}
+                  </div>
+                  {intent.vibeDescription && (
+                    <p className="text-xs text-muted-foreground italic">
+                      "{intent.vibeDescription}"
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
-        )}
+            </Card>
+          )}
 
-        <div className={isDiscoveryMode ? "" : "grid lg:grid-cols-[300px_1fr] gap-8"}>
+        <div
+          className={
+            isDiscoveryMode ? "" : "grid lg:grid-cols-[300px_1fr] gap-8"
+          }
+        >
           {/* Filters Sidebar (structured mode only) */}
           {!isDiscoveryMode && (
             <aside>
@@ -219,7 +257,9 @@ export default function ArtistBrowse() {
                 {isDiscoveryMode && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>AI is analyzing your request and matching portfolios...</span>
+                    <span>
+                      AI is analyzing your request and matching portfolios...
+                    </span>
                   </div>
                 )}
                 <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -247,7 +287,10 @@ export default function ArtistBrowse() {
                       : 0;
 
                     const artistStyles = artist.styles
-                      ? artist.styles.split(",").map((s) => s.trim()).filter((s) => s)
+                      ? artist.styles
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter((s) => s)
                       : [];
 
                     // Discovery mode: get matched images
@@ -287,12 +330,16 @@ export default function ArtistBrowse() {
                               <h3 className="text-xl font-semibold mb-2">
                                 {artist.shopName}
                               </h3>
-                              {isDiscoveryMode && "relevanceScore" in artist && (
-                                <Badge variant="secondary" className="text-xs shrink-0">
-                                  <Sparkles className="w-3 h-3 mr-0.5" />
-                                  {(artist as any).relevanceScore}
-                                </Badge>
-                              )}
+                              {isDiscoveryMode &&
+                                "relevanceScore" in artist && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs shrink-0"
+                                  >
+                                    <Sparkles className="w-3 h-3 mr-0.5" />
+                                    {(artist as any).relevanceScore}
+                                  </Badge>
+                                )}
                             </div>
 
                             {artist.city && artist.state && (

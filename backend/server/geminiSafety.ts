@@ -1,5 +1,5 @@
 /**
- * Administrative Safety — Gemini AI Services
+ * Administrative Safety — Groq + Hugging Face AI Services
  *
  * 1. License Verification OCR: Extracts names, dates, and license numbers
  *    from uploaded health permits / state IDs, then cross-references against
@@ -10,17 +10,18 @@
  *    for human moderation.
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ENV } from "./_core/env";
+import {
+  groqGenerateJson,
+  imageToTextWithHuggingFace,
+} from "./_core/aiProviders";
 import { logger } from "./_core/logger";
-
-const genAI = new GoogleGenerativeAI(ENV.googleAiApiKey);
 
 // ============================================
 // LICENSE VERIFICATION OCR
 // ============================================
 
-const LICENSE_OCR_PROMPT_TEMPLATE = () => `You are a document verification specialist. Analyze this uploaded document image and extract all verifiable information. The document should be a tattoo/body art license, health permit, state-issued ID, or business permit related to tattooing.
+const LICENSE_OCR_PROMPT_TEMPLATE =
+  () => `You are a document verification specialist. Analyze this uploaded document image and extract all verifiable information. The document should be a tattoo/body art license, health permit, state-issued ID, or business permit related to tattooing.
 
 Return a JSON object with the following fields:
 
@@ -89,8 +90,11 @@ const DEFAULT_OCR_RESULT: LicenseOCRResult = {
  */
 function compareNames(
   extractedName: string | null,
-  profileName: string | null
-): { match: "exact" | "partial" | "mismatch" | "unavailable"; details: string } {
+  profileName: string | null,
+): {
+  match: "exact" | "partial" | "mismatch" | "unavailable";
+  details: string;
+} {
   if (!extractedName || !profileName) {
     return { match: "unavailable", details: "One or both names are missing" };
   }
@@ -108,12 +112,16 @@ function compareNames(
 
   // Exact match (all tokens match)
   if (extracted.join(" ") === profile.join(" ")) {
-    return { match: "exact", details: `Names match exactly: "${extractedName}"` };
+    return {
+      match: "exact",
+      details: `Names match exactly: "${extractedName}"`,
+    };
   }
 
   // Partial match — check if first and last name tokens overlap
   const overlap = extracted.filter((t) => profile.includes(t));
-  const overlapRatio = overlap.length / Math.max(extracted.length, profile.length);
+  const overlapRatio =
+    overlap.length / Math.max(extracted.length, profile.length);
 
   if (overlapRatio >= 0.5) {
     return {
@@ -129,7 +137,7 @@ function compareNames(
 }
 
 /**
- * Verify a license document using Gemini Vision OCR.
+ * Verify a license document using Hugging Face OCR + Groq reasoning.
  * Downloads the document image, runs OCR, and cross-references extracted
  * information against the artist's profile.
  *
@@ -145,7 +153,7 @@ export async function verifyLicenseDocument(
     name: string | null;
     shopName: string | null;
     state: string | null;
-  }
+  },
 ): Promise<LicenseVerificationResult> {
   try {
     let base64Data: string;
@@ -176,7 +184,7 @@ export async function verifyLicenseDocument(
       base64Data = imageData;
     }
 
-    // Skip OCR for PDFs — Gemini Vision doesn't process PDF documents
+    // Skip OCR for PDFs - current OCR pipeline only supports image inputs
     if (mimeType === "application/pdf") {
       return {
         ...DEFAULT_OCR_RESULT,
@@ -185,32 +193,37 @@ export async function verifyLicenseDocument(
         nameMatch: "unavailable",
         nameMatchDetails: "PDF documents require manual review",
         overallVerdict: "needs_review",
-        verdictReason: "PDF documents cannot be analyzed via OCR — requires manual admin review",
+        verdictReason:
+          "PDF documents cannot be analyzed via OCR — requires manual admin review",
       };
     }
 
-    // Call Gemini Vision for OCR
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const imageBuffer = Buffer.from(base64Data, "base64");
 
-    const result = await model.generateContent([
-      LICENSE_OCR_PROMPT_TEMPLATE(),
-      {
-        inlineData: {
-          mimeType,
-          data: base64Data,
-        },
-      },
-    ]);
+    // Step 1: OCR extraction via Hugging Face
+    const ocrText = await imageToTextWithHuggingFace(
+      imageBuffer,
+      mimeType,
+      "ocr",
+    );
 
-    const text = result.response.text().trim();
-
-    // Parse JSON response — strip markdown fences if present
-    let jsonText = text;
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    if (!ocrText) {
+      return {
+        ...DEFAULT_OCR_RESULT,
+        issues: ["ocr-no-text-extracted"],
+        nameMatch: "unavailable",
+        nameMatchDetails: "No OCR text could be extracted",
+        overallVerdict: "needs_review",
+        verdictReason: "OCR returned no text — requires manual review",
+      };
     }
 
-    const parsed = JSON.parse(jsonText) as LicenseOCRResult;
+    // Step 2: Structure OCR output with Groq
+    const parsed = await groqGenerateJson<Partial<LicenseOCRResult>>(
+      LICENSE_OCR_PROMPT_TEMPLATE(),
+      `OCR extracted text:\n${ocrText.slice(0, 4000)}\n\nArtist profile context:\n- Profile name: ${artistProfile.name || "unknown"}\n- Shop name: ${artistProfile.shopName || "unknown"}\n- State: ${artistProfile.state || "unknown"}`,
+      { maxTokens: 1600 },
+    );
 
     // Normalize and validate
     const ocr: LicenseOCRResult = {
@@ -224,9 +237,10 @@ export async function verifyLicenseDocument(
       expirationDate: parsed.expirationDate || null,
       isExpired: parsed.isExpired ?? null,
       state: parsed.state || null,
-      confidence: typeof parsed.confidence === "number"
-        ? Math.max(0, Math.min(100, Math.round(parsed.confidence)))
-        : 0,
+      confidence:
+        typeof parsed.confidence === "number"
+          ? Math.max(0, Math.min(100, Math.round(parsed.confidence)))
+          : 0,
       issues: Array.isArray(parsed.issues) ? parsed.issues : [],
     };
 
@@ -236,7 +250,10 @@ export async function verifyLicenseDocument(
     // Also check business/shop name if personal name doesn't match
     let shopNameComparison: ReturnType<typeof compareNames> | null = null;
     if (nameComparison.match === "mismatch" && ocr.extractedBusinessName) {
-      shopNameComparison = compareNames(ocr.extractedBusinessName, artistProfile.shopName);
+      shopNameComparison = compareNames(
+        ocr.extractedBusinessName,
+        artistProfile.shopName,
+      );
     }
 
     // Determine overall verdict
@@ -248,11 +265,16 @@ export async function verifyLicenseDocument(
       verdictReason = "Uploaded file does not appear to be a valid document";
     } else if (!ocr.isLegible || ocr.confidence < 30) {
       verdict = "needs_review";
-      verdictReason = "Document is too unclear for automated verification — needs manual review";
+      verdictReason =
+        "Document is too unclear for automated verification — needs manual review";
     } else if (ocr.isExpired === true) {
       verdict = "rejected";
       verdictReason = `Document appears to be expired (expiration: ${ocr.expirationDate})`;
-    } else if (nameComparison.match === "exact" && ocr.confidence >= 70 && !ocr.isExpired) {
+    } else if (
+      nameComparison.match === "exact" &&
+      ocr.confidence >= 70 &&
+      !ocr.isExpired
+    ) {
       verdict = "verified";
       verdictReason = `Name matches profile exactly, document type: ${ocr.documentType}, confidence: ${ocr.confidence}%`;
     } else if (
@@ -266,7 +288,8 @@ export async function verifyLicenseDocument(
       verdictReason = `Name on document does not match profile — possible issue. ${nameComparison.details}`;
     } else {
       verdict = "needs_review";
-      verdictReason = "Automated checks inconclusive — requires manual admin review";
+      verdictReason =
+        "Automated checks inconclusive — requires manual admin review";
     }
 
     // Add any issues that affect the verdict (only escalate, never downgrade)
@@ -276,7 +299,7 @@ export async function verifyLicenseDocument(
     }
 
     logger.info(
-      `License OCR: type=${ocr.documentType} confidence=${ocr.confidence} name=${nameComparison.match} verdict=${verdict}`
+      `License OCR: type=${ocr.documentType} confidence=${ocr.confidence} name=${nameComparison.match} verdict=${verdict}`,
     );
 
     return {
@@ -287,7 +310,7 @@ export async function verifyLicenseDocument(
       verdictReason,
     };
   } catch (error) {
-    logger.error("Gemini License OCR failed:", error);
+    logger.error("Hugging Face/Groq license OCR failed:", error);
     return {
       ...DEFAULT_OCR_RESULT,
       nameMatch: "unavailable",
@@ -363,7 +386,7 @@ const DEFAULT_REVIEW_ANALYSIS: ReviewAnalysisResult = {
 };
 
 /**
- * Analyze a review for fraudulent/abusive content using Gemini.
+ * Analyze a review for fraudulent/abusive content using Groq.
  *
  * @param review - The review to analyze
  * @returns Moderation analysis with scores, flags, and recommended action
@@ -377,7 +400,8 @@ export async function analyzeReviewSentiment(review: {
   if (!review.comment || review.comment.trim().length === 0) {
     return {
       ...DEFAULT_REVIEW_ANALYSIS,
-      moderationReason: "No comment text to analyze — rating-only review auto-approved",
+      moderationReason:
+        "No comment text to analyze — rating-only review auto-approved",
     };
   }
 
@@ -385,62 +409,76 @@ export async function analyzeReviewSentiment(review: {
     // Build prompt safely — replace tokens in order so user-controlled content
     // (the comment) can't inject remaining template tokens like {verifiedBooking}.
     const sanitizedComment = review.comment
-      .replace(/\\/g, '\\\\')    // Escape backslashes first
-      .replace(/"/g, '\\"')      // Escape double quotes
-      .replace(/\n/g, '\\n')     // Escape newlines
-      .replace(/\r/g, '\\r')     // Escape carriage returns
-      .replace(/\t/g, '\\t');    // Escape tabs
-    const prompt = REVIEW_ANALYSIS_PROMPT
-      .replace("{rating}", String(review.rating))
+      .replace(/\\/g, "\\\\") // Escape backslashes first
+      .replace(/"/g, '\\"') // Escape double quotes
+      .replace(/\n/g, "\\n") // Escape newlines
+      .replace(/\r/g, "\\r") // Escape carriage returns
+      .replace(/\t/g, "\\t"); // Escape tabs
+    const prompt = REVIEW_ANALYSIS_PROMPT.replace(
+      "{rating}",
+      String(review.rating),
+    )
       .replace("{verifiedBooking}", String(review.verifiedBooking ?? false))
       .replace("{comment}", sanitizedComment);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-
-    // Parse JSON response — strip markdown fences if present
-    let jsonText = text;
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const parsed = JSON.parse(jsonText);
+    const parsed = await groqGenerateJson<Partial<ReviewAnalysisResult>>(
+      REVIEW_ANALYSIS_PROMPT,
+      prompt,
+      { maxTokens: 1400 },
+    );
 
     // Normalize and validate
-    const analysis: ReviewAnalysisResult = {
-      overallSentiment: ["positive", "neutral", "negative", "mixed"].includes(parsed.overallSentiment)
+    const overallSentimentValue =
+      typeof parsed.overallSentiment === "string"
         ? parsed.overallSentiment
-        : "neutral",
-      toxicityScore: typeof parsed.toxicityScore === "number"
-        ? Math.max(0, Math.min(100, Math.round(parsed.toxicityScore)))
-        : 0,
-      spamScore: typeof parsed.spamScore === "number"
-        ? Math.max(0, Math.min(100, Math.round(parsed.spamScore)))
-        : 0,
-      fraudScore: typeof parsed.fraudScore === "number"
-        ? Math.max(0, Math.min(100, Math.round(parsed.fraudScore)))
-        : 0,
-      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
-      moderationAction: ["approve", "flag_for_review", "auto_hide"].includes(parsed.moderationAction)
+        : "";
+
+    const moderationActionValue =
+      typeof parsed.moderationAction === "string"
         ? parsed.moderationAction
+        : "";
+
+    const analysis: ReviewAnalysisResult = {
+      overallSentiment: ["positive", "neutral", "negative", "mixed"].includes(
+        overallSentimentValue,
+      )
+        ? (overallSentimentValue as ReviewAnalysisResult["overallSentiment"])
+        : "neutral",
+      toxicityScore:
+        typeof parsed.toxicityScore === "number"
+          ? Math.max(0, Math.min(100, Math.round(parsed.toxicityScore)))
+          : 0,
+      spamScore:
+        typeof parsed.spamScore === "number"
+          ? Math.max(0, Math.min(100, Math.round(parsed.spamScore)))
+          : 0,
+      fraudScore:
+        typeof parsed.fraudScore === "number"
+          ? Math.max(0, Math.min(100, Math.round(parsed.fraudScore)))
+          : 0,
+      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
+      moderationAction: ["approve", "flag_for_review", "auto_hide"].includes(
+        moderationActionValue,
+      )
+        ? (moderationActionValue as ReviewAnalysisResult["moderationAction"])
         : "approve",
-      moderationReason: typeof parsed.moderationReason === "string"
-        ? parsed.moderationReason.slice(0, 500)
-        : "No reason provided",
-      summary: typeof parsed.summary === "string"
-        ? parsed.summary.slice(0, 300)
-        : "No summary available",
+      moderationReason:
+        typeof parsed.moderationReason === "string"
+          ? parsed.moderationReason.slice(0, 500)
+          : "No reason provided",
+      summary:
+        typeof parsed.summary === "string"
+          ? parsed.summary.slice(0, 300)
+          : "No summary available",
     };
 
     logger.info(
-      `Review sentiment: ${analysis.overallSentiment} | toxicity=${analysis.toxicityScore} spam=${analysis.spamScore} fraud=${analysis.fraudScore} | action=${analysis.moderationAction}`
+      `Review sentiment: ${analysis.overallSentiment} | toxicity=${analysis.toxicityScore} spam=${analysis.spamScore} fraud=${analysis.fraudScore} | action=${analysis.moderationAction}`,
     );
 
     return analysis;
   } catch (error) {
-    logger.error("Gemini review sentiment analysis failed:", error);
+    logger.error("Groq review sentiment analysis failed:", error);
     return DEFAULT_REVIEW_ANALYSIS;
   }
 }

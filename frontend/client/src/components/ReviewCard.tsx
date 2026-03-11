@@ -19,7 +19,10 @@ interface ReviewCardProps {
   onHelpfulClick?: (reviewId: number) => void;
 }
 
-export default function ReviewCard({ review, onHelpfulClick }: ReviewCardProps) {
+export default function ReviewCard({
+  review,
+  onHelpfulClick,
+}: ReviewCardProps) {
   const [hasVoted, setHasVoted] = useState(false);
   const photos = review.photos ? review.photos.split(",").filter(Boolean) : [];
 
@@ -96,7 +99,9 @@ export default function ReviewCard({ review, onHelpfulClick }: ReviewCardProps) 
           disabled={hasVoted}
           className={hasVoted ? "text-primary" : ""}
         >
-          <ThumbsUp className={`w-4 h-4 mr-1 ${hasVoted ? "fill-primary" : ""}`} />
+          <ThumbsUp
+            className={`w-4 h-4 mr-1 ${hasVoted ? "fill-primary" : ""}`}
+          />
           Helpful {review.helpfulVotes ? `(${review.helpfulVotes})` : ""}
         </Button>
       </div>

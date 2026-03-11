@@ -12,24 +12,33 @@ export type TrpcContext = {
 };
 
 export async function createContext(
-  opts: CreateExpressContextOptions
+  opts: CreateExpressContextOptions,
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
   try {
     // Get session token from cookie
     const authHeader = opts.req.headers.authorization;
-    const token = authHeader?.replace('Bearer ', '') || opts.req.cookies?.['sb-access-token'];
+    const token =
+      authHeader?.replace("Bearer ", "") ||
+      opts.req.cookies?.["sb-access-token"];
 
     if (token) {
       // Verify token with Supabase
-      const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
-      
+      const {
+        data: { user: supabaseUser },
+        error,
+      } = await supabaseAdmin.auth.getUser(token);
+
       if (!error && supabaseUser) {
         // Fetch user from database
         const db = await getDb();
         if (db) {
-          const [dbUser] = await db.select().from(users).where(eq(users.openId, supabaseUser.id)).limit(1);
+          const [dbUser] = await db
+            .select()
+            .from(users)
+            .where(eq(users.openId, supabaseUser.id))
+            .limit(1);
           user = dbUser || null;
         }
       }

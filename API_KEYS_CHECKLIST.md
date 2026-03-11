@@ -5,9 +5,11 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 ## ✅ Required Services
 
 ### 1. Supabase (Database + Auth + Storage)
+
 **Priority**: 🔴 CRITICAL - Start here first
 
 **Steps**:
+
 1. Go to https://supabase.com/dashboard
 2. Click "New Project"
 3. Choose organization and set project name: `tattoo-shops`
@@ -17,12 +19,16 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 7. Go to Project Settings > API
 8. Copy these values to `.env`:
    - `SUPABASE_URL` - Project URL
-   - `SUPABASE_ANON_KEY` - anon/public key (safe for frontend)
+   - `SUPABASE_ANON_KEY` - anon/public key (safe for frontend and browser-visible)
    - `SUPABASE_SERVICE_KEY` - service_role key (backend only, SECRET!)
    - `VITE_SUPABASE_URL` - Same as SUPABASE_URL
    - `VITE_SUPABASE_ANON_KEY` - Same as SUPABASE_ANON_KEY
+9. Important note:
+   - `SUPABASE_ANON_KEY` is intentionally public and does not need to be hidden
+   - Protect data using Supabase RLS policies; never expose `SUPABASE_SERVICE_KEY`
 
 **Cost**: Free tier includes:
+
 - 500 MB database
 - 1 GB file storage
 - 50k monthly active users
@@ -31,9 +37,11 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 ---
 
 ### 2. Stripe (Payment Processing)
+
 **Priority**: 🔴 CRITICAL - Required for bookings
 
 **Steps**:
+
 1. Go to https://dashboard.stripe.com/register
 2. Complete account setup
 3. Go to Developers > API keys
@@ -62,15 +70,18 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 **Cost**: 2.9% + 30¢ per successful transaction
 
 **Test Cards**:
+
 - Success: `4242 4242 4242 4242`
 - Decline: `4000 0000 0000 0002`
 
 ---
 
 ### 3. Resend (Email Service)
+
 **Priority**: 🟡 HIGH - Needed for booking confirmations
 
 **Steps**:
+
 1. Go to https://resend.com/signup
 2. Verify your email
 3. Go to API Keys
@@ -86,9 +97,11 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 ---
 
 ### 4. Maptiler (Maps & Geocoding)
+
 **Priority**: 🟡 HIGH - Required for artist location search
 
 **Steps**:
+
 1. Go to https://cloud.maptiler.com/
 2. Sign up for free account
 3. Go to "Account" > "API Keys"
@@ -105,55 +118,52 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 ---
 
-### 5. AI Service (Choose ONE)
+### 5. AI Services (Groq + Hugging Face)
 
-#### Option A: OpenAI (Recommended - All-in-One)
-**Priority**: 🟢 MEDIUM - For AI features
+#### 5A. Groq (Structured Text AI)
 
-**Provides**: Chat (GPT-4), Image Generation (DALL-E), Voice Transcription (Whisper)
+**Priority**: 🟢 MEDIUM - Required for discovery, prompt refinement, bid drafting, and moderation
+
+**Provides**: Fast chat completions for structured JSON outputs
 
 **Steps**:
-1. Go to https://platform.openai.com/signup
-2. Add payment method (required)
-3. Go to API keys
-4. Create new secret key
+
+1. Go to https://console.groq.com/
+2. Create/sign in to your account
+3. Open API Keys
+4. Create a new key
 5. Copy to `.env`:
-   - `OPENAI_API_KEY` - (starts with `sk-proj-`)
+   - `GROQ_API_KEY` - (starts with `gsk_`)
 
-**Cost**: 
-- GPT-4: ~$0.01-0.03 per request
-- DALL-E 3: $0.04-0.12 per image
-- Whisper: $0.006 per minute
+**Optional**:
 
----
+- `GROQ_MODEL` — override default model
+- `GROQ_BASE_URL` — override base URL if needed
 
-#### Option B: Google Gemini (Alternative)
-**Priority**: 🟢 MEDIUM
-
-**Provides**: Chat (Gemini), Image Generation (Imagen)
-
-**Steps**:
-1. Go to https://aistudio.google.com/app/apikey
-2. Create API key
-3. Copy to `.env`:
-   - `GOOGLE_AI_API_KEY`
-
-**Cost**: Free tier: 60 requests/minute
+**Cost**: Usage-based (see Groq pricing dashboard)
 
 ---
 
-#### Option C: Anthropic Claude (Chat Only)
-**Priority**: 🟢 MEDIUM
+#### 5B. Hugging Face (Image Generation + Vision/OCR)
 
-**Provides**: Chat only (Claude 3.5 Sonnet)
+**Priority**: 🟢 MEDIUM - Required for design generation and image understanding flows
+
+**Provides**: Image generation, captioning, and OCR via Inference API
 
 **Steps**:
-1. Go to https://console.anthropic.com/account/keys
-2. Create API key
-3. Copy to `.env`:
-   - `ANTHROPIC_API_KEY`
 
-**Cost**: ~$0.003-0.015 per request
+1. Go to https://huggingface.co/settings/tokens
+2. Create a token with Inference API access
+3. Copy to `.env`:
+   - `HUGGINGFACE_API_KEY` - (starts with `hf_`)
+
+**Optional model overrides**:
+
+- `HUGGINGFACE_IMAGE_MODEL`
+- `HUGGINGFACE_CAPTION_MODEL`
+- `HUGGINGFACE_OCR_MODEL`
+
+**Cost**: Usage-based (see Hugging Face Inference API pricing)
 
 ---
 
@@ -163,7 +173,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 2. **Stripe** (15 min) - Payment processing
 3. **Maptiler** (10 min) - Maps and location features
 4. **Resend** (10 min) - Email notifications
-5. **OpenAI** (5 min) - AI features
+5. **Groq + Hugging Face** (10 min) - AI features
 
 **Total Setup Time**: ~1.25 hours
 
@@ -172,6 +182,8 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 ## 🔒 Security Checklist
 
 - [ ] Never commit `.env` file to git
+- [ ] Keep `SUPABASE_SERVICE_KEY` backend-only (never expose it in frontend code)
+- [ ] Enable and verify Supabase RLS policies (anon key is public)
 - [ ] Use different keys for development and production
 - [ ] Restrict API keys by domain/IP when possible
 - [ ] Store production keys in hosting platform's environment variables
@@ -184,6 +196,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 ## 📝 After Getting All Keys
 
 1. Copy `.env.example` to `.env`:
+
    ```bash
    cp .env.example .env
    ```
@@ -191,6 +204,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 2. Fill in all your API keys in `.env`
 
 3. Test the setup:
+
    ```bash
    pnpm install
    pnpm dev
@@ -202,7 +216,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
    - [ ] Can search locations (Maptiler Maps)
    - [ ] Can create test booking (Stripe)
    - [ ] Receive confirmation email (Resend)
-   - [ ] AI features work (OpenAI/Gemini)
+   - [ ] AI features work (Groq/Hugging Face)
 
 ---
 
@@ -210,7 +224,8 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 - **Stripe**: Use test mode during development
 - **Maptiler**: 100k free loads/month is generous - monitor usage in dashboard
-- **OpenAI**: Start with GPT-3.5-turbo (cheaper) before upgrading to GPT-4
+- **Groq**: Use a stable production model in `GROQ_MODEL` and keep temperature low for JSON-heavy tasks
+- **Hugging Face**: Keep model overrides in `.env` so you can swap models without code changes
 - **Supabase**: Enable Row Level Security (RLS) policies immediately
 - **Resend**: Verify your domain to avoid spam filters
 
@@ -222,19 +237,20 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 - Stripe: https://stripe.com/docs
 - Resend: https://resend.com/docs
 - Maptiler: https://docs.maptiler.com/
-- OpenAI: https://platform.openai.com/docs
+- Groq: https://console.groq.com/docs
+- Hugging Face: https://huggingface.co/docs/api-inference
 
 ---
 
 ## 📊 Monthly Cost Estimate (Small Scale)
 
-| Service | Free Tier | Paid (if exceeded) |
-|---------|-----------|-------------------|
-| Supabase | Up to 500MB DB | $25/month (Pro) |
-| Stripe | No fee | 2.9% + 30¢/transaction |
-| Resend | 3,000 emails | $20/month (50k emails) |
-| Maptiler | 100k map loads | $49/month (500k loads) |
-| OpenAI | No free tier | ~$30-100/month (usage) |
-| **Total** | **~$0-10/month** | **~$80-200/month** |
+| Service   | Free Tier        | Paid (if exceeded)     |
+| --------- | ---------------- | ---------------------- |
+| Supabase  | Up to 500MB DB   | $25/month (Pro)        |
+| Stripe    | No fee           | 2.9% + 30¢/transaction |
+| Resend    | 3,000 emails     | $20/month (50k emails) |
+| Maptiler  | 100k map loads   | $49/month (500k loads) |
+| Groq + HF | Usage-based tiers| ~$20-120/month (usage) |
+| **Total** | **~$0-10/month** | **~$80-200/month**     |
 
-*Costs scale with usage. Most apps stay in free tier during development.*
+_Costs scale with usage. Most apps stay in free tier during development._

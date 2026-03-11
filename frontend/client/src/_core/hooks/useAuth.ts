@@ -61,7 +61,7 @@ export function useAuth(options?: UseAuthOptions) {
     if (meQuery.isLoading || logoutMutation.isPending) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
-    
+
     // Normalize paths for comparison - extract pathname from redirectPath
     const currentPath = window.location.pathname;
     let targetPath: string;
@@ -71,9 +71,9 @@ export function useAuth(options?: UseAuthOptions) {
       targetPath = url.pathname;
     } catch {
       // If not a full URL, use as-is
-      targetPath = redirectPath.split('?')[0];
+      targetPath = redirectPath.split("?")[0];
     }
-    
+
     if (currentPath === targetPath) return;
 
     window.location.href = redirectPath;

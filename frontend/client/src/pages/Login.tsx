@@ -13,8 +13,9 @@ import { FaGithub } from "react-icons/fa";
 export default function Login() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, loading } = useAuth();
-  const { signInWithEmail, signUpWithEmail, signInWithOAuth } = useSupabaseAuth();
-  
+  const { signInWithEmail, signUpWithEmail, signInWithOAuth } =
+    useSupabaseAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -31,7 +32,7 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    
+
     try {
       if (isSignUp) {
         await signUpWithEmail(email, password);
@@ -45,8 +46,8 @@ export default function Login() {
       setIsLoading(false);
     }
   };
-  
-  const handleOAuthLogin = async (provider: 'google' | 'github') => {
+
+  const handleOAuthLogin = async (provider: "google" | "github") => {
     try {
       await signInWithOAuth(provider);
     } catch (err: any) {
@@ -92,23 +93,23 @@ export default function Login() {
               variant="outline"
               size="lg"
               className="w-full"
-              onClick={() => handleOAuthLogin('google')}
+              onClick={() => handleOAuthLogin("google")}
             >
               <FcGoogle className="w-5 h-5 mr-2" />
               Continue with Google
             </Button>
-            
+
             <Button
               type="button"
               variant="outline"
               size="lg"
               className="w-full"
-              onClick={() => handleOAuthLogin('github')}
+              onClick={() => handleOAuthLogin("github")}
             >
               <FaGithub className="w-5 h-5 mr-2" />
               Continue with GitHub
             </Button>
-            
+
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -119,7 +120,7 @@ export default function Login() {
                 </span>
               </div>
             </div>
-            
+
             {/* Email/Password Form */}
             <form onSubmit={handleEmailAuth} className="space-y-4">
               <div className="space-y-2">
@@ -133,7 +134,7 @@ export default function Login() {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -146,13 +147,15 @@ export default function Login() {
                   minLength={6}
                 />
               </div>
-              
+
               {error && (
-                <p className={`text-sm ${error.includes('Check your email') ? 'text-green-600' : 'text-destructive'}`}>
+                <p
+                  className={`text-sm ${error.includes("Check your email") ? "text-green-600" : "text-destructive"}`}
+                >
                   {error}
                 </p>
               )}
-              
+
               <Button
                 type="submit"
                 size="lg"
@@ -160,9 +163,9 @@ export default function Login() {
                 disabled={isLoading}
               >
                 <Mail className="w-4 h-4 mr-2" />
-                {isLoading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+                {isLoading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
               </Button>
-              
+
               <Button
                 type="button"
                 variant="ghost"
@@ -172,12 +175,15 @@ export default function Login() {
                   setError(null);
                 }}
               >
-                {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                {isSignUp
+                  ? "Already have an account? Sign In"
+                  : "Don't have an account? Sign Up"}
               </Button>
             </form>
 
             <p className="text-xs text-center text-muted-foreground">
-              By continuing, you agree to our Terms of Service and Privacy Policy
+              By continuing, you agree to our Terms of Service and Privacy
+              Policy
             </p>
           </div>
 

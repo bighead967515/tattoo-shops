@@ -9,7 +9,7 @@ let initialized = false;
  */
 export function initSentry(): void {
   const dsn = process.env.SENTRY_DSN;
-  
+
   if (!dsn) {
     logger.warn("SENTRY_DSN not configured - error tracking disabled");
     return;
@@ -25,31 +25,31 @@ export function initSentry(): void {
       dsn,
       environment: process.env.NODE_ENV || "development",
       release: process.env.npm_package_version || "unknown",
-      
+
       // Performance monitoring
       tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-      
+
       // Integrations
       integrations: [
         // Express integration is automatically added
         Sentry.httpIntegration(),
         Sentry.expressIntegration(),
       ],
-      
+
       // Filter out noisy errors
       beforeSend(event, hint) {
         const error = hint.originalException;
-        
+
         // Don't send 4xx errors to Sentry
         if (error instanceof Error && error.message.includes("401")) {
           return null;
         }
-        
+
         // Don't send rate limit errors
         if (error instanceof Error && error.message.includes("rate limit")) {
           return null;
         }
-        
+
         return event;
       },
 
@@ -75,7 +75,7 @@ export function initSentry(): void {
  */
 export function captureException(
   error: Error | unknown,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): string | undefined {
   if (!initialized) {
     return undefined;
@@ -92,7 +92,7 @@ export function captureException(
 export function captureMessage(
   message: string,
   level: "fatal" | "error" | "warning" | "info" | "debug" = "info",
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): string | undefined {
   if (!initialized) {
     return undefined;
@@ -107,7 +107,9 @@ export function captureMessage(
 /**
  * Set user context for error tracking
  */
-export function setUser(user: { id: string; email?: string; username?: string } | null): void {
+export function setUser(
+  user: { id: string; email?: string; username?: string } | null,
+): void {
   if (!initialized) return;
   Sentry.setUser(user);
 }
@@ -128,9 +130,12 @@ export function addBreadcrumb(breadcrumb: {
 /**
  * Start a transaction for performance monitoring
  */
-export function startTransaction(name: string, op: string): ReturnType<typeof Sentry.startSpan> | undefined {
+export function startTransaction(
+  name: string,
+  op: string,
+): ReturnType<typeof Sentry.startSpan> | undefined {
   if (!initialized) return undefined;
-  
+
   return Sentry.startSpan({ name, op }, (span) => span);
 }
 

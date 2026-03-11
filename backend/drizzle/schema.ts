@@ -1,4 +1,14 @@
-import { serial, text, timestamp, varchar, boolean, integer, pgTable, pgEnum, unique } from "drizzle-orm/pg-core";
+import {
+  serial,
+  text,
+  timestamp,
+  varchar,
+  boolean,
+  integer,
+  pgTable,
+  pgEnum,
+  unique,
+} from "drizzle-orm/pg-core";
 import type { SubscriptionTier } from "@shared/const";
 
 /**
@@ -12,10 +22,10 @@ export const roleEnum = pgEnum("role", ["user", "admin", "artist", "client"]);
 
 // Define verification status enum
 export const verificationStatusEnum = pgEnum("verification_status", [
-  "unverified",  // Default: Just signed up, can browse but not interact
-  "pending",     // Uploaded license, waiting for admin review
-  "verified",    // Admin approved, can accept payments/messages
-  "rejected"     // License was rejected, needs to re-upload
+  "unverified", // Default: Just signed up, can browse but not interact
+  "pending", // Uploaded license, waiting for admin review
+  "verified", // Admin approved, can accept payments/messages
+  "rejected", // License was rejected, needs to re-upload
 ]);
 
 export const users = pgTable("users", {
@@ -30,7 +40,9 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
-  verificationStatus: verificationStatusEnum("verification_status").default("unverified").notNull(),
+  verificationStatus: verificationStatusEnum("verification_status")
+    .default("unverified")
+    .notNull(),
   licenseDocumentKey: varchar("licenseDocumentKey", { length: 500 }), // Supabase Storage key for private license document
   licenseDocumentUrl: varchar("licenseDocumentUrl", { length: 1000 }), // Signed URL for license document
   verificationSubmittedAt: timestamp("verificationSubmittedAt"), // When they uploaded license
@@ -60,7 +72,10 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const artists = pgTable("artists", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("userId")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
   shopName: varchar("shop_name", { length: 255 }).notNull(),
   bio: text("bio"),
   specialties: text("specialties"), // Comma-separated list
@@ -97,7 +112,9 @@ export type InsertArtist = typeof artists.$inferInsert;
  */
 export const portfolioImages = pgTable("portfolioImages", {
   id: serial("id").primaryKey(),
-  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
+  artistId: integer("artistId")
+    .notNull()
+    .references(() => artists.id, { onDelete: "cascade" }),
   imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
   imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
   caption: text("caption"),
@@ -120,8 +137,12 @@ export type InsertPortfolioImage = typeof portfolioImages.$inferInsert;
  */
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
-  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
-  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  artistId: integer("artistId")
+    .notNull()
+    .references(() => artists.id, { onDelete: "cascade" }),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   rating: integer("rating").notNull(), // 1-5 stars
   comment: text("comment"),
   helpfulVotes: integer("helpfulVotes").default(0), // Number of helpful votes
@@ -130,7 +151,9 @@ export const reviews = pgTable("reviews", {
   artistResponse: text("artistResponse"), // Artist's response to review
   artistResponseDate: timestamp("artistResponseDate"), // When artist responded
   // AI Moderation fields (Review Sentiment Analysis via Gemini)
-  moderationStatus: varchar("moderationStatus", { length: 20 }).default("pending"), // "pending", "approved", "flagged", "hidden"
+  moderationStatus: varchar("moderationStatus", { length: 20 }).default(
+    "pending",
+  ), // "pending", "approved", "flagged", "hidden"
   moderationFlags: text("moderationFlags"), // JSON array of flag strings from AI analysis
   toxicityScore: integer("toxicityScore"), // 0-100
   spamScore: integer("spamScore"), // 0-100
@@ -149,8 +172,12 @@ export type InsertReview = typeof reviews.$inferInsert;
  */
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
-  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
-  userId: integer("userId").references(() => users.id, { onDelete: "set null" }), // nullable for guest bookings
+  artistId: integer("artistId")
+    .notNull()
+    .references(() => artists.id, { onDelete: "cascade" }),
+  userId: integer("userId").references(() => users.id, {
+    onDelete: "set null",
+  }), // nullable for guest bookings
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerEmail: varchar("customerEmail", { length: 320 }).notNull(),
   customerPhone: varchar("customerPhone", { length: 50 }).notNull(),
@@ -174,14 +201,22 @@ export type InsertBooking = typeof bookings.$inferInsert;
 /**
  * Favorite artists saved by users
  */
-export const favorites = pgTable("favorites", {
-  id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (table) => ({
-  uniqueUserArtist: unique().on(table.userId, table.artistId),
-}));
+export const favorites = pgTable(
+  "favorites",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    artistId: integer("artistId")
+      .notNull()
+      .references(() => artists.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueUserArtist: unique().on(table.userId, table.artistId),
+  }),
+);
 
 export type Favorite = typeof favorites.$inferSelect;
 export type InsertFavorite = typeof favorites.$inferInsert;
@@ -213,19 +248,25 @@ export type InsertWebhookQueueItem = typeof webhookQueue.$inferInsert;
  */
 export const verificationDocuments = pgTable("verificationDocuments", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   documentType: varchar("documentType", { length: 100 }).notNull(), // "state_license", "business_permit", etc.
   documentKey: varchar("documentKey", { length: 500 }).notNull(), // Supabase Storage key (private bucket)
   originalFileName: varchar("originalFileName", { length: 255 }).notNull(),
   fileSize: integer("fileSize"), // In bytes
   mimeType: varchar("mimeType", { length: 100 }),
   status: verificationStatusEnum("status").default("pending").notNull(),
-  reviewedBy: integer("reviewedBy").references(() => users.id, { onDelete: "set null" }), // Admin who reviewed
+  reviewedBy: integer("reviewedBy").references(() => users.id, {
+    onDelete: "set null",
+  }), // Admin who reviewed
   reviewNotes: text("reviewNotes"), // Admin review notes
   // AI OCR Verification fields (License Verification via Gemini)
   ocrDocumentType: varchar("ocrDocumentType", { length: 50 }), // Detected document type
   ocrExtractedName: varchar("ocrExtractedName", { length: 255 }), // Name from OCR
-  ocrExtractedBusinessName: varchar("ocrExtractedBusinessName", { length: 255 }), // Business name from OCR
+  ocrExtractedBusinessName: varchar("ocrExtractedBusinessName", {
+    length: 255,
+  }), // Business name from OCR
   ocrLicenseNumber: varchar("ocrLicenseNumber", { length: 100 }), // License number from OCR
   ocrExpirationDate: varchar("ocrExpirationDate", { length: 20 }), // Expiration date string
   ocrIssuingAuthority: varchar("ocrIssuingAuthority", { length: 255 }), // Issuing body
@@ -242,7 +283,8 @@ export const verificationDocuments = pgTable("verificationDocuments", {
 });
 
 export type VerificationDocument = typeof verificationDocuments.$inferSelect;
-export type InsertVerificationDocument = typeof verificationDocuments.$inferInsert;
+export type InsertVerificationDocument =
+  typeof verificationDocuments.$inferInsert;
 
 // ============================================
 // CLIENT MARKETPLACE TABLES
@@ -250,18 +292,18 @@ export type InsertVerificationDocument = typeof verificationDocuments.$inferInse
 
 // Define request status enum
 export const requestStatusEnum = pgEnum("request_status", [
-  "open",       // Accepting bids
+  "open", // Accepting bids
   "in_progress", // Artist selected, work in progress
-  "completed",   // Tattoo completed
-  "cancelled"    // Client cancelled
+  "completed", // Tattoo completed
+  "cancelled", // Client cancelled
 ]);
 
 // Define bid status enum
 export const bidStatusEnum = pgEnum("bid_status", [
-  "pending",    // Waiting for client review
-  "accepted",   // Client accepted this bid
-  "rejected",   // Client rejected this bid
-  "withdrawn"   // Artist withdrew bid
+  "pending", // Waiting for client review
+  "accepted", // Client accepted this bid
+  "rejected", // Client rejected this bid
+  "withdrawn", // Artist withdrew bid
 ]);
 
 /**
@@ -269,7 +311,10 @@ export const bidStatusEnum = pgEnum("bid_status", [
  */
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("userId")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
   displayName: varchar("displayName", { length: 255 }).notNull(),
   bio: text("bio"),
   preferredStyles: text("preferredStyles"), // Comma-separated list
@@ -282,7 +327,9 @@ export const clients = pgTable("clients", {
    * During the transition, application-level sync propagates users.subscriptionTier → clients.subscriptionTier
    * whenever Stripe webhooks update the user record.
    */
-  subscriptionTier: varchar("subscriptionTier", { length: 30 }).default("client_free").notNull(), // 'client_free', 'enthusiast', 'elite'
+  subscriptionTier: varchar("subscriptionTier", { length: 30 })
+    .default("client_free")
+    .notNull(), // 'client_free', 'enthusiast', 'elite'
   aiCredits: integer("aiCredits").default(0).notNull(), // Number of AI generation credits remaining
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID for billing
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -298,7 +345,9 @@ export type InsertClient = typeof clients.$inferInsert;
  */
 export const tattooRequests = pgTable("tattooRequests", {
   id: serial("id").primaryKey(),
-  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  clientId: integer("clientId")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description").notNull(),
   style: varchar("style", { length: 100 }), // e.g., "Realism", "Traditional", "Watercolor"
@@ -313,8 +362,8 @@ export const tattooRequests = pgTable("tattooRequests", {
   desiredTimeframe: varchar("desiredTimeframe", { length: 100 }), // e.g., "ASAP", "Within 1 month", "Flexible"
   status: requestStatusEnum("status").default("open").notNull(),
   // NOTE: selectedBidId references bids.id. Due to circular dependency (bids references tattooRequests),
-  // the FK constraint is added via migration after both tables exist: 
-  // ALTER TABLE "tattooRequests" ADD CONSTRAINT "tattooRequests_selectedBidId_fkey" 
+  // the FK constraint is added via migration after both tables exist:
+  // ALTER TABLE "tattooRequests" ADD CONSTRAINT "tattooRequests_selectedBidId_fkey"
   // FOREIGN KEY ("selectedBidId") REFERENCES "bids"("id") ON DELETE SET NULL;
   selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
   viewCount: integer("viewCount").default(0),
@@ -332,7 +381,9 @@ export type InsertTattooRequest = typeof tattooRequests.$inferInsert;
  */
 export const requestImages = pgTable("requestImages", {
   id: serial("id").primaryKey(),
-  requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
+  requestId: integer("requestId")
+    .notNull()
+    .references(() => tattooRequests.id, { onDelete: "cascade" }),
   imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
   imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
   caption: text("caption"),
@@ -346,22 +397,30 @@ export type InsertRequestImage = typeof requestImages.$inferInsert;
 /**
  * Artist bids on tattoo requests
  */
-export const bids = pgTable("bids", {
-  id: serial("id").primaryKey(),
-  requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
-  artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
-  priceEstimate: integer("priceEstimate").notNull(), // In cents
-  estimatedHours: integer("estimatedHours"),
-  message: text("message").notNull(), // Artist's pitch to the client
-  availableDate: timestamp("availableDate"), // When artist can do the work
-  portfolioLinks: text("portfolioLinks"), // Links to relevant portfolio pieces
-  status: bidStatusEnum("status").default("pending").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-}, (table) => ({
-  // One bid per artist per request
-  uniqueArtistRequest: unique().on(table.artistId, table.requestId),
-}));
+export const bids = pgTable(
+  "bids",
+  {
+    id: serial("id").primaryKey(),
+    requestId: integer("requestId")
+      .notNull()
+      .references(() => tattooRequests.id, { onDelete: "cascade" }),
+    artistId: integer("artistId")
+      .notNull()
+      .references(() => artists.id, { onDelete: "cascade" }),
+    priceEstimate: integer("priceEstimate").notNull(), // In cents
+    estimatedHours: integer("estimatedHours"),
+    message: text("message").notNull(), // Artist's pitch to the client
+    availableDate: timestamp("availableDate"), // When artist can do the work
+    portfolioLinks: text("portfolioLinks"), // Links to relevant portfolio pieces
+    status: bidStatusEnum("status").default("pending").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    // One bid per artist per request
+    uniqueArtistRequest: unique().on(table.artistId, table.requestId),
+  }),
+);
 
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = typeof bids.$inferInsert;
@@ -371,9 +430,13 @@ export type InsertBid = typeof bids.$inferInsert;
  */
 export const requestMessages = pgTable("requestMessages", {
   id: serial("id").primaryKey(),
-  requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
+  requestId: integer("requestId")
+    .notNull()
+    .references(() => tattooRequests.id, { onDelete: "cascade" }),
   bidId: integer("bidId").references(() => bids.id, { onDelete: "cascade" }), // Optional - can be general request message
-  senderId: integer("senderId").references(() => users.id, { onDelete: "set null" }), // Nullable - set null if user deleted
+  senderId: integer("senderId").references(() => users.id, {
+    onDelete: "set null",
+  }), // Nullable - set null if user deleted
   message: text("message").notNull(),
   isRead: boolean("isRead").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

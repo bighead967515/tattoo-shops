@@ -44,7 +44,7 @@ export default function ArtistFilters({
     const newStyles = filters.styles.includes(style)
       ? filters.styles.filter((s) => s !== style)
       : [...filters.styles, style];
-    
+
     onFiltersChange({ ...filters, styles: newStyles });
   };
 
@@ -56,7 +56,7 @@ export default function ArtistFilters({
     onFiltersChange({ ...filters, minExperience: value[0] });
   };
 
-  const handleLocationChange = (field: 'city' | 'state', value: string) => {
+  const handleLocationChange = (field: "city" | "state", value: string) => {
     onFiltersChange({ ...filters, [field]: value });
   };
 
@@ -89,15 +89,15 @@ export default function ArtistFilters({
         <div>
           <h4 className="font-medium mb-3">Location</h4>
           <div className="space-y-2">
-            <Input 
+            <Input
               placeholder="City"
               value={filters.city}
-              onChange={(e) => handleLocationChange('city', e.target.value)}
+              onChange={(e) => handleLocationChange("city", e.target.value)}
             />
-            <Input 
+            <Input
               placeholder="State"
               value={filters.state}
-              onChange={(e) => handleLocationChange('state', e.target.value)}
+              onChange={(e) => handleLocationChange("state", e.target.value)}
             />
           </div>
         </div>

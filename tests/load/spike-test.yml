@@ -5,36 +5,36 @@ config:
     - duration: 10
       arrivalRate: 10
       name: "Normal traffic"
-    
+
     - duration: 5
       arrivalRate: 200
       name: "Traffic spike"
-    
+
     - duration: 30
       arrivalRate: 200
       name: "Sustained spike"
-    
+
     - duration: 10
       arrivalRate: 200
       rampTo: 10
       name: "Recovery"
-    
+
     - duration: 30
       arrivalRate: 10
       name: "Post-spike normal"
-  
+
   defaults:
     headers:
       Content-Type: "application/json"
-  
+
   plugins:
     expect: {}
-  
+
   # More lenient thresholds for spike test
   ensure:
-    p95: 2000   # 95th percentile under 2s during spike
-    p99: 5000   # 99th percentile under 5s during spike
-    maxErrorRate: 5  # Up to 5% errors acceptable during spike
+    p95: 2000 # 95th percentile under 2s during spike
+    p99: 5000 # 99th percentile under 5s during spike
+    maxErrorRate: 5 # Up to 5% errors acceptable during spike
 
 scenarios:
   - name: "API stress test"
@@ -44,12 +44,12 @@ scenarios:
           url: "/api/health"
           expect:
             - statusCode: 200
-      
+
       - get:
           url: "/api/trpc/artists.getAll"
           expect:
             - statusCode:
                 - 200
-                - 429  # Rate limited is acceptable during spike
-      
+                - 429 # Rate limited is acceptable during spike
+
       - think: 1

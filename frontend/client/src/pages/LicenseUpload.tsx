@@ -16,7 +16,7 @@ export default function LicenseUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const getUploadUrlMutation = trpc.verification.getUploadUrl.useMutation();
   const addDocumentMutation = trpc.verification.addDocument.useMutation();
 
@@ -91,23 +91,30 @@ export default function LicenseUpload() {
       // 3. Create document record in our database
       await addDocumentMutation.mutateAsync({
         documentKey: path,
-        documentType: 'state_license',
+        documentType: "state_license",
         originalFileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
       });
-      
-      toast.success("License submitted for verification! We'll notify you upon review.");
-      // Redirect user after a short delay - leave isUploading true to keep button disabled
-      redirectTimeoutRef.current = setTimeout(() => setLocation('/dashboard'), 2000);
 
+      toast.success(
+        "License submitted for verification! We'll notify you upon review.",
+      );
+      // Redirect user after a short delay - leave isUploading true to keep button disabled
+      redirectTimeoutRef.current = setTimeout(
+        () => setLocation("/dashboard"),
+        2000,
+      );
     } catch (error: any) {
       toast.error(error.message || "An unknown error occurred during upload.");
       setIsUploading(false); // Only reset on error
     }
   };
-  
-  const isLoading = getUploadUrlMutation.isPending || addDocumentMutation.isPending || isUploading;
+
+  const isLoading =
+    getUploadUrlMutation.isPending ||
+    addDocumentMutation.isPending ||
+    isUploading;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-primary/5 flex items-center justify-center p-4">
@@ -128,7 +135,8 @@ export default function LicenseUpload() {
             </div>
             <h1 className="text-3xl font-bold mb-2">Artist Verification</h1>
             <p className="text-muted-foreground">
-              To get verified, please upload a copy of your state-issued tattoo license.
+              To get verified, please upload a copy of your state-issued tattoo
+              license.
             </p>
           </div>
 
@@ -154,17 +162,22 @@ export default function LicenseUpload() {
               disabled={isLoading || !file}
             >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {isLoading ? 'Submitting...' : 'Upload State License'}
+              {isLoading ? "Submitting..." : "Upload State License"}
             </Button>
           </form>
 
           <div className="mt-8 pt-6 border-t text-center">
-            <h3 className="font-semibold text-muted-foreground mb-3">What happens next?</h3>
+            <h3 className="font-semibold text-muted-foreground mb-3">
+              What happens next?
+            </h3>
             <div className="space-y-2 text-sm text-left text-muted-foreground">
-                <p>1. Our team will review your submission.</p>
-                <p>2. Verification can take up to 3-5 business days.</p>
-                <p>3. You'll receive an email notification once the review is complete.</p>
-                <p>4. Your profile will show a "Verified" badge upon approval.</p>
+              <p>1. Our team will review your submission.</p>
+              <p>2. Verification can take up to 3-5 business days.</p>
+              <p>
+                3. You'll receive an email notification once the review is
+                complete.
+              </p>
+              <p>4. Your profile will show a "Verified" badge upon approval.</p>
             </div>
           </div>
         </Card>

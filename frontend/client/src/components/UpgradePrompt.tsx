@@ -9,7 +9,11 @@ interface UpgradePromptProps {
   inline?: boolean;
 }
 
-export default function UpgradePrompt({ feature, description, inline = false }: UpgradePromptProps) {
+export default function UpgradePrompt({
+  feature,
+  description,
+  inline = false,
+}: UpgradePromptProps) {
   if (inline) {
     return (
       <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-lg">
@@ -33,7 +37,9 @@ export default function UpgradePrompt({ feature, description, inline = false }: 
           <Crown className="h-6 w-6 text-primary" />
         </div>
         <div className="flex-1">
-          <h3 className="text-lg font-semibold mb-2">{feature} - Premium Feature</h3>
+          <h3 className="text-lg font-semibold mb-2">
+            {feature} - Premium Feature
+          </h3>
           <p className="text-muted-foreground mb-4">{description}</p>
           <Link href="/pricing">
             <Button variant="default" className="group">
