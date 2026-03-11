@@ -96,31 +96,9 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 ---
 
-### 4. Maptiler (Maps & Geocoding)
+### 4. AI Services (Groq + Hugging Face)
 
-**Priority**: 🟡 HIGH - Required for artist location search
-
-**Steps**:
-
-1. Go to https://cloud.maptiler.com/
-2. Sign up for free account
-3. Go to "Account" > "API Keys"
-4. Copy your default API key (or create new one)
-5. Optional: Restrict key by HTTP referrer in key settings
-   - Add your domains: `localhost:5173`, `yourdomain.com`
-6. Copy to `.env`:
-   - `MAPTILER_API_KEY` - For backend geocoding
-   - `VITE_MAPTILER_API_KEY` - For frontend maps
-
-**Cost**: Free tier includes 100,000 map loads/month + geocoding (vs Google's ~28,000)
-
-**Bonus**: Includes beautiful map styles, works with MapLibre/Mapbox code
-
----
-
-### 5. AI Services (Groq + Hugging Face)
-
-#### 5A. Groq (Structured Text AI)
+#### 4A. Groq (Structured Text AI)
 
 **Priority**: 🟢 MEDIUM - Required for discovery, prompt refinement, bid drafting, and moderation
 
@@ -144,7 +122,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 ---
 
-#### 5B. Hugging Face (Image Generation + Vision/OCR)
+#### 4B. Hugging Face (Image Generation + Vision/OCR)
 
 **Priority**: 🟢 MEDIUM - Required for design generation and image understanding flows
 
@@ -171,11 +149,10 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 1. **Supabase** (30 min) - Core infrastructure
 2. **Stripe** (15 min) - Payment processing
-3. **Maptiler** (10 min) - Maps and location features
-4. **Resend** (10 min) - Email notifications
-5. **Groq + Hugging Face** (10 min) - AI features
+3. **Resend** (10 min) - Email notifications
+4. **Groq + Hugging Face** (10 min) - AI features
 
-**Total Setup Time**: ~1.25 hours
+**Total Setup Time**: ~1.1 hours
 
 ---
 
@@ -213,7 +190,6 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 4. Verify each integration:
    - [ ] Can sign up/login (Supabase Auth)
    - [ ] Can upload images (Supabase Storage)
-   - [ ] Can search locations (Maptiler Maps)
    - [ ] Can create test booking (Stripe)
    - [ ] Receive confirmation email (Resend)
    - [ ] AI features work (Groq/Hugging Face)
@@ -223,7 +199,6 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 ## 💡 Pro Tips
 
 - **Stripe**: Use test mode during development
-- **Maptiler**: 100k free loads/month is generous - monitor usage in dashboard
 - **Groq**: Use a stable production model in `GROQ_MODEL` and keep temperature low for JSON-heavy tasks
 - **Hugging Face**: Keep model overrides in `.env` so you can swap models without code changes
 - **Supabase**: Enable Row Level Security (RLS) policies immediately
@@ -236,7 +211,6 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 - Supabase: https://supabase.com/docs
 - Stripe: https://stripe.com/docs
 - Resend: https://resend.com/docs
-- Maptiler: https://docs.maptiler.com/
 - Groq: https://console.groq.com/docs
 - Hugging Face: https://huggingface.co/docs/api-inference
 
@@ -244,13 +218,12 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 ## 📊 Monthly Cost Estimate (Small Scale)
 
-| Service   | Free Tier        | Paid (if exceeded)     |
-| --------- | ---------------- | ---------------------- |
-| Supabase  | Up to 500MB DB   | $25/month (Pro)        |
-| Stripe    | No fee           | 2.9% + 30¢/transaction |
-| Resend    | 3,000 emails     | $20/month (50k emails) |
-| Maptiler  | 100k map loads   | $49/month (500k loads) |
-| Groq + HF | Usage-based tiers| ~$20-120/month (usage) |
-| **Total** | **~$0-10/month** | **~$80-200/month**     |
+| Service   | Free Tier         | Paid (if exceeded)     |
+| --------- | ----------------- | ---------------------- |
+| Supabase  | Up to 500MB DB    | $25/month (Pro)        |
+| Stripe    | No fee            | 2.9% + 30¢/transaction |
+| Resend    | 3,000 emails      | $20/month (50k emails) |
+| Groq + HF | Usage-based tiers | ~$20-120/month (usage) |
+| **Total** | **~$0-10/month**  | **~$45-165/month**     |
 
 _Costs scale with usage. Most apps stay in free tier during development._
