@@ -16,9 +16,9 @@ export function registerSupabaseAuthRoutes(app: Express) {
    */
   app.post("/api/auth/session", async (req: Request, res: Response) => {
     try {
-      const { access_token, refresh_token } = req.body;
+      const accessToken = req.body?.access_token ?? req.body?.accessToken;
 
-      if (!access_token) {
+      if (!accessToken) {
         res.status(400).json({ error: "access_token is required" });
         return;
       }
@@ -27,7 +27,7 @@ export function registerSupabaseAuthRoutes(app: Express) {
       const {
         data: { user },
         error,
-      } = await supabaseAdmin.auth.getUser(access_token);
+      } = await supabaseAdmin.auth.getUser(accessToken);
 
       if (error || !user) {
         console.error("[Auth] Invalid token:", error);
@@ -45,7 +45,7 @@ export function registerSupabaseAuthRoutes(app: Express) {
 
       // Set session cookie with access token
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, access_token, {
+      res.cookie(COOKIE_NAME, accessToken, {
         ...cookieOptions,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });

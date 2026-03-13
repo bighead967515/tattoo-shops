@@ -8,6 +8,17 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        const params = new URLSearchParams(window.location.search);
+        const oauthError = params.get("error");
+        const oauthErrorDescription = params.get("error_description");
+
+        if (oauthError || oauthErrorDescription) {
+          const message =
+            oauthErrorDescription || oauthError || "OAuth sign-in failed";
+          setLocation(`/login?oauth_error=${encodeURIComponent(message)}`);
+          return;
+        }
+
         // Get the session from URL hash parameters
         const {
           data: { session },
@@ -28,9 +39,10 @@ export default function AuthCallback() {
               headers: {
                 "Content-Type": "application/json",
               },
+              credentials: "include",
               body: JSON.stringify({
-                accessToken: session.access_token,
-                refreshToken: session.refresh_token,
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
               }),
             });
 

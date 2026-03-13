@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { FaGithub } from "react-icons/fa";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { isAuthenticated, loading } = useAuth();
   const { signInWithEmail, signUpWithEmail, signInWithOAuth } =
     useSupabaseAuth();
@@ -27,6 +28,15 @@ export default function Login() {
       setLocation("/dashboard");
     }
   }, [loading, isAuthenticated, setLocation]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const oauthError = params.get("oauth_error");
+
+    if (oauthError) {
+      setError(oauthError);
+    }
+  }, [search]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +58,7 @@ export default function Login() {
   };
 
   const handleOAuthLogin = async (provider: "google" | "github") => {
+    setError(null);
     try {
       await signInWithOAuth(provider);
     } catch (err: any) {

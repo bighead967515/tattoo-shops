@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -36,6 +37,10 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
     }
   }
   throw new Error(`No available port found starting from ${startPort}`);
+}
+
+function isBundledDistRuntime(): boolean {
+  return path.basename(import.meta.dirname).toLowerCase() === "dist";
 }
 
 const app = express();
@@ -242,8 +247,12 @@ app.use(
       logger.error("Failed to initialize webhook processor", { error });
     }
 
-    // In development, Vite handles static serving. In production, serve from `dist/public`.
-    if (process.env.NODE_ENV === "development") {
+    // Use Vite middleware only when running source in development.
+    // Bundled dist runtime should always serve built static assets.
+    const useViteDevMiddleware =
+      process.env.NODE_ENV === "development" && !isBundledDistRuntime();
+
+    if (useViteDevMiddleware) {
       await setupVite(app, server);
     } else {
       serveStatic(app);
