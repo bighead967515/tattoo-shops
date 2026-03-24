@@ -24,14 +24,51 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-          ui: [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tooltip",
-          ],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+
+          // Core React runtime + router primitives
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/wouter/") ||
+            id.includes("/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+
+          // Data and API layer
+          if (
+            id.includes("/@tanstack/react-query/") ||
+            id.includes("/@trpc/") ||
+            id.includes("/superjson/") ||
+            id.includes("/@supabase/supabase-js/")
+          ) {
+            return "vendor-data";
+          }
+
+          // UI primitives and animation ecosystem
+          if (
+            id.includes("/@radix-ui/") ||
+            id.includes("/cmdk/") ||
+            id.includes("/vaul/") ||
+            id.includes("/framer-motion/") ||
+            id.includes("/embla-carousel-react/")
+          ) {
+            return "vendor-ui";
+          }
+
+          // Visualization and date utilities
+          if (id.includes("/recharts/") || id.includes("/date-fns/")) {
+            return "vendor-viz";
+          }
+
+          // Icon packs are large and can be isolated.
+          if (id.includes("/lucide-react/") || id.includes("/react-icons/")) {
+            return "vendor-icons";
+          }
+
+          return "vendor-misc";
         },
       },
     },

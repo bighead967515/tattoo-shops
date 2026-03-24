@@ -26,6 +26,7 @@ import {
   type ClientSubscriptionTier,
 } from "../shared/tierLimits";
 import { canUseAiBidAssistant, isFreeArtistTier } from "../shared/tierCompat";
+import { buildClientOnboardingUserUpdate } from "./_core/onboarding";
 
 /**
  * Sanitize a filename to prevent path traversal attacks.
@@ -103,7 +104,7 @@ export const clientsRouter = router({
         // Update user role to client
         await tx
           .update(users)
-          .set({ role: "client", updatedAt: new Date() })
+          .set(buildClientOnboardingUserUpdate())
           .where(eq(users.id, ctx.user.id));
 
         // Create client profile

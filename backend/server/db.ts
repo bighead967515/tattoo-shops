@@ -19,6 +19,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { logger } from "./_core/logger";
+import { buildArtistOnboardingUserUpdate } from "./_core/onboarding";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _sqlClient: ReturnType<typeof postgres> | null = null;
@@ -191,8 +192,15 @@ export async function createArtist(artist: InsertArtist) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(artists).values(artist);
-  return result;
+  return await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set(buildArtistOnboardingUserUpdate())
+      .where(eq(users.id, artist.userId));
+
+    const [created] = await tx.insert(artists).values(artist).returning();
+    return created;
+  });
 }
 
 export async function getArtistByUserId(userId: number) {
