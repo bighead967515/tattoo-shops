@@ -1,4 +1,5 @@
 import {
+  bigint,
   serial,
   text,
   timestamp,
@@ -7,6 +8,7 @@ import {
   integer,
   pgTable,
   pgEnum,
+  index,
   unique,
 } from "drizzle-orm/pg-core";
 import type { SubscriptionTier } from "@shared/const";
@@ -106,6 +108,34 @@ export const artists = pgTable("artists", {
 
 export type Artist = typeof artists.$inferSelect;
 export type InsertArtist = typeof artists.$inferInsert;
+
+/**
+ * Tattoo shops catalog
+ */
+export const shops = pgTable(
+  "shops",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    shopName: text("shop_name").notNull(),
+    address: text("address"),
+    city: text("city"),
+    state: text("state"),
+    zipCode: text("zip_code"),
+    phone: text("phone"),
+    email: text("email"),
+    isVerified: boolean("is_verified").default(false),
+    isClaimed: boolean("is_claimed").default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    shopNameIdx: index("idx_shops_name").on(table.shopName),
+    cityIdx: index("idx_shops_city").on(table.city),
+  }),
+);
+
+export type Shop = typeof shops.$inferSelect;
+export type InsertShop = typeof shops.$inferInsert;
 
 /**
  * Portfolio images for artists

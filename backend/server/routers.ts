@@ -25,6 +25,7 @@ import { analyzePortfolioImage } from "./geminiVision";
 import { parseDiscoveryQuery } from "./geminiDiscovery";
 import { analyzeReviewSentiment } from "./geminiSafety";
 import { aiRouter } from "./aiRouter";
+import { shopRouter } from "./shopRouter";
 import path from "path";
 
 /**
@@ -523,6 +524,7 @@ export const appRouter = router({
   clients: clientsRouter,
   requests: requestsRouter,
   bids: bidsRouter,
+  shop: shopRouter,
   verification: verificationRouter,
 
   // Admin moderation
