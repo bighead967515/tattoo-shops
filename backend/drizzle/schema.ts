@@ -8,9 +8,11 @@ import {
   integer,
   pgTable,
   pgEnum,
+  foreignKey,
   index,
   unique,
 } from "drizzle-orm/pg-core";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SubscriptionTier } from "@shared/const";
 
 /**
@@ -373,34 +375,43 @@ export type InsertClient = typeof clients.$inferInsert;
  * Tattoo requests posted by clients
  * Clients describe what they want and artists can bid
  */
-export const tattooRequests = pgTable("tattooRequests", {
-  id: serial("id").primaryKey(),
-  clientId: integer("clientId")
-    .notNull()
-    .references(() => clients.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description").notNull(),
-  style: varchar("style", { length: 100 }), // e.g., "Realism", "Traditional", "Watercolor"
-  placement: varchar("placement", { length: 100 }).notNull(), // e.g., "forearm", "back", "sleeve"
-  size: varchar("size", { length: 50 }).notNull(), // e.g., "small", "medium", "large", "full sleeve"
-  colorPreference: varchar("colorPreference", { length: 50 }), // "color", "black_and_grey", "either"
-  budgetMin: integer("budgetMin"), // In cents
-  budgetMax: integer("budgetMax"), // In cents
-  preferredCity: varchar("preferredCity", { length: 100 }),
-  preferredState: varchar("preferredState", { length: 50 }),
-  willingToTravel: boolean("willingToTravel").default(false),
-  desiredTimeframe: varchar("desiredTimeframe", { length: 100 }), // e.g., "ASAP", "Within 1 month", "Flexible"
-  status: requestStatusEnum("status").default("open").notNull(),
-  // NOTE: selectedBidId references bids.id. Due to circular dependency (bids references tattooRequests),
-  // the FK constraint is added via migration after both tables exist:
-  // ALTER TABLE "tattooRequests" ADD CONSTRAINT "tattooRequests_selectedBidId_fkey"
-  // FOREIGN KEY ("selectedBidId") REFERENCES "bids"("id") ON DELETE SET NULL;
-  selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
-  viewCount: integer("viewCount").default(0),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-  expiresAt: timestamp("expiresAt"), // Optional expiration date
-});
+export const tattooRequests = pgTable(
+  "tattooRequests",
+  {
+    id: serial("id").primaryKey(),
+    clientId: integer("clientId")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description").notNull(),
+    style: varchar("style", { length: 100 }), // e.g., "Realism", "Traditional", "Watercolor"
+    placement: varchar("placement", { length: 100 }).notNull(), // e.g., "forearm", "back", "sleeve"
+    size: varchar("size", { length: 50 }).notNull(), // e.g., "small", "medium", "large", "full sleeve"
+    colorPreference: varchar("colorPreference", { length: 50 }), // "color", "black_and_grey", "either"
+    budgetMin: integer("budgetMin"), // In cents
+    budgetMax: integer("budgetMax"), // In cents
+    preferredCity: varchar("preferredCity", { length: 100 }),
+    preferredState: varchar("preferredState", { length: 50 }),
+    willingToTravel: boolean("willingToTravel").default(false),
+    desiredTimeframe: varchar("desiredTimeframe", { length: 100 }), // e.g., "ASAP", "Within 1 month", "Flexible"
+    status: requestStatusEnum("status").default("open").notNull(),
+    selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
+    viewCount: integer("viewCount").default(0),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt"), // Optional expiration date
+  },
+  (table) => ({
+    // Table-level FK keeps circular request <-> bid relationship explicit in schema snapshots.
+    selectedBidFk: foreignKey({
+      name: "tattooRequests_selectedBidId_bids_id_fk",
+      columns: [table.selectedBidId],
+      foreignColumns: [bids.id as AnyPgColumn],
+    })
+      .onDelete("set null")
+      .onUpdate("no action"),
+  }),
+);
 
 export type TattooRequest = typeof tattooRequests.$inferSelect;
 export type InsertTattooRequest = typeof tattooRequests.$inferInsert;
@@ -433,7 +444,9 @@ export const bids = pgTable(
     id: serial("id").primaryKey(),
     requestId: integer("requestId")
       .notNull()
-      .references(() => tattooRequests.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => tattooRequests.id, {
+        onDelete: "cascade",
+      }),
     artistId: integer("artistId")
       .notNull()
       .references(() => artists.id, { onDelete: "cascade" }),

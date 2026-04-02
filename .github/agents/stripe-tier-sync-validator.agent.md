@@ -17,6 +17,13 @@ Your job is to verify that onboarding state and Stripe lifecycle events keep sub
 - Legacy propagation to clients.subscriptionTier or artists.subscriptionTier where still required
 - Retry queue and idempotency behavior for failed or duplicated webhook events
 
+## Ownership Boundaries
+- Owns Stripe metadata, webhook processing, tier mapping, and canonical tier persistence.
+- Does not own onboarding browse/finder visibility or non-billing onboarding UX.
+- Does not own frontend upload/retry/empty-state resilience work.
+- Handoff onboarding visibility issues to Onboarding Shop Validator.
+- Handoff frontend resilience issues to UX Resilience Implementer.
+
 ## Constraints
 - Treat users.subscriptionTier as the canonical source of truth.
 - Do not rely on deprecated tier columns as authoritative.

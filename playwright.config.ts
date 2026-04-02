@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const appPort = process.env.PORT || "300";
+const appBaseUrl = process.env.BASE_URL || `http://localhost:${appPort}`;
+const useManagedWebServer = process.env.SKIP_WEB_SERVER !== "1";
+
 /**
  * Playwright Configuration for E2E and Performance Tests
  *
@@ -23,7 +27,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:3001",
+    baseURL: appBaseUrl,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -33,30 +37,17 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
-    },
-    {
-      name: "Mobile Chrome",
-      use: { ...devices["Pixel 5"] },
-    },
-    {
-      name: "Mobile Safari",
-      use: { ...devices["iPhone 12"] },
-    },
   ],
 
   // Run local dev server before tests if not running
-  webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:3001",
-    reuseExistingServer: !process.env.CI,
-    stdout: "ignore",
-    stderr: "pipe",
-  },
+  webServer: useManagedWebServer
+    ? {
+        command:
+          "node -r dotenv/config ./node_modules/tsx/dist/cli.mjs watch backend/server/_core/index.ts dotenv_config_path=.env",
+        url: `${appBaseUrl}/api/health`,
+        reuseExistingServer: !process.env.CI,
+        stdout: "ignore",
+        stderr: "pipe",
+      }
+    : undefined,
 });

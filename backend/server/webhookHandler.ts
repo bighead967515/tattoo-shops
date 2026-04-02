@@ -42,6 +42,13 @@ async function processWebhookEvent(
   switch (eventType) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
+
+      // Client subscription checkout completion path
+      if (session.mode === "subscription") {
+        await handleSubscriptionCheckoutCompleted(session);
+        break;
+      }
+
       const bookingId = parseInt(session.metadata?.bookingId || "0", 10);
 
       if (!bookingId || isNaN(bookingId) || bookingId <= 0) {
@@ -140,6 +147,135 @@ async function processWebhookEvent(
   }
 }
 
+function parseUserIdFromMetadata(
+  metadata?: Record<string, string | undefined> | null,
+): number | null {
+  const raw = metadata?.userId;
+  if (!raw) return null;
+
+  const userId = parseInt(raw, 10);
+  if (isNaN(userId) || userId <= 0) return null;
+  return userId;
+}
+
+async function resolveUserForSubscription(
+  database: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  stripeCustomerId: string,
+  metadata?: Record<string, string | undefined> | null,
+) {
+  let user:
+    | {
+        id: number;
+        stripeCustomerId: string | null;
+      }
+    | undefined;
+
+  if (stripeCustomerId) {
+    [user] = await database
+      .select({ id: users.id, stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.stripeCustomerId, stripeCustomerId))
+      .limit(1);
+  }
+
+  if (!user) {
+    const metadataUserId = parseUserIdFromMetadata(metadata);
+    if (metadataUserId) {
+      [user] = await database
+        .select({ id: users.id, stripeCustomerId: users.stripeCustomerId })
+        .from(users)
+        .where(eq(users.id, metadataUserId))
+        .limit(1);
+    }
+  }
+
+  return user;
+}
+
+async function handleSubscriptionCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const customerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id;
+
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id;
+
+  const metadataTier = session.metadata?.tier;
+  const tier =
+    metadataTier === "client_plus" || metadataTier === "client_elite"
+      ? metadataTier
+      : null;
+
+  const database = await getDb();
+  if (!database) {
+    throw new Error(
+      "Database not available for subscription checkout completion webhook",
+    );
+  }
+
+  const user = await resolveUserForSubscription(
+    database,
+    customerId ?? "",
+    session.metadata,
+  );
+
+  if (!user) {
+    logger.warn("No user found for completed subscription checkout", {
+      sessionId: session.id,
+      stripeCustomerId: customerId,
+      subscriptionId,
+      metadataUserId: session.metadata?.userId,
+    });
+    return;
+  }
+
+  await database.transaction(async (tx) => {
+    const userUpdate: {
+      stripeCustomerId?: string;
+      stripeSubscriptionId?: string;
+      subscriptionTier?: "client_plus" | "client_elite";
+      updatedAt: Date;
+    } = { updatedAt: new Date() };
+
+    if (customerId) userUpdate.stripeCustomerId = customerId;
+    if (subscriptionId) userUpdate.stripeSubscriptionId = subscriptionId;
+    if (tier) userUpdate.subscriptionTier = tier;
+
+    await tx.update(users).set(userUpdate).where(eq(users.id, user.id));
+
+    if (tier) {
+      const tierLimits = CLIENT_TIER_LIMITS[tier];
+      const aiCredits =
+        tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+          ? 999
+          : tierLimits.aiGenerationsPerMonth;
+
+      await tx
+        .update(clients)
+        .set({
+          subscriptionTier: tier,
+          aiCredits,
+          stripeSubscriptionId: subscriptionId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(clients.userId, user.id));
+    }
+  });
+
+  logger.info("Subscription checkout completed and customer reconciled", {
+    userId: user.id,
+    sessionId: session.id,
+    tier,
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscriptionId,
+  });
+}
+
 /**
  * Handle subscription created / updated events.
  * Maps the Stripe Price ID to a client tier, updates both
@@ -155,7 +291,8 @@ async function handleSubscriptionChange(
       ? subscription.customer
       : subscription.customer.id;
 
-  const priceId = subscription.items.data[0]?.plan?.id;
+  const priceId =
+    subscription.items.data[0]?.price?.id || subscription.items.data[0]?.plan?.id;
   if (!priceId) {
     logger.warn("Subscription event missing plan price ID", {
       eventType,
@@ -176,17 +313,30 @@ async function handleSubscriptionChange(
     return;
   }
 
+  // Only active/trialing subscriptions should grant paid client tiers.
+  const grantableStatuses = new Set<Stripe.Subscription.Status>([
+    "active",
+    "trialing",
+  ]);
+  if (!grantableStatuses.has(subscription.status)) {
+    logger.info("Skipping tier grant for non-grantable subscription status", {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      eventType,
+    });
+    return;
+  }
+
   const database = await getDb();
   if (!database) {
     throw new Error("Database not available for subscription webhook");
   }
 
-  // Find the user by stripeCustomerId
-  const [user] = await database
-    .select()
-    .from(users)
-    .where(eq(users.stripeCustomerId, stripeCustomerId))
-    .limit(1);
+  const user = await resolveUserForSubscription(
+    database,
+    stripeCustomerId,
+    subscription.metadata,
+  );
 
   if (!user) {
     logger.warn(
@@ -211,6 +361,7 @@ async function handleSubscriptionChange(
     await tx
       .update(users)
       .set({
+        stripeCustomerId,
         subscriptionTier: tier,
         stripeSubscriptionId: subscription.id,
         updatedAt: new Date(),
@@ -257,11 +408,11 @@ async function handleSubscriptionCancelled(
     );
   }
 
-  const [user] = await database
-    .select()
-    .from(users)
-    .where(eq(users.stripeCustomerId, stripeCustomerId))
-    .limit(1);
+  const user = await resolveUserForSubscription(
+    database,
+    stripeCustomerId,
+    subscription.metadata,
+  );
 
   if (!user) {
     logger.warn(

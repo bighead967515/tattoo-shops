@@ -1,5 +1,5 @@
 import { trpc, trpcClient } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from "@shared/const";
+import { UNAUTHED_ERR_MSG } from "@shared/clientConst";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { StrictMode } from "react";

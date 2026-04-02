@@ -14,6 +14,13 @@ Your job is to verify both onboarding paths end-to-end and ensure artist shops s
 - Shop visibility in browse/finder pages that should reflect DB records
 - Regression tests that lock expected behavior
 
+## Ownership Boundaries
+- Owns onboarding profile creation, role/tier assignment at onboarding time, and browse/finder visibility wiring.
+- Does not own Stripe checkout/webhook subscription reconciliation.
+- Does not own generic UX polish work (progress, retries, empty states).
+- Handoff Stripe tier issues to Stripe Tier Sync Validator.
+- Handoff UX resilience issues to UX Resilience Implementer.
+
 ## Constraints
 - Prefer targeted tests over broad suite runs.
 - Keep fixes minimal and localized to affected files.

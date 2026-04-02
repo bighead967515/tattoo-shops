@@ -1,148 +1,113 @@
-# Production Ready TODO List
+# Production Readiness Tracker
 
-## 🔴 Critical (Must Complete Before Launch)
+Last updated: 2026-03-31
 
-### Environment & Security
+## Completed Baseline (Verified In Code)
 
-- [ ] **Configure production environment variables in deployment platform**
-  - Set SUPABASE_URL, SUPABASE_SERVICE_KEY (secret), SUPABASE_ANON_KEY (public)
-  - Set VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY for frontend
-  - Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
-  - Set RESEND_API_KEY for email notifications
-  - Set strong JWT_SECRET
-  - Verify DATABASE_URL connection string
+- [x] Canonical subscription tiers implemented end-to-end (users.subscriptionTier source of truth)
+- [x] Stripe webhook tier sync with retry queue and integration tests
+- [x] Health endpoint implemented at /api/health with DB and webhook queue status
+- [x] Sentry initialized with server error capture middleware
+- [x] Supabase storage buckets bootstrap automatically on server startup (initializeBuckets)
+- [x] Bookings table has FK references for artistId and userId
+- [x] Auth session sync route exists at /api/auth/session with integration tests
+- [x] Client onboarding and role/tier transitions covered by integration tests
+- [x] Artist search/filter, request board, bids, and client marketplace flow implemented
+- [x] SEO essentials present (dynamic sitemap + page metadata support)
 
-- [ ] **Set up monitoring & alerting**
-  - Configure health checks for /api/health endpoint
-  - Set up database connection monitoring
-  - Configure Stripe webhook failure alerts
-  - Set up error tracking (Sentry/LogRocket)
+## Critical Before Launch (Blocking)
 
-### Database & Storage
+### Environment And Secrets
 
-- [ ] **Initialize Supabase Storage bucket**
-  - Run `initializeBucket()` from supabaseStorage.ts
-  - Configure proper bucket policies for portfolio images
-  - Test image upload/delete flows
+- [ ] Configure all production environment variables in hosting platform
+  - DATABASE_URL, JWT_SECRET
+  - SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
+  - VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+  - STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+  - STRIPE_CLIENT_PLUS_PRICE_ID, STRIPE_CLIENT_ELITE_PRICE_ID
+  - RESEND_API_KEY
+  - GROQ_API_KEY, HUGGINGFACE_API_KEY
+- [ ] Verify production domain allowlist/cookies/CORS behavior
+- [ ] Rotate any previously shared test keys
 
-- [ ] **Add database foreign key constraints**
-  - Update schema.ts with proper .references() for bookings table
-  - Run migration to add FK constraints to existing data
+### Deployment And Reliability
 
-### Authentication & User Management
+- [ ] Configure uptime monitor for /api/health with paging alerts
+- [ ] Add alerting for Stripe webhook failures and queue backlog growth
+- [ ] Validate Sentry alerts route to on-call channel
+- [ ] Confirm backups and recovery process for PostgreSQL/Supabase
 
-- [ ] **Test complete auth flow end-to-end**
-  - Supabase sign-up → session creation → user sync to local DB
-  - Verify protected routes work correctly
-  - Test artist profile creation and ownership checks
+### End-To-End Verification (Staging)
 
-## 🟡 High Priority (Week 1 After Launch)
+- [ ] Run full auth regression
+  - sign up/sign in
+  - session sync
+  - protected route enforcement
+- [ ] Run booking payment path with Stripe test cards
+- [ ] Run artist onboarding to approved discovery visibility flow
+- [ ] Run client request to bid to accept flow
+- [ ] Run license upload and admin verification flow
 
-### User Experience
+### Quality Gates
 
-- [ ] **Add loading states and error handling**
-  - Portfolio upload progress indicators
-  - Better error messages for failed bookings
-  - Network connectivity error handling
+- [x] pnpm check passes
+- [x] pnpm test passes
+- [x] pnpm build passes
+- [ ] Execute load tests and compare against performance targets
 
-- [ ] **Implement search and filtering**
-  - Artist search by location, style, rating
-  - Portfolio filtering by tattoo style
-  - Sort bookings by date/status
+## High Priority (Week 1 Post Launch)
 
-### Business Logic
+### UX And Resilience
 
-- [ ] **Complete booking workflow**
-  - Email notifications for new bookings
-  - Artist approval/rejection of booking requests
-  - Calendar integration for scheduling
+- [ ] Improve upload UX (progress, retries, cancellation feedback)
+- [ ] Improve network failure messaging across booking/request forms
+- [ ] Add explicit empty states where data can be validly absent
 
-- [ ] **Add review system enhancements**
-  - Review photo uploads
-  - Artist response to reviews
-  - Helpful/unhelpful voting
+### Product Gaps
+
+- [ ] Deliver request/booking messaging UI backed by requestMessages
+- [ ] Add calendar sync export (Google/ICS) for confirmed bookings
+- [ ] Add admin dashboard tiles for core health and revenue KPIs
 
 ### Performance
 
-- [ ] **Optimize image handling**
-  - Image compression on upload
-  - WebP format conversion
-  - Lazy loading for portfolio galleries
+- [ ] Add client-side image compression before uploads
+- [ ] Add aggressive lazy loading for heavy portfolio/request image lists
+- [ ] Audit largest bundles and split non-critical routes
 
-## 🟢 Medium Priority (Month 1)
+## Medium Priority (Month 1)
 
-### Analytics & Business Intelligence
+- [ ] Event analytics for funnel: discovery -> profile -> booking/request
+- [ ] Conversion dashboard for client and artist subscription upgrades
+- [ ] Advanced SEO: structured data QA, index coverage checks, rich result monitoring
+- [ ] Security hardening pass (headers, dependency audit, key rotation runbook)
 
-- [ ] **Add analytics tracking**
-  - User behavior tracking
-  - Booking conversion rates
-  - Popular artist/style metrics
+## Future Enhancements (Month 2+)
 
-### Advanced Features
-
-- [ ] **Implement subscription tiers**
-  - Free vs Premium artist accounts
-  - Feature limitations based on tier
-  - Stripe subscription management
-
-- [ ] **Add messaging system**
-  - Direct communication between users and artists
-  - Booking-specific chat threads
-
-### SEO & Marketing
-
-- [ ] **SEO optimization**
-  - Meta tags for artist profiles
-  - Structured data markup
-  - Sitemap generation
-
-## 🔵 Future Enhancements (Month 2+)
-
-### Mobile & Desktop Apps
-
-- [ ] **Progressive Web App (PWA)**
-  - Offline capability for browsing
-  - Push notifications for bookings
-
-### Advanced Integrations
-
-- [ ] **Social media integration**
-  - Instagram portfolio sync
-  - Social sharing features
-
-- [ ] **Advanced booking features**
-  - Multi-session tattoo projects
-  - Deposit and payment scheduling
-  - Cancellation and refund policies
-
-### Platform Expansion
-
-- [ ] **Multi-location support**
-  - Franchise/chain shop management
-  - Location-based artist search
+- [ ] PWA support (offline browse cache + install prompt)
+- [ ] Push notifications for booking and bid status updates
+- [ ] Instagram/social portfolio sync
+- [ ] Multi-session project management and payment schedules
+- [ ] Multi-location studio support
 
 ---
 
-## Launch Checklist
+## Launch Day Runbook
 
-### Before Going Live
+### Before Go-Live
 
-- [ ] All Critical (🔴) items completed
-- [ ] Load testing completed with expected traffic
-- [ ] Backup and disaster recovery plan in place
-- [ ] Legal compliance verified (GDPR, CCPA, etc.)
-- [ ] Terms of service and privacy policy published
+- [ ] All Critical Before Launch items completed
+- [ ] Rollback plan tested and documented
+- [ ] Terms, privacy, and compliance pages published
 
 ### Go-Live Day
 
-- [ ] Monitor error rates and response times
-- [ ] Watch Stripe webhook processing
-- [ ] Monitor user registration and booking flows
-- [ ] Have rollback plan ready
+- [ ] Monitor error rate, p95 latency, and queue depth hourly
+- [ ] Monitor Stripe webhook success rate and replay failures immediately
+- [ ] Monitor signup, onboarding completion, request creation, and booking conversion
 
-### Week 1 Post-Launch
+### Week 1
 
-- [ ] Analyze user behavior and conversion rates
-- [ ] Collect user feedback on UX pain points
-- [ ] Monitor database performance and queries
-- [ ] Review security logs and access patterns
+- [ ] Review production incidents and patch highest-impact issues
+- [ ] Prioritize UX pain points from support tickets and session recordings
+- [ ] Rebaseline performance and DB query hotspots under real traffic

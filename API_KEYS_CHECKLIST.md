@@ -26,6 +26,12 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 9. Important note:
    - `SUPABASE_ANON_KEY` is intentionally public and does not need to be hidden
    - Protect data using Supabase RLS policies; never expose `SUPABASE_SERVICE_KEY`
+10. If you are using the **Application Preset: Vite**:
+      - Frontend-only keys must be prefixed with `VITE_`
+      - Keep these two values identical:
+         - `SUPABASE_URL` = `VITE_SUPABASE_URL`
+         - `SUPABASE_ANON_KEY` = `VITE_SUPABASE_ANON_KEY`
+      - Restart dev server after editing `.env`
 
 **Cost**: Free tier includes:
 

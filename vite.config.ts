@@ -4,7 +4,11 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { defineConfig } from "vite";
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin()];
+const plugins = [react(), tailwindcss()];
+
+if (process.env.VITE_ENABLE_JSX_LOC === "true") {
+  plugins.push(jsxLocPlugin());
+}
 
 export default defineConfig({
   plugins,
@@ -22,59 +26,12 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-
-          // Core React runtime + router primitives
-          if (
-            id.includes("/react/") ||
-            id.includes("/react-dom/") ||
-            id.includes("/wouter/") ||
-            id.includes("/scheduler/")
-          ) {
-            return "vendor-react";
-          }
-
-          // Data and API layer
-          if (
-            id.includes("/@tanstack/react-query/") ||
-            id.includes("/@trpc/") ||
-            id.includes("/superjson/") ||
-            id.includes("/@supabase/supabase-js/")
-          ) {
-            return "vendor-data";
-          }
-
-          // UI primitives and animation ecosystem
-          if (
-            id.includes("/@radix-ui/") ||
-            id.includes("/cmdk/") ||
-            id.includes("/vaul/") ||
-            id.includes("/framer-motion/") ||
-            id.includes("/embla-carousel-react/")
-          ) {
-            return "vendor-ui";
-          }
-
-          // Visualization and date utilities
-          if (id.includes("/recharts/") || id.includes("/date-fns/")) {
-            return "vendor-viz";
-          }
-
-          // Icon packs are large and can be isolated.
-          if (id.includes("/lucide-react/") || id.includes("/react-icons/")) {
-            return "vendor-icons";
-          }
-
-          return "vendor-misc";
-        },
-      },
-    },
   },
   server: {
     host: true,
+    hmr: {
+      overlay: false,
+    },
     allowedHosts: ["localhost", "127.0.0.1"],
     fs: {
       strict: true,

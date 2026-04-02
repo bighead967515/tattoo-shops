@@ -90,6 +90,9 @@ export async function createSubscriptionCheckout({
         ? { customer: stripeCustomerId }
         : { customer_email: customerEmail }),
       metadata,
+      subscription_data: {
+        metadata,
+      },
       success_url: successUrl,
       cancel_url: cancelUrl,
       allow_promotion_codes: true,

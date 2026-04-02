@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test_jwt_secret_abcdefghijklmnopqrstuvwxyz123456
+      DATABASE_URL: https://example.com/db
+      OWNER_OPEN_ID: owner_test
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_test_placeholder
+      RESEND_API_KEY: re_test_placeholder
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_KEY: service_key_placeholder
+      SUPABASE_ANON_KEY: anon_key_placeholder
+      GROQ_API_KEY: groq_test_placeholder
+      HUGGINGFACE_API_KEY: hf_test_placeholder
+      PORT: "3000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Unit and integration tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

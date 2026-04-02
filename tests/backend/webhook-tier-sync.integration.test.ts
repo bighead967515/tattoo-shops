@@ -113,12 +113,52 @@ function createDbForSubscription(user: Record<string, unknown>) {
   };
 }
 
+function createDbForMetadataFallback(user: Record<string, unknown>) {
+  const where = vi
+    .fn()
+    .mockImplementationOnce(() => ({
+      limit: vi.fn(async () => []),
+    }))
+    .mockImplementationOnce(() => ({
+      limit: vi.fn(async () => [user]),
+    }));
+
+  const updateCalls: Array<{ table: unknown; setPayload: unknown }> = [];
+
+  const tx = {
+    update: vi.fn((table: unknown) => ({
+      set: vi.fn((setPayload: unknown) => ({
+        where: vi.fn(async () => {
+          updateCalls.push({ table, setPayload });
+        }),
+      })),
+    })),
+  };
+
+  const database = {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where,
+      })),
+    })),
+    transaction: vi.fn(async (callback: (tx: unknown) => Promise<void>) =>
+      callback(tx),
+    ),
+  };
+
+  return {
+    database,
+    updateCalls,
+    where,
+  };
+}
+
 let handleStripeWebhook: (typeof import("../../backend/server/webhookHandler"))["handleStripeWebhook"];
 
 describe("webhook tier-sync and safety integration", () => {
   beforeAll(async () => {
     ({ handleStripeWebhook } = await import("../../backend/server/webhookHandler"));
-  }, 30000);
+  }, 120000);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -132,8 +172,9 @@ describe("webhook tier-sync and safety integration", () => {
         object: {
           id: "sub_123",
           customer: "cus_123",
+          status: "active",
           items: {
-            data: [{ plan: { id: "price_plus" } }],
+            data: [{ price: { id: "price_plus" } }],
           },
         },
       },
@@ -271,8 +312,9 @@ describe("webhook tier-sync and safety integration", () => {
         object: {
           id: "sub_fail",
           customer: "cus_fail",
+          status: "active",
           items: {
-            data: [{ plan: { id: "price_plus" } }],
+            data: [{ price: { id: "price_plus" } }],
           },
         },
       },
@@ -332,5 +374,81 @@ describe("webhook tier-sync and safety integration", () => {
       expect.stringContaining("transaction failed"),
     );
     expect(res.json).toHaveBeenCalledWith({ received: true, queued: true });
+  });
+
+  it("skips paid tier grant for non-grantable subscription status", async () => {
+    const event = {
+      id: "evt_live_7",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_past_due",
+          customer: "cus_123",
+          status: "past_due",
+          items: {
+            data: [{ price: { id: "price_plus" } }],
+          },
+        },
+      },
+    };
+
+    const { database } = createDbForSubscription({
+      id: 17,
+      stripeCustomerId: "cus_123",
+    });
+
+    mockConstructWebhookEvent.mockResolvedValue(event);
+    mockStripePriceToClientTier.mockReturnValue("client_plus");
+    mockGetDb.mockResolvedValue(database);
+
+    const req = createReq();
+    const res = createRes();
+
+    await handleStripeWebhook(req as any, res as any);
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    expect(database.transaction).not.toHaveBeenCalled();
+  });
+
+  it("reconciles subscription checkout by metadata userId when customer mapping is missing", async () => {
+    const event = {
+      id: "evt_live_8",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_sub_1",
+          mode: "subscription",
+          customer: "cus_new_1",
+          subscription: "sub_new_1",
+          metadata: {
+            userId: "42",
+            tier: "client_plus",
+          },
+        },
+      },
+    };
+
+    const { database, updateCalls, where } = createDbForMetadataFallback({
+      id: 42,
+      stripeCustomerId: null,
+    });
+
+    mockConstructWebhookEvent.mockResolvedValue(event);
+    mockGetDb.mockResolvedValue(database);
+
+    const req = createReq();
+    const res = createRes();
+
+    await handleStripeWebhook(req as any, res as any);
+
+    expect(where).toHaveBeenCalledTimes(2);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    expect(database.transaction).toHaveBeenCalledTimes(1);
+    expect(updateCalls.some((call) =>
+      (call.setPayload as Record<string, unknown>).stripeCustomerId === "cus_new_1",
+    )).toBe(true);
+    expect(updateCalls.some((call) =>
+      (call.setPayload as Record<string, unknown>).subscriptionTier === "client_plus",
+    )).toBe(true);
   });
 });

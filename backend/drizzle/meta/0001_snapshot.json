@@ -1367,6 +1367,19 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "tattooRequests_selectedBidId_bids_id_fk": {
+          "name": "tattooRequests_selectedBidId_bids_id_fk",
+          "tableFrom": "tattooRequests",
+          "tableTo": "bids",
+          "columnsFrom": [
+            "selectedBidId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},

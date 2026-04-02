@@ -4,7 +4,7 @@
 
 Full-stack web application for finding and booking tattoo artists with a client marketplace for tattoo requests and artist bidding. Built with:
 
-- **Frontend**: React 18 + Vite, Wouter routing, Tailwind CSS, shadcn/ui
+- **Frontend**: React 19 + Vite, Wouter routing, Tailwind CSS, shadcn/ui
 - **Backend**: Node.js / Express + tRPC (type-safe APIs)
 - **Database**: PostgreSQL via Supabase, Drizzle ORM
 - **Auth**: Supabase Auth (email/password + OAuth providers)
@@ -31,7 +31,7 @@ frontend/client/          React app (Vite)
     contexts/             React contexts (ThemeContext)
 
 backend/server/           Express + tRPC server
-  index.ts                Server entrypoint
+  _core/index.ts          Server entrypoint
   routers.ts              Main tRPC routers (auth, artists, portfolio, reviews, bookings, favorites, moderation)
   clientRouters.ts        Client marketplace routers (clients, requests, bids)
   aiRouter.ts             AI generation router
@@ -645,7 +645,7 @@ Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in 
 2. Export types from `backend/shared/types.ts`
 3. Run `pnpm db:push`
 4. Create tRPC router (or add to existing one)
-5. Register router in `backend/server/index.ts` if new
+5. Register router in `backend/server/_core/index.ts` if new
 6. Create frontend page/component using tRPC hooks
 7. Add route in `frontend/client/src/App.tsx`
 

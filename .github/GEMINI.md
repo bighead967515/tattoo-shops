@@ -35,7 +35,7 @@ Image Optimization: Portfolio and profile uploads must be processed (compressed/
 Theme: Support both dark and light modes using the custom `ThemeContext` (see `frontend/client/src/contexts/ThemeContext.tsx`). Public API: wrap the app in `<ThemeProvider>`, consume via the `useTheme()` hook which exposes `theme` (`"light"` | `"dark"`), `toggleTheme()`, and `switchable` flag. Preference is persisted to `localStorage` under the key `"theme"` and applied by toggling the `dark` CSS class on `<html>`.
 
 📋 Workflow & Quality Control
-Database Migrations: All schema updates must be executed via pnpm db:generate followed by pnpm db:push.
+Database Migrations: All schema updates must be executed via pnpm db:push (this script runs Drizzle generate + migrate).
 
 File Structure: Adhere to the established backend/, frontend/client/, shared/, and tests/ hierarchy.
 

@@ -13,5 +13,18 @@ CREATE TABLE "shops" (
 	"updated_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+	NEW.updated_at = now();
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+--> statement-breakpoint
+CREATE TRIGGER update_shops_updated_at
+BEFORE UPDATE ON "shops"
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+--> statement-breakpoint
 CREATE INDEX "idx_shops_name" ON "shops" USING btree ("shop_name");--> statement-breakpoint
 CREATE INDEX "idx_shops_city" ON "shops" USING btree ("city");
