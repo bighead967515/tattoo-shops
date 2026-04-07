@@ -112,10 +112,10 @@ export default function TermsOfService() {
             <p className="text-muted-foreground">
               If you have any questions about these Terms, please contact us at{" "}
               <a
-                href="mailto:legal@universalinc.com"
+                href="mailto:legal@universalinc.pro"
                 className="text-primary hover:underline"
               >
-                legal@universalinc.com
+                legal@universalinc.pro
               </a>
               .
             </p>

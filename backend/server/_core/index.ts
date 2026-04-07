@@ -52,7 +52,7 @@ initSentry();
 app.use(
   cors({
     origin: ENV.isProduction
-      ? ["https://universalinc.com", "https://www.universalinc.com"]
+      ? ["https://universalinc.pro", "https://www.universalinc.pro"]
       : ["http://localhost:3000", "http://localhost:5173"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
@@ -134,7 +134,7 @@ app.get("/sitemap.xml", async (_req, res) => {
   try {
     const { getAllArtists } = await import("../db");
     const artists = await getAllArtists();
-    const baseUrl = "https://universalinc.com";
+    const baseUrl = "https://universalinc.pro";
 
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },

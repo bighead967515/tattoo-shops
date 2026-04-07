@@ -183,13 +183,13 @@ export default function Help() {
             </div>
             <h3 className="font-semibold mb-2">Email Support</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              support@universalinc.com
+              support@universalinc.pro
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() =>
-                (window.location.href = "mailto:support@universalinc.com")
+                (window.location.href = "mailto:support@universalinc.pro")
               }
             >
               Send Email

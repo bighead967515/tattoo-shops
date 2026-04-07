@@ -160,10 +160,10 @@ export default function CancellationPolicy() {
               emergencies (medical, family, etc.), please contact our support
               team at{" "}
               <a
-                href="mailto:support@universalinc.com"
+                href="mailto:support@universalinc.pro"
                 className="text-primary hover:underline"
               >
-                support@universalinc.com
+                support@universalinc.pro
               </a>{" "}
               with relevant documentation.
             </p>
@@ -238,10 +238,10 @@ export default function CancellationPolicy() {
             <li>
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:support@universalinc.com"
+                href="mailto:support@universalinc.pro"
                 className="text-primary hover:underline"
               >
-                support@universalinc.com
+                support@universalinc.pro
               </a>
             </li>
             <li>
