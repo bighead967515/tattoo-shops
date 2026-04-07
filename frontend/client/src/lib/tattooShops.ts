@@ -1,3 +1,6 @@
+/** Discriminates between artist profiles and shops-table entries in the unified list */
+export type TattooShopSource = "artist" | "shop";
+
 export interface TattooShop {
   id: number;
   name: string;
@@ -12,6 +15,23 @@ export interface TattooShop {
   rating: string;
   lat?: number;
   lng?: number;
+  /** Indicates whether this entry came from the artists table or the shops table */
+  source: TattooShopSource;
+  isVerified?: boolean;
+}
+
+/** Shape returned by trpc.shop.getAll — mirrors the shops table columns */
+export interface ShopRecord {
+  id: number;
+  shopName: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  phone: string | null;
+  email: string | null;
+  isVerified: boolean | null;
+  isClaimed: boolean | null;
 }
 
 export interface ArtistShopSource {
@@ -69,6 +89,29 @@ export function mapArtistsToTattooShops(
     rating: toRatingString(artist.averageRating, artist.totalReviews),
     lat: parseCoordinate(artist.lat),
     lng: parseCoordinate(artist.lng),
+    source: "artist" as TattooShopSource,
+  }));
+}
+
+/**
+ * Map shops-table records into the unified TattooShop shape.
+ * Shop IDs are offset by 1,000,000 to avoid collisions with artist IDs.
+ */
+export function mapShopsToTattooShops(shopRecords: ShopRecord[]): TattooShop[] {
+  return shopRecords.map((shop) => ({
+    id: shop.id + 1_000_000,
+    name: shop.shopName,
+    city: [shop.city, shop.state].filter(Boolean).join(", "),
+    address: shop.address ?? "",
+    phone: shop.phone ?? "",
+    website: "",
+    facebook: "",
+    instagram: "",
+    email: shop.email ?? "",
+    specialties: "",
+    rating: "",
+    source: "shop" as TattooShopSource,
+    isVerified: shop.isVerified ?? false,
   }));
 }
 
@@ -133,6 +176,7 @@ export async function loadTattooShops(): Promise<TattooShop[]> {
         email: fields[7] || "",
         specialties: fields[8] || "",
         rating: fields[9] || "",
+        source: "shop",
       };
 
       if (shop.name) {

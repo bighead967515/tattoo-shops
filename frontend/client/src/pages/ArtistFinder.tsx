@@ -10,6 +10,9 @@ import {
   Phone,
   Mail,
   SearchX,
+  Store,
+  BadgeCheck,
+  User,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import {
@@ -17,6 +20,7 @@ import {
   parseRating,
   getInitials,
   mapArtistsToTattooShops,
+  mapShopsToTattooShops,
   type TattooShop,
 } from "@/lib/tattooShops";
 import BookingDialog from "@/components/BookingDialog";
@@ -26,23 +30,57 @@ export default function ArtistFinder() {
   const [activeSearch, setActiveSearch] = useState("");
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedShop, setSelectedShop] = useState<TattooShop | null>(null);
+  const [activeTab, setActiveTab] = useState<"all" | "artists" | "shops">("all");
 
   const {
     data: artists,
-    isLoading: loading,
-    isError,
-    error,
+    isLoading: artistsLoading,
+    isError: artistsError,
   } = trpc.artists.getAll.useQuery();
 
-  const shops = useMemo(() => mapArtistsToTattooShops(artists ?? []), [artists]);
+  const {
+    data: shopRecords,
+    isLoading: shopsLoading,
+    isError: shopsError,
+  } = trpc.shop.getAll.useQuery();
+
+  const loading = artistsLoading || shopsLoading;
+  const isError = artistsError || shopsError;
+
+  const allEntries = useMemo(() => {
+    const artistEntries = mapArtistsToTattooShops(artists ?? []);
+    const shopEntries = mapShopsToTattooShops(shopRecords ?? []);
+    // Merge: artists first, then shops — deduplicate by name+city to avoid showing
+    // the same business twice if it appears in both tables.
+    const seen = new Set<string>();
+    const merged: TattooShop[] = [];
+    for (const entry of [...artistEntries, ...shopEntries]) {
+      const key = `${entry.name.toLowerCase()}|${entry.city.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(entry);
+      }
+    }
+    return merged;
+  }, [artists, shopRecords]);
+
+  const tabFiltered = useMemo(() => {
+    if (activeTab === "artists") return allEntries.filter((e) => e.source === "artist");
+    if (activeTab === "shops") return allEntries.filter((e) => e.source === "shop");
+    return allEntries;
+  }, [allEntries, activeTab]);
+
   const filteredShops = useMemo(
-    () => filterTattooShops(shops, activeSearch),
-    [shops, activeSearch],
+    () => filterTattooShops(tabFiltered, activeSearch),
+    [tabFiltered, activeSearch],
   );
 
   const handleSearch = () => {
     setActiveSearch(searchCity);
   };
+
+  const artistCount = allEntries.filter((e) => e.source === "artist").length;
+  const shopCount = allEntries.filter((e) => e.source === "shop").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,14 +89,14 @@ export default function ArtistFinder() {
       <div className="container py-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-4xl font-bold text-foreground mb-2">
-            Find Tattoo Artists Near You
+            Find Tattoo Artists &amp; Shops Near You
           </h1>
           <p className="text-muted-foreground mb-8">
             Discover talented tattoo artists and shops across Louisiana
           </p>
 
           {/* Search Bar */}
-          <div className="flex gap-3 mb-8">
+          <div className="flex gap-3 mb-6">
             <div className="flex-1 relative">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -75,61 +113,128 @@ export default function ArtistFinder() {
             </Button>
           </div>
 
+          {/* Tab Filter */}
+          {!loading && !isError && (
+            <div className="flex gap-2 mb-6">
+              <Button
+                variant={activeTab === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("all")}
+              >
+                All ({allEntries.length})
+              </Button>
+              <Button
+                variant={activeTab === "artists" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("artists")}
+              >
+                <User className="h-3.5 w-3.5 mr-1" />
+                Artists ({artistCount})
+              </Button>
+              <Button
+                variant={activeTab === "shops" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("shops")}
+              >
+                <Store className="h-3.5 w-3.5 mr-1" />
+                Shops ({shopCount})
+              </Button>
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                Loading shops from the database...
+                Loading artists and shops from the database...
               </p>
             </div>
           ) : isError ? (
             <div className="text-center py-12">
               <p className="text-destructive mb-2">
-                Unable to load shops from Supabase.
-              </p>
-              <p className="text-muted-foreground text-sm">
-                {error.message}
+                Unable to load results. Please try again.
               </p>
             </div>
           ) : (
             <div className="max-w-3xl mx-auto">
-              {/* Shop List */}
+              {/* Results List */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-foreground">
-                    {filteredShops.length} Shop
+                    {filteredShops.length} Result
                     {filteredShops.length !== 1 ? "s" : ""} Found
                   </h2>
                 </div>
 
-                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
                   {filteredShops.length === 0 ? (
                     <Card className="p-8 text-center">
                       <SearchX className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
                       <p className="text-sm text-muted-foreground">
-                        No shops matched your search.
+                        No results matched your search.
                       </p>
                     </Card>
                   ) : (
                     filteredShops.map((shop) => {
                       const { rating, count } = parseRating(shop.rating);
                       const initials = getInitials(shop.name);
+                      const isShopEntry = shop.source === "shop";
 
                       return (
                         <Card
-                          key={shop.id}
+                          key={`${shop.source}-${shop.id}`}
                           className="p-4 bg-card border-border hover:border-primary/50 transition-colors"
                         >
                           <div className="flex gap-4">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-lg flex-shrink-0">
-                              {initials}
+                            {/* Avatar */}
+                            <div
+                              className={`flex h-16 w-16 items-center justify-center rounded-full font-bold text-lg flex-shrink-0 ${
+                                isShopEntry
+                                  ? "bg-secondary text-secondary-foreground"
+                                  : "bg-primary text-primary-foreground"
+                              }`}
+                            >
+                              {isShopEntry ? (
+                                <Store className="h-7 w-7" />
+                              ) : (
+                                initials
+                              )}
                             </div>
 
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2 mb-1">
                                 <div>
-                                  <h3 className="font-semibold text-foreground">
-                                    {shop.name}
-                                  </h3>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-semibold text-foreground">
+                                      {shop.name}
+                                    </h3>
+                                    {/* Source badge */}
+                                    <span
+                                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full font-medium ${
+                                        isShopEntry
+                                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                      }`}
+                                    >
+                                      {isShopEntry ? (
+                                        <>
+                                          <Store className="h-3 w-3" />
+                                          Shop
+                                        </>
+                                      ) : (
+                                        <>
+                                          <User className="h-3 w-3" />
+                                          Artist
+                                        </>
+                                      )}
+                                    </span>
+                                    {/* Verified badge for shops */}
+                                    {isShopEntry && shop.isVerified && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                        <BadgeCheck className="h-3 w-3" />
+                                        Verified
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-sm text-muted-foreground">
                                     {shop.city}
                                   </p>
@@ -211,16 +316,19 @@ export default function ArtistFinder() {
                                 )}
                               </div>
 
-                              <Button
-                                size="sm"
-                                className="w-full"
-                                onClick={() => {
-                                  setSelectedShop(shop);
-                                  setBookingDialogOpen(true);
-                                }}
-                              >
-                                Book Appointment
-                              </Button>
+                              {/* Only show booking button for artist profiles */}
+                              {!isShopEntry && (
+                                <Button
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => {
+                                    setSelectedShop(shop);
+                                    setBookingDialogOpen(true);
+                                  }}
+                                >
+                                  Book Appointment
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </Card>

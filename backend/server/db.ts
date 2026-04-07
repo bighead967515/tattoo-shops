@@ -5,6 +5,7 @@ import {
   InsertUser,
   users,
   artists,
+  shops,
   portfolioImages,
   reviews,
   bookings,
@@ -280,6 +281,36 @@ export async function searchArtists(filters: {
     .select()
     .from(artists)
     .where(and(...conditions));
+}
+
+/**
+ * Get all shops from the shops table.
+ */
+export async function getAllShops() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(shops).orderBy(shops.shopName);
+}
+
+/**
+ * Search shops by city or shop name (case-insensitive).
+ */
+export async function searchShops(query: string) {
+  const db = await getDb();
+  if (!db) return [];
+  if (!query.trim()) return getAllShops();
+  const term = `%${query.trim()}%`;
+  return await db
+    .select()
+    .from(shops)
+    .where(
+      or(
+        sql`${shops.shopName} ILIKE ${term}`,
+        sql`${shops.city} ILIKE ${term}`,
+        sql`${shops.state} ILIKE ${term}`,
+      ),
+    )
+    .orderBy(shops.shopName);
 }
 
 export async function updateArtist(id: number, data: Partial<InsertArtist>) {
