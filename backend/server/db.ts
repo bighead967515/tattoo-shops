@@ -114,7 +114,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
+    logger.warn("Cannot upsert user: database not available");
     return;
   }
 
@@ -167,7 +167,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       set: updateSet,
     });
   } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
+    logger.error("Failed to upsert user", { error });
     throw error;
   }
 }
@@ -175,7 +175,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+    logger.warn("Cannot get user: database not available");
     return undefined;
   }
 
@@ -247,18 +247,17 @@ export async function searchArtists(filters: {
 
   const conditions: any[] = [eq(artists.isApproved, true)];
 
-  // Filter by styles
+   // Filter by styles — PostgreSQL ILIKE on comma-separated styles column
   if (filters.styles && filters.styles.length > 0) {
     const styleConditions = filters.styles.map(
-      (style) => sql`FIND_IN_SET(${style}, ${artists.styles}) > 0`,
+      (style) => sql`${artists.styles} ILIKE ${'%' + style + '%'}`,
     );
     conditions.push(or(...styleConditions));
   }
-
-  // Filter by minimum rating
+  // Filter by minimum rating — cast text column to numeric for comparison
   if (filters.minRating && filters.minRating > 0) {
     conditions.push(
-      sql`CAST(${artists.averageRating} AS DECIMAL(3,2)) >= ${filters.minRating}`,
+      sql`${artists.averageRating}::numeric >= ${filters.minRating}`,
     );
   }
 

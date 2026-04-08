@@ -7,7 +7,8 @@ import { defineConfig } from "vite";
 const plugins = [react(), tailwindcss()];
 
 if (process.env.VITE_ENABLE_JSX_LOC === "true") {
-  plugins.push(jsxLocPlugin());
+  // jsxLocPlugin returns a single Plugin; cast to any to satisfy the typed array
+  plugins.push(jsxLocPlugin() as any);
 }
 
 export default defineConfig({

@@ -24,6 +24,22 @@ import type { SubscriptionTier } from "@shared/const";
 // Define role enum for PostgreSQL
 export const roleEnum = pgEnum("role", ["user", "admin", "artist", "client"]);
 
+// Define booking status enum
+export const bookingStatusEnum = pgEnum("booking_status", [
+  "pending",
+  "confirmed",
+  "cancelled",
+  "completed",
+]);
+
+// Define webhook queue status enum
+export const webhookStatusEnum = pgEnum("webhook_status", [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+]);
+
 // Define verification status enum
 export const verificationStatusEnum = pgEnum("verification_status", [
   "unverified", // Default: Just signed up, can browse but not interact
@@ -219,7 +235,7 @@ export const bookings = pgTable("bookings", {
   size: varchar("size", { length: 100 }).notNull(),
   budget: varchar("budget", { length: 100 }),
   additionalNotes: text("additionalNotes"),
-  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  status: bookingStatusEnum("status").default("pending").notNull(),
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }), // For deposit payments
   depositAmount: integer("depositAmount"), // Amount in cents
   depositPaid: boolean("depositPaid").default(false),
@@ -262,7 +278,7 @@ export const webhookQueue = pgTable("webhookQueue", {
   eventId: varchar("eventId", { length: 255 }).notNull().unique(),
   eventType: varchar("eventType", { length: 100 }).notNull(),
   payload: text("payload").notNull(), // JSON stringified
-  status: varchar("status", { length: 50 }).notNull().default("pending"), // pending, processing, completed, failed
+  status: webhookStatusEnum("status").notNull().default("pending"),
   retryCount: integer("retryCount").notNull().default(0),
   maxRetries: integer("maxRetries").notNull().default(5),
   nextRetryAt: timestamp("nextRetryAt").notNull(),
