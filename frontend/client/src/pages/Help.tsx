@@ -183,13 +183,13 @@ export default function Help() {
             </div>
             <h3 className="font-semibold mb-2">Email Support</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              support@universalinc.pro
+              support@inkconnect.pro
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() =>
-                (window.location.href = "mailto:support@universalinc.pro")
+                (window.location.href = "mailto:support@inkconnect.pro")
               }
             >
               Send Email
@@ -354,7 +354,7 @@ export default function Help() {
         <div className="container py-8">
           <div className="text-center text-sm text-muted-foreground">
             <p>
-              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+              © {new Date().getFullYear()} Ink Connect. All rights reserved.
             </p>
           </div>
         </div>

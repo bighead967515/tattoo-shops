@@ -28,9 +28,9 @@ export default function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
-            <img src={APP_LOGO} alt="Universal Inc" className="h-10 w-10" />
-            <span className="text-xl font-bold text-foreground">
-              Universal Inc
+            <img src={APP_LOGO} alt="Ink Connect" className="h-10 w-10" />
+            <span className="text-xl font-bold text-foreground tracking-tight">
+              <span className="text-primary">Ink</span> Connect
             </span>
           </Link>
 
@@ -39,7 +39,7 @@ export default function Header() {
               href="/"
               className="text-sm font-medium text-foreground hover:text-primary transition-colors"
             >
-              Tattoos
+              Explore
             </Link>
             <Link
               href="/artists"
@@ -51,7 +51,7 @@ export default function Header() {
               href="/artist-finder"
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
-              Artist Finder
+              Find Artists & Shops
             </Link>
             <Link
               href="/for-artists"

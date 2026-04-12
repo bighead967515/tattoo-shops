@@ -200,7 +200,7 @@ export default function Login() {
 
           <div className="mt-8 pt-6 border-t text-center">
             <p className="text-sm text-muted-foreground mb-4">
-              New to Universal Inc?
+              New to Ink Connect?
             </p>
             <div className="space-y-2 text-sm">
               <p>✓ Save your favorite artists</p>

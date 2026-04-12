@@ -22,11 +22,11 @@ export default function TermsOfService() {
 
         <Card className="p-8 mb-8 bg-primary/5 border-primary/20">
           <h2 className="text-2xl font-semibold mb-4">
-            Welcome to Universal Inc.
+            Welcome to Ink Connect.
           </h2>
           <p className="text-muted-foreground">
             These Terms of Service ("Terms") govern your access to and use of
-            the Universal Inc. website, services, and applications
+            the Ink Connect website, services, and applications
             (collectively, the "Service"). Please read them carefully.
           </p>
         </Card>
@@ -96,7 +96,7 @@ export default function TermsOfService() {
                   4. Disclaimers and Limitation of Liability
                 </h3>
                 <p className="text-muted-foreground mb-3">
-                  The Service is provided "as is." Universal Inc. makes no
+                  The Service is provided "as is." Ink Connect makes no
                   warranties regarding the service and is not liable for any
                   damages arising from your use of the service. We are a
                   platform that connects clients with tattoo artists; we do not
@@ -112,10 +112,10 @@ export default function TermsOfService() {
             <p className="text-muted-foreground">
               If you have any questions about these Terms, please contact us at{" "}
               <a
-                href="mailto:legal@universalinc.pro"
+                href="mailto:legal@inkconnect.pro"
                 className="text-primary hover:underline"
               >
-                legal@universalinc.pro
+                legal@inkconnect.pro
               </a>
               .
             </p>
@@ -127,7 +127,7 @@ export default function TermsOfService() {
         <div className="container py-8">
           <div className="text-center text-sm text-muted-foreground">
             <p>
-              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+              © {new Date().getFullYear()} Ink Connect. All rights reserved.
             </p>
           </div>
         </div>

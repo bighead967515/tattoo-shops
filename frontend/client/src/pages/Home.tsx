@@ -48,8 +48,7 @@ export default function Home() {
               Find Your Perfect Tattoo Artist
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-8">
-              Browse portfolios, post your tattoo idea, and get bids from
-              top-rated artists
+              <span className="text-primary font-semibold">Ink Connect</span> — browse portfolios, post your tattoo idea, and get bids from top-rated artists and shops
             </p>
 
             {/* Search Bar */}
@@ -218,10 +217,10 @@ export default function Home() {
         <div className="container py-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Why Choose Universal Inc
+              Why Choose Ink Connect
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              The trusted platform for finding and booking tattoo artists
+              The trusted platform for finding and booking tattoo artists and shops
             </p>
           </div>
 
@@ -277,7 +276,7 @@ export default function Home() {
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join thousands of satisfied customers who found their perfect artist
-            on Universal Inc
+            on Ink Connect
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
@@ -382,7 +381,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Universal Inc. All rights reserved.
+            © {new Date().getFullYear()} Ink Connect. All rights reserved.
           </div>
         </div>
       </footer>

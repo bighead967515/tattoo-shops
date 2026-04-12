@@ -116,7 +116,7 @@ export default function ForArtists() {
         <div className="container">
           <div className="max-w-4xl mx-auto text-center space-y-6">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground">
-              Join Universal Inc
+              Join Ink Connect
             </h1>
             <p className="text-xl text-muted-foreground">
               Connect with thousands of clients looking for talented tattoo
@@ -465,7 +465,7 @@ export default function ForArtists() {
         <div className="container">
           <div className="text-center text-sm text-muted-foreground">
             <p className="mb-2">
-              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+              © {new Date().getFullYear()} Ink Connect. All rights reserved.
             </p>
             <div className="flex justify-center gap-4">
               <a href="/terms-of-service" className="hover:text-primary">

@@ -1,4 +1,4 @@
-# Universal Inc. — Tattoo Artist Directory & Booking Platform
+# Ink Connect. — Tattoo Artist Directory & Booking Platform
 
 A full-stack web application for finding, connecting with, and booking tattoo artists. Clients can browse artist portfolios, post tattoo requests for artists to bid on, generate AI tattoo designs, and book appointments — all with integrated payments and real-time communication.
 

@@ -92,7 +92,7 @@ export default function ArtistFinder() {
             Find Tattoo Artists &amp; Shops Near You
           </h1>
           <p className="text-muted-foreground mb-8">
-            Discover talented tattoo artists and shops across Louisiana
+            Discover verified tattoo artists and shops near you
           </p>
 
           {/* Search Bar */}
@@ -357,7 +357,7 @@ export default function ArtistFinder() {
         <div className="container">
           <div className="text-center text-sm text-muted-foreground">
             <p className="mb-2">
-              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+              © {new Date().getFullYear()} Ink Connect. All rights reserved.
             </p>
             <div className="flex justify-center gap-4">
               <a href="/terms-of-service" className="hover:text-primary">

@@ -65,7 +65,7 @@ export async function sendEmail(options: EmailOptions) {
     to,
     subject,
     html,
-    from = "Universal Inc <noreply@universalinc.pro>",
+    from = "Ink Connect <noreply@universalinc.pro>",
   } = options;
 
   return emailCircuit.execute(async () => {
@@ -151,15 +151,15 @@ export async function sendArtistInvitation(to: string, shopName: string) {
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎨 You're Invited to Join Universal Inc</h1>
+      <h1>🎨 You're Invited to Join Ink Connect</h1>
     </div>
     
     <div class="content">
       <h2>Hello ${escapedShopName}!</h2>
       
-      <p>We're excited to invite you to join <strong>Universal Inc</strong>, Louisiana's premier online platform connecting tattoo artists with clients looking for their perfect artist.</p>
+      <p>We're excited to invite you to join <strong>Ink Connect</strong>, the premier platform connecting tattoo artists and shops with clients looking for their perfect artist.</p>
       
-      <p>We've noticed your excellent work and reputation in the Louisiana tattoo community, and we'd love to have you as part of our growing network.</p>
+      <p>We've noticed your excellent work and reputation in the tattoo community, and we'd love to have you as part of our growing network.</p>
       
       <div class="features">
         <h3>✨ What You Get with a FREE Basic Listing:</h3>
@@ -188,16 +188,16 @@ export async function sendArtistInvitation(to: string, shopName: string) {
         </a>
       </p>
       
-      <p>Join hundreds of Louisiana tattoo artists who are already growing their business with Universal Inc. It takes less than 5 minutes to get started!</p>
+      <p>Join hundreds of tattoo artists and shops who are already growing their business with Ink Connect. It takes less than 5 minutes to get started!</p>
       
       <p>Questions? Just reply to this email and we'll be happy to help.</p>
       
       <p>Best regards,<br>
-      <strong>The Universal Inc Team</strong></p>
+      <strong>The Ink Connect Team</strong></p>
     </div>
     
     <div class="footer">
-      <p>Universal Inc - Louisiana's Tattoo Artist Network</p>
+      <p>Ink Connect &mdash; Find Tattoo Artists &amp; Shops Near You</p>
       <p>This is a one-time invitation. You can unsubscribe by replying to this email.</p>
     </div>
   </div>
@@ -207,7 +207,7 @@ export async function sendArtistInvitation(to: string, shopName: string) {
 
   return sendEmail({
     to,
-    subject: `${shopName} - You're Invited to Join Universal Inc! 🎨`,
+    subject: `${shopName} - You're Invited to Join Ink Connect! 🎨`,
     html,
   });
 }
@@ -284,10 +284,10 @@ export async function sendBookingConfirmation(
       <p>If you need to reschedule or have any questions, please contact the shop directly.</p>
       
       <p>See you soon!<br>
-      <strong>Universal Inc Team</strong></p>
+      <strong>Ink Connect Team</strong></p>
     </div>
     <div class="footer">
-      <p>Universal Inc - Your Tattoo Journey Starts Here</p>
+      <p>Ink Connect &mdash; Your Tattoo Journey Starts Here</p>
     </div>
   </div>
 </body>

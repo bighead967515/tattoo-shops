@@ -160,10 +160,10 @@ export default function CancellationPolicy() {
               emergencies (medical, family, etc.), please contact our support
               team at{" "}
               <a
-                href="mailto:support@universalinc.pro"
+                href="mailto:support@inkconnect.pro"
                 className="text-primary hover:underline"
               >
-                support@universalinc.pro
+                support@inkconnect.pro
               </a>{" "}
               with relevant documentation.
             </p>
@@ -238,10 +238,10 @@ export default function CancellationPolicy() {
             <li>
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:support@universalinc.pro"
+                href="mailto:support@inkconnect.pro"
                 className="text-primary hover:underline"
               >
-                support@universalinc.pro
+                support@inkconnect.pro
               </a>
             </li>
             <li>
@@ -265,7 +265,7 @@ export default function CancellationPolicy() {
         <div className="container py-8">
           <div className="text-center text-sm text-muted-foreground">
             <p className="mb-2">
-              © {new Date().getFullYear()} Universal Inc. All rights reserved.
+              © {new Date().getFullYear()} Ink Connect. All rights reserved.
             </p>
             <div className="flex justify-center gap-4">
               <a href="/terms-of-service" className="hover:text-primary">

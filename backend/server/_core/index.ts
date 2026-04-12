@@ -129,7 +129,7 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-// Dynamic sitemap for SEO - includes all approved artists
+// Dynamic sitemap for SEO - Ink Connect artist and shop pages
 app.get("/sitemap.xml", async (_req, res) => {
   try {
     const { getAllArtists } = await import("../db");
