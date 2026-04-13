@@ -59,23 +59,37 @@ app.use(
   }),
 );
 
-// Rate limiting: 100 requests per 15 minutes per IP
+// Rate limiting: 500 requests per 15 minutes per IP for general API
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Too many requests from this IP, please try again later.",
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      error: "Too many requests from this IP, please try again later.",
+      retryAfter: 15,
+    });
+  },
+  skip: (req) => {
+    // Skip rate limiting for GET tRPC queries (read-only, public data)
+    return req.method === "GET" && req.path.startsWith("/api/trpc/");
+  },
 });
 app.use("/api/", limiter);
 
-// Stricter rate limiting for auth routes: 10 requests per 15 minutes per IP
+// Stricter rate limiting for auth routes: 20 requests per 15 minutes per IP
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: "Too many authentication attempts, please try again later.",
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      error: "Too many authentication attempts, please try again later.",
+      retryAfter: 15,
+    });
+  },
 });
 app.use("/api/auth/", authLimiter);
 
