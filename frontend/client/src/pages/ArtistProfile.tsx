@@ -26,6 +26,7 @@ import {
   Calendar,
   Upload,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -156,7 +157,15 @@ export default function ArtistProfile() {
         <div className="container">
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-4">{artist.shopName}</h1>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h1 className="text-4xl font-bold">{artist.shopName}</h1>
+                {portfolio && portfolio.length >= 3 && (
+                  <Badge className="bg-primary/15 text-primary border border-primary/30 gap-1.5 px-3 py-1 text-sm font-semibold">
+                    <ShieldCheck className="w-4 h-4" />
+                    Vibe Verified
+                  </Badge>
+                )}
+              </div>
 
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-1">
