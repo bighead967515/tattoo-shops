@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import ArtistFinder from "./pages/ArtistFinder";
 import ArtistBrowse from "./pages/ArtistBrowse";
@@ -28,7 +29,6 @@ import AdminModeration from "./pages/AdminModeration";
 import DesignLab from "./pages/DesignLab";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
@@ -72,7 +72,12 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          {/* Fixed left sidebar (desktop) / top bar + drawer (mobile) */}
+          <Sidebar />
+          {/* Main content area — offset by sidebar width on desktop, top bar height on mobile */}
+          <main className="md:ml-60 pt-14 md:pt-0 min-h-screen">
+            <Router />
+          </main>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

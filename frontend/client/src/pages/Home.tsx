@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import Header from "@/components/Header";
 import HomepageFeed from "@/components/HomepageFeed";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,8 +37,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-
       {/* Hero Section with Value Proposition */}
       <div className="relative bg-gradient-to-br from-background via-background to-primary/5 border-b">
         <div className="container py-20 md:py-32">
@@ -112,33 +109,33 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Trust Indicators */}
+      {/* Value Proposition Cards */}
       <div className="border-b bg-muted/30">
-        <div className="container py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">500+</div>
-              <div className="text-sm text-muted-foreground">
-                Verified Artists
+        <div className="container py-14">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {/* Card 1 — Hand-Picked Artists */}
+            <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(112,255,112,0.08)] transition-all duration-300 group">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
+                <Star className="w-7 h-7 text-primary" />
               </div>
+              <h3 className="text-lg font-bold mb-2">Hand-Picked Artists</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">Every artist on Ink Connect is individually reviewed for quality, professionalism, and portfolio excellence.</p>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">10K+</div>
-              <div className="text-sm text-muted-foreground">
-                Happy Customers
+            {/* Card 2 — Custom Designs */}
+            <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(112,255,112,0.08)] transition-all duration-300 group">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
+                <Sparkles className="w-7 h-7 text-primary" />
               </div>
+              <h3 className="text-lg font-bold mb-2">Custom Designs</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">Post your idea and receive unique design concepts tailored specifically to your vision from multiple artists.</p>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">4.9</div>
-              <div className="text-sm text-muted-foreground">
-                Average Rating
+            {/* Card 3 — Safe & Sanitary Studios */}
+            <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(112,255,112,0.08)] transition-all duration-300 group">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
+                <Shield className="w-7 h-7 text-primary" />
               </div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">100%</div>
-              <div className="text-sm text-muted-foreground">
-                Secure Payments
-              </div>
+              <h3 className="text-lg font-bold mb-2">Safe &amp; Sanitary Studios</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">All listed studios follow strict health and safety standards, so you can focus on your art, not your safety.</p>
             </div>
           </div>
         </div>
