@@ -72,7 +72,10 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          {/* Offset page content to the right of the fixed 256px sidebar on desktop */}
+          <div className="md:pl-64">
+            <Router />
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

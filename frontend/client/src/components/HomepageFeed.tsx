@@ -46,13 +46,15 @@ export default function HomepageFeed() {
 
   if (!requests || requests.length === 0) {
     return (
-      <div className="text-center py-10 px-4 border-2 border-dashed rounded-md">
-        <h3 className="text-xl font-semibold mb-2">No open requests yet!</h3>
-        <p className="text-muted-foreground mb-6">
-          Be the first one to post a public request and get bids from artists.
+      <div className="text-center py-16 px-4 border-2 border-dashed rounded-2xl bg-muted/20">
+        <div className="text-5xl mb-4">🎨</div>
+        <h3 className="text-xl font-semibold mb-2">The canvas is blank!</h3>
+        <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+          Post your idea to start receiving bids from local artists. Be the
+          first to spark something great.
         </p>
         <Button onClick={() => setLocation("/client/new-request")}>
-          Post a Request
+          Post Your Idea
         </Button>
       </div>
     );

@@ -42,7 +42,7 @@ export default function Home() {
 
       {/* Hero Section with Value Proposition */}
       <div className="relative bg-gradient-to-br from-background via-background to-primary/5 border-b">
-        <div className="container py-20 md:py-32">
+        <div className="container pt-20 pb-20 md:py-32">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
               Find Your Perfect Tattoo Artist
@@ -113,33 +113,41 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Trust Indicators */}
+      {/* Value Propositions */}
       <div className="border-b bg-muted/30">
         <div className="container py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">500+</div>
-              <div className="text-sm text-muted-foreground">
-                Verified Artists
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center p-8 rounded-xl border bg-background/60 hover:shadow-lg transition-shadow">
+              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Award className="w-7 h-7 text-primary" />
               </div>
+              <h3 className="text-lg font-semibold mb-2">Hand-Picked Artists</h3>
+              <p className="text-sm text-muted-foreground">
+                Every artist is individually reviewed for quality,
+                professionalism, and style before joining the platform.
+              </p>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">10K+</div>
-              <div className="text-sm text-muted-foreground">
-                Happy Customers
+
+            <div className="text-center p-8 rounded-xl border bg-background/60 hover:shadow-lg transition-shadow">
+              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-7 h-7 text-primary" />
               </div>
+              <h3 className="text-lg font-semibold mb-2">Custom Designs</h3>
+              <p className="text-sm text-muted-foreground">
+                Post your idea and receive tailored bids from artists who match
+                your vision, budget, and preferred style.
+              </p>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">4.9</div>
-              <div className="text-sm text-muted-foreground">
-                Average Rating
+
+            <div className="text-center p-8 rounded-xl border bg-background/60 hover:shadow-lg transition-shadow">
+              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-7 h-7 text-primary" />
               </div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">100%</div>
-              <div className="text-sm text-muted-foreground">
-                Secure Payments
-              </div>
+              <h3 className="text-lg font-semibold mb-2">Safe &amp; Sanitary Studios</h3>
+              <p className="text-sm text-muted-foreground">
+                All listed studios meet verified health and safety standards so
+                you can focus on your art, not your safety.
+              </p>
             </div>
           </div>
         </div>

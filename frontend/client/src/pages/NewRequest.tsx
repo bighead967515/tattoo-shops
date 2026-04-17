@@ -441,12 +441,15 @@ export default function NewRequest() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Size directly affects price and session time.
+                </p>
               </div>
             </div>
 
             {/* Placement */}
             <div>
-              <Label htmlFor="placement">Placement *</Label>
+              <Label htmlFor="placement">Placement on Body *</Label>
               <Select
                 value={formData.placement}
                 onValueChange={(value) =>
@@ -464,6 +467,9 @@ export default function NewRequest() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Artists plan stencils, sizing, and flow around exact body placement — be as specific as possible.
+              </p>
             </div>
 
             {/* Color Preference */}
@@ -511,6 +517,9 @@ export default function NewRequest() {
                   />
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Typical ranges: small pieces $100–300 · medium $300–700 · sleeves &amp; back pieces $1,500+. Honest budgets attract better bids.
+              </p>
             </div>
 
             {/* Location */}

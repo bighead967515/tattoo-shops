@@ -4,11 +4,38 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { APP_LOGO } from "@/const";
 import { Button } from "@/components/ui/button";
-import { Search, Menu, Moon, Sun } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Menu,
+  Moon,
+  Sun,
+  X,
+  PenLine,
+  Search,
+  Users,
+  Compass,
+  Palette,
+  LayoutDashboard,
+  LogOut,
+  ClipboardList,
+} from "lucide-react";
+
+const navLinks = [
+  { href: "/", label: "Home", icon: Search },
+  { href: "/artists", label: "Browse Artists", icon: Users },
+  { href: "/artist-finder", label: "Artist Finder", icon: Compass },
+  { href: "/requests", label: "Request Board", icon: ClipboardList },
+  { href: "/for-artists", label: "For Artists", icon: Palette },
+];
 
 export default function Header() {
   const [location] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
@@ -23,113 +50,158 @@ export default function Header() {
     }
   };
 
-  return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2">
-            <img src={APP_LOGO} alt="Universal Inc" className="h-10 w-10" />
-            <span className="text-xl font-bold text-foreground">
-              Universal Inc
-            </span>
+  const close = () => setMobileOpen(false);
+
+  const sidebarInner = (
+    <div className="flex flex-col h-full p-4">
+      {/* Logo */}
+      <Link
+        href="/"
+        onClick={close}
+        className="flex items-center gap-3 mb-8 px-2"
+      >
+        <img src={APP_LOGO} alt="Universal Inc" className="h-10 w-10 rounded-lg" />
+        <span className="text-lg font-bold text-white">Universal Inc</span>
+      </Link>
+
+      {/* Primary CTA */}
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          <Link href="/client/new-request" onClick={close} className="mb-6">
+            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-[0_0_15px_rgba(112,255,112,0.35)] hover:shadow-[0_0_25px_rgba(112,255,112,0.65)] transition-all duration-300">
+              <PenLine className="w-4 h-4 mr-2" />
+              Post an Idea
+            </Button>
           </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="text-xs">
+          Describe your tattoo idea and receive bids from artists
+        </TooltipContent>
+      </Tooltip>
 
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/"
-              className="text-sm font-medium text-foreground hover:text-primary transition-colors"
-            >
-              Tattoos
-            </Link>
-            <Link
-              href="/artists"
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              Browse Artists
-            </Link>
-            <Link
-              href="/artist-finder"
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              Artist Finder
-            </Link>
-            <Link
-              href="/for-artists"
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              For Artists
-            </Link>
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-foreground"
-            onClick={toggleTheme}
-          >
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-          <Button variant="ghost" size="icon" className="text-foreground">
-            <Search className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-foreground"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          {isAuthenticated ? (
-            <>
-              <Link href="/dashboard">
-                <Button
-                  variant="ghost"
-                  className="hidden md:inline-flex hover:scale-105 transition-all duration-300 hover:shadow-[0_0_15px_rgba(112,255,112,0.5)]"
-                >
-                  Dashboard
-                </Button>
+      {/* Navigation links */}
+      <nav className="flex-1 space-y-1">
+        {navLinks.map(({ href, label, icon: Icon }) => (
+          <Tooltip key={href} delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Link
+                href={href}
+                onClick={close}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  location === href
+                    ? "bg-primary/20 text-primary"
+                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
               </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              {label}
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </nav>
+
+      {/* Bottom controls */}
+      <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-slate-300 hover:text-white hover:bg-white/10"
+          onClick={toggleTheme}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4 mr-2" />
+          ) : (
+            <Moon className="h-4 w-4 mr-2" />
+          )}
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </Button>
+
+        {isAuthenticated ? (
+          <>
+            <Link href="/dashboard" onClick={close}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-slate-300 hover:text-white hover:bg-white/10"
+              >
+                <LayoutDashboard className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-slate-300 hover:text-white hover:bg-white/10"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              {isLoggingOut ? "Signing Out…" : "Sign Out"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Link href="/login" onClick={close}>
               <Button
                 variant="outline"
-                className="hidden md:inline-flex hover:scale-105 transition-all duration-300 hover:shadow-[0_0_15px_rgba(255,112,255,0.5)]"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
+                size="sm"
+                className="w-full border-white/20 text-white hover:bg-white/10 hover:text-white"
               >
-                {isLoggingOut ? "Signing Out..." : "Sign Out"}
+                Sign In
               </Button>
-            </>
-          ) : (
-            <div className="hidden md:flex items-center gap-3">
-              <Link href="/login">
-                <Button
-                  variant="outline"
-                  className="relative overflow-hidden group hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(112,255,112,0.6)] border-primary/50 hover:border-primary"
-                >
-                  <span className="relative z-10">Sign In</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                </Button>
-              </Link>
-              <Link href="/signup">
-                <Button
-                  variant="default"
-                  className="relative overflow-hidden group hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(112,255,112,0.4)] hover:shadow-[0_0_25px_rgba(112,255,112,0.8)] bg-primary hover:bg-primary/90"
-                >
-                  <span className="relative z-10 font-semibold">
-                    Sign Up Free
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
+            </Link>
+            <Link href="/login" onClick={close}>
+              <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
+                Sign Up Free
+              </Button>
+            </Link>
+          </>
+        )}
       </div>
-    </header>
+    </div>
+  );
+
+  return (
+    <>
+      {/* ── Desktop sidebar (fixed left) ── */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 flex-col bg-slate-900 border-r border-white/10 z-50">
+        {sidebarInner}
+      </aside>
+
+      {/* ── Mobile: hamburger button ── */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-slate-900 border border-white/10 text-white shadow-lg"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* ── Mobile: sidebar drawer overlay ── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={close}
+          />
+          {/* Drawer */}
+          <aside className="relative w-64 h-full bg-slate-900 border-r border-white/10 flex flex-col">
+            <button
+              className="absolute top-4 right-4 p-1 text-slate-300 hover:text-white"
+              onClick={close}
+              aria-label="Close navigation"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {sidebarInner}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

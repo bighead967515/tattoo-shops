@@ -2,13 +2,13 @@ import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 
-const plugins = [react(), tailwindcss()];
-
-if (process.env.VITE_ENABLE_JSX_LOC === "true") {
-  plugins.push(jsxLocPlugin());
-}
+const plugins: PluginOption[] = [
+  react(),
+  tailwindcss(),
+  process.env.VITE_ENABLE_JSX_LOC === "true" && jsxLocPlugin(),
+];
 
 export default defineConfig({
   plugins,
