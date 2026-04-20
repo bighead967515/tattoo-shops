@@ -446,8 +446,8 @@ export const requestsRouter = router({
     }));
   }),
 
-  // Create a new tattoo request
-  create: protectedProcedure
+  // Create a new tattoo request — open to everyone, including guests without an account
+  create: publicProcedure
     .input(
       z.object({
         title: z.string().min(5).max(255),
@@ -464,37 +464,35 @@ export const requestsRouter = router({
         preferredState: z.string().max(50).optional(),
         willingToTravel: z.boolean().default(false),
         desiredTimeframe: z.string().max(100).optional(),
+        guestEmail: z.string().email().max(255).optional(), // guests can optionally leave contact info
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      // Get client ID
-      const [client] = await db
-        .select()
-        .from(clients)
-        .where(eq(clients.userId, ctx.user.id))
-        .limit(1);
-
-      if (!client) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You must complete client onboarding first",
-        });
+      const { guestEmail, ...requestInput } = input;
+      // If user is logged in, try to link to their client profile
+      let clientId: number | null = null;
+      if (ctx.user) {
+        const [client] = await db
+          .select({ id: clients.id })
+          .from(clients)
+          .where(eq(clients.userId, ctx.user.id))
+          .limit(1);
+        if (client) clientId = client.id;
       }
-
       const [newRequest] = await db
         .insert(tattooRequests)
         .values({
-          clientId: client.id,
-          ...input,
+          clientId,
+          guestEmail: clientId ? null : (guestEmail ?? null),
+          ...requestInput,
         })
         .returning();
-
       return newRequest;
     }),
 
-  // AI Prompt Refiner — analyze description completeness and suggest improvements
-  refineDescription: protectedProcedure
+  // AI Prompt Refiner — open to everyone including guests
+  refineDescription: publicProcedure
     .input(
       z.object({
         description: z.string().min(1).max(5000),
@@ -519,8 +517,8 @@ export const requestsRouter = router({
       }
     }),
 
-  // Get a signed URL for uploading a request image
-  getUploadUrl: protectedProcedure
+  // Get a signed URL for uploading a request image — open to guests too
+  getUploadUrl: publicProcedure
     .input(
       z.object({
         fileName: z.string(),
@@ -528,29 +526,25 @@ export const requestsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Use client ID if logged in, otherwise use a guest prefix
       const db = await requireDb();
-      // Get client ID to create a unique path
-      const [client] = await db
-        .select({ id: clients.id })
-        .from(clients)
-        .where(eq(clients.userId, ctx.user.id))
-        .limit(1);
-
-      if (!client) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You must be a client to upload request images.",
-        });
+      let prefix = "guest";
+      if (ctx.user) {
+        const [client] = await db
+          .select({ id: clients.id })
+          .from(clients)
+          .where(eq(clients.userId, ctx.user.id))
+          .limit(1);
+        if (client) prefix = String(client.id);
       }
-
       // Sanitize filename to prevent path traversal
       const sanitizedFileName = sanitizeFileName(input.fileName);
-      const fileKey = `public/${client.id}/${Date.now()}-${sanitizedFileName}`;
+      const fileKey = `public/${prefix}/${Date.now()}-${sanitizedFileName}`;
       return await createSignedUploadUrl(BUCKETS.REQUEST_IMAGES, fileKey);
     }),
 
-  // Add image to request
-  addImage: protectedProcedure
+  // Add image to request — open to guests (guest requests have clientId = NULL)
+  addImage: publicProcedure
     .input(
       z.object({
         requestId: z.number(),
@@ -561,23 +555,40 @@ export const requestsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      // Verify ownership
-      const [client] = await db
-        .select()
-        .from(clients)
-        .where(eq(clients.userId, ctx.user.id))
-        .limit(1);
+      let request: typeof tattooRequests.$inferSelect | undefined;
 
-      const [request] = await db
-        .select()
-        .from(tattooRequests)
-        .where(
-          and(
-            eq(tattooRequests.id, input.requestId),
-            eq(tattooRequests.clientId, client?.id ?? 0),
-          ),
-        )
-        .limit(1);
+      if (ctx.user) {
+        // Logged-in user: verify they own the request via clientId
+        const [client] = await db
+          .select({ id: clients.id })
+          .from(clients)
+          .where(eq(clients.userId, ctx.user.id))
+          .limit(1);
+        const rows = await db
+          .select()
+          .from(tattooRequests)
+          .where(
+            and(
+              eq(tattooRequests.id, input.requestId),
+              eq(tattooRequests.clientId, client?.id ?? 0),
+            ),
+          )
+          .limit(1);
+        request = rows[0];
+      } else {
+        // Guest: only allow adding images to guest requests (clientId IS NULL)
+        const rows = await db
+          .select()
+          .from(tattooRequests)
+          .where(
+            and(
+              eq(tattooRequests.id, input.requestId),
+              sql`"clientId" IS NULL`,
+            ),
+          )
+          .limit(1);
+        request = rows[0];
+      }
 
       if (!request) {
         throw new TRPCError({

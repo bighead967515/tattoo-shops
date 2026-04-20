@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -286,6 +286,8 @@ export default function NewRequest() {
     number | null
   >(null);
 
+  const [guestEmail, setGuestEmail] = useState("");
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -381,6 +383,8 @@ export default function NewRequest() {
         preferredState: formData.preferredState || undefined,
         willingToTravel: formData.willingToTravel,
         desiredTimeframe: formData.desiredTimeframe || undefined,
+        // Only send guestEmail if user is not logged in
+        guestEmail: !user && guestEmail ? guestEmail : undefined,
       });
 
       if (uploadedImages.length > 0) {
@@ -426,59 +430,13 @@ export default function NewRequest() {
     }
   };
 
-  // ── Guards ──────────────────────────────────────────────────────────────────
-
-  if (user && user.role !== "client") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="max-w-md w-full bg-card border-border/50">
-          <CardHeader className="text-center">
-            <CardTitle>Client Account Required</CardTitle>
-            <CardDescription>
-              You need a client account to post tattoo ideas.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Link href="/client/onboarding">
-              <Button className="bg-primary text-primary-foreground">
-                Create Client Profile
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (user?.role === "client" && !clientProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="max-w-md w-full bg-card border-border/50">
-          <CardHeader className="text-center">
-            <CardTitle>Complete Your Profile</CardTitle>
-            <CardDescription>
-              Finish your client profile before posting a request.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Link href="/client/onboarding">
-              <Button className="bg-primary text-primary-foreground">
-                Complete Onboarding
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const isValid =
     formData.title.length >= 5 &&
     formData.description.length >= 20 &&
-    formData.placement &&
-    formData.size;
+    !!formData.placement &&
+    !!formData.size;
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -775,7 +733,39 @@ export default function NewRequest() {
             </CardContent>
           </Card>
 
-          {/* Card 5: Location & Timing */}
+          {/* Card 5: Guest Email (only shown when not logged in) */}
+          {!user && (
+            <Card className="bg-card border-border/60 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">
+                  Get Notified{" "}
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    optional
+                  </span>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Leave your email and we'll send you artist bids when they come in
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1.5">
+                  <Label htmlFor="guestEmail" className="text-sm font-medium">
+                    Email Address
+                  </Label>
+                  <Input
+                    id="guestEmail"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    className="bg-background/50 border-border/60 focus:border-primary"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Card 6: Location & Timing */}
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
