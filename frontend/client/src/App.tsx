@@ -27,6 +27,8 @@ import RequestBoard from "./pages/RequestBoard";
 import RequestDetail from "./pages/RequestDetail";
 import AdminModeration from "./pages/AdminModeration";
 import DesignLab from "./pages/DesignLab";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function Router() {
   return (
@@ -40,6 +42,8 @@ function Router() {
       <Route path="/artist-dashboard" component={ArtistDashboard} />
       <Route path="/login" component={Login} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/auth/reset-password" component={ResetPassword} />
       <Route path="/help" component={Help} />
       <Route path="/cancellation-policy" component={CancellationPolicy} />
       <Route path="/terms-of-service" component={TermsOfService} />
