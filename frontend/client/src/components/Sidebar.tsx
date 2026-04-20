@@ -19,6 +19,8 @@ import {
   X,
   Lightbulb,
   HelpCircle,
+  ChevronDown,
+  Settings2,
 } from "lucide-react";
 
 const navLinks = [
@@ -32,6 +34,7 @@ const navLinks = [
 export default function Sidebar() {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -76,7 +79,7 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      {/* Navigation Links */}
+      {/* Primary Navigation Links — always visible, takes all available space */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navLinks.map(({ href, label, icon: Icon }) => (
           <Link
@@ -91,7 +94,9 @@ export default function Sidebar() {
           >
             <Icon
               className={`h-4 w-4 flex-shrink-0 transition-colors ${
-                isActive(href) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                isActive(href)
+                  ? "text-primary"
+                  : "text-muted-foreground group-hover:text-foreground"
               }`}
             />
             {label}
@@ -102,75 +107,99 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom Section */}
-      <div className="px-3 py-4 border-t border-border/40 space-y-1">
-        {/* Theme Toggle */}
+      {/* ── Collapsible Bottom Accordion ── */}
+      <div className="px-3 pb-4 border-t border-border/40">
+        {/* Accordion Toggle Button */}
         <button
-          onClick={toggleTheme}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+          onClick={() => setSettingsOpen((prev) => !prev)}
+          className="flex items-center gap-3 w-full px-3 py-2.5 mt-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 group"
+          aria-expanded={settingsOpen}
         >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          <Settings2 className="h-4 w-4 flex-shrink-0" />
+          <span className="flex-1 text-left">Settings & Account</span>
+          <ChevronDown
+            className={`h-4 w-4 flex-shrink-0 transition-transform duration-300 ${
+              settingsOpen ? "rotate-180" : "rotate-0"
+            }`}
+          />
         </button>
 
-        {/* Help */}
-        <Link
-          href="/help"
-          onClick={() => setMobileOpen(false)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+        {/* Accordion Panel — animates open/closed */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            settingsOpen ? "max-h-72 opacity-100" : "max-h-0 opacity-0"
+          }`}
         >
-          <HelpCircle className="h-4 w-4" />
-          Help
-        </Link>
-
-        {/* Auth */}
-        {isAuthenticated ? (
-          <>
-            <Link
-              href="/dashboard"
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isActive("/dashboard")
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </Link>
+          <div className="pt-1 space-y-1">
+            {/* Theme Toggle */}
             <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
+              onClick={toggleTheme}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
             >
-              <LogOut className="h-4 w-4" />
-              {isLoggingOut ? "Signing Out..." : "Sign Out"}
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </button>
-          </>
-        ) : (
-          <>
+
+            {/* Help */}
             <Link
-              href="/login"
+              href="/help"
               onClick={() => setMobileOpen(false)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
             >
-              <LogIn className="h-4 w-4" />
-              Sign In
+              <HelpCircle className="h-4 w-4" />
+              Help
             </Link>
-            <Link
-              href="/signup"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-all duration-200"
-            >
-              <UserPlus className="h-4 w-4" />
-              Sign Up Free
-            </Link>
-          </>
-        )}
+
+            {/* Auth */}
+            {isAuthenticated ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    isActive("/dashboard")
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? "Signing Out..." : "Sign Out"}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-all duration-200"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Sign Up Free
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -192,7 +221,10 @@ export default function Sidebar() {
         </Link>
         <div className="flex items-center gap-2">
           <Link href="/client/new-request">
-            <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold">
+            <Button
+              size="sm"
+              className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold"
+            >
               <Lightbulb className="h-3.5 w-3.5" />
               Post Idea
             </Button>
