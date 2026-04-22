@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { constructWebhookEvent, stripePriceToClientTier } from "./stripe";
+import { constructWebhookEvent, stripePriceToClientTier, stripePriceToArtistTier } from "./stripe";
 import * as db from "./db";
 import { getDb } from "./db";
 import { clients, users } from "../drizzle/schema";
@@ -12,6 +12,7 @@ import {
   getQueueStats,
 } from "./webhookQueue";
 import { CLIENT_TIER_LIMITS } from "../shared/tierLimits";
+import { artists } from "../drizzle/schema";
 
 // Flag to track if processor is started
 let processorStarted = false;
@@ -301,10 +302,17 @@ async function handleSubscriptionChange(
     return;
   }
 
+  // First check if this is an artist tier subscription
+  const artistTier = stripePriceToArtistTier(priceId);
+  if (artistTier) {
+    await handleArtistSubscriptionChange(subscription, artistTier, eventType);
+    return;
+  }
+
   const tier = stripePriceToClientTier(priceId);
   if (!tier) {
     logger.debug(
-      "Subscription price does not match a client tier — may be an artist subscription",
+      "Subscription price does not match any known tier",
       {
         priceId,
         subscriptionId: subscription.id,
@@ -384,6 +392,62 @@ async function handleSubscriptionChange(
     userId: user.id,
     tier,
     aiCredits,
+    subscriptionId: subscription.id,
+    eventType,
+  });
+}
+
+/**
+ * Handle artist subscription created / updated events.
+ * Updates both users.subscriptionTier and artists.subscriptionTier.
+ */
+async function handleArtistSubscriptionChange(
+  subscription: Stripe.Subscription,
+  tier: "artist_amateur" | "artist_pro" | "artist_icon",
+  eventType: string,
+): Promise<void> {
+  const stripeCustomerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
+
+  const grantableStatuses = new Set<Stripe.Subscription.Status>(["active", "trialing"]);
+  if (!grantableStatuses.has(subscription.status)) {
+    logger.info("Skipping artist tier grant for non-grantable subscription status", {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      eventType,
+    });
+    return;
+  }
+
+  const database = await getDb();
+  if (!database) throw new Error("Database not available for artist subscription webhook");
+
+  const user = await resolveUserForSubscription(database, stripeCustomerId, subscription.metadata);
+  if (!user) {
+    logger.warn("No user found for artist subscription change", {
+      stripeCustomerId,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  await database.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({ stripeCustomerId, subscriptionTier: tier, stripeSubscriptionId: subscription.id, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+
+    await tx
+      .update(artists)
+      .set({ subscriptionTier: tier, updatedAt: new Date() })
+      .where(eq(artists.userId, user.id));
+  });
+
+  logger.info("Artist subscription changed", {
+    userId: user.id,
+    tier,
     subscriptionId: subscription.id,
     eventType,
   });

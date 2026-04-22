@@ -74,22 +74,22 @@ export const TIER_PRICING = {
     stripePriceIdYear: null,
   },
   amateur: {
-    monthly: 900, // $9.00 (Stored in cents usually)
-    yearly: 9000, // $90.00
-    stripePriceIdMonth: "price_amateur_mo_123", // Placeholder for Stripe ID
-    stripePriceIdYear: "price_amateur_yr_123",
+    monthly: 900,   // $9.00/mo
+    yearly: 9000,   // $90.00/yr
+    stripePriceIdMonth: "price_1TOraXQRJTQEheTOvLHhTihz",
+    stripePriceIdYear:  "price_1TOraXQRJTQEheTOVr8zI9O4",
   },
   professional: {
-    monthly: 1900,
-    yearly: 19000,
-    stripePriceIdMonth: "price_pro_mo_123",
-    stripePriceIdYear: "price_pro_yr_123",
+    monthly: 1900,  // $19.00/mo
+    yearly: 19000,  // $190.00/yr
+    stripePriceIdMonth: "price_1TOraYQRJTQEheTO3k4MS3PR",
+    stripePriceIdYear:  "price_1TOraYQRJTQEheTOHNQL82m3",
   },
   frontPage: {
-    monthly: 3900,
-    yearly: 39000,
-    stripePriceIdMonth: "price_icon_mo_123",
-    stripePriceIdYear: "price_icon_yr_123",
+    monthly: 3900,  // $39.00/mo
+    yearly: 39000,  // $390.00/yr
+    stripePriceIdMonth: "price_1TOraZQRJTQEheTOofBdpJwM",
+    stripePriceIdYear:  "price_1TOraaQRJTQEheTOwDiBtF35",
   },
 } as const;
 
@@ -151,11 +151,13 @@ export const CLIENT_TIER_PRICING = {
   },
   client_plus: {
     monthly: 900, // $9.00
-    stripePriceIdMonth: "price_client_enthusiast_mo", // Placeholder — set in Stripe Dashboard
+    // TODO: Create client_plus product in Stripe and set STRIPE_CLIENT_PLUS_PRICE_ID env var
+    stripePriceIdMonth: process.env.STRIPE_CLIENT_PLUS_PRICE_ID ?? null,
   },
   client_elite: {
     monthly: 1900, // $19.00
-    stripePriceIdMonth: "price_client_elite_mo", // Placeholder — set in Stripe Dashboard
+    // TODO: Create client_elite product in Stripe and set STRIPE_CLIENT_ELITE_PRICE_ID env var
+    stripePriceIdMonth: process.env.STRIPE_CLIENT_ELITE_PRICE_ID ?? null,
   },
 } as const;
 

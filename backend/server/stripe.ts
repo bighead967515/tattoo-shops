@@ -114,6 +114,66 @@ export function stripePriceToClientTier(
   return null;
 }
 
+/**
+ * Map a Stripe Price ID to an artist subscription tier.
+ * Covers both monthly and yearly prices for all paid artist tiers.
+ * Returns null if the Price ID doesn't match a known artist tier.
+ */
+export function stripePriceToArtistTier(
+  priceId: string,
+): "artist_amateur" | "artist_pro" | "artist_icon" | null {
+  const { 
+    stripeArtistAmateurPriceIdMonth, stripeArtistAmateurPriceIdYear,
+    stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
+    stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
+  } = ENV;
+
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
+    return "artist_amateur";
+  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+    return "artist_pro";
+  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
+    return "artist_icon";
+
+  return null;
+}
+
+/**
+ * Create a Stripe Checkout Session for an artist subscription upgrade.
+ */
+export async function createArtistSubscriptionCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl,
+}: {
+  priceId: string;
+  customerEmail: string;
+  stripeCustomerId?: string;
+  metadata: Record<string, string>;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      ...(stripeCustomerId
+        ? { customer: stripeCustomerId }
+        : { customer_email: customerEmail }),
+      metadata,
+      subscription_data: { metadata },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true,
+    });
+    return session;
+  });
+}
+
 export async function constructWebhookEvent(
   payload: string | Buffer,
   signature: string,

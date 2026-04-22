@@ -9,6 +9,13 @@ const envSchema = z.object({
     .default("development"),
   STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
   STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
+  // Artist subscription Stripe Price IDs (live — created 2026-04-20)
+  STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
+  STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR:  z.string().default("price_1TOraXQRJTQEheTOVr8zI9O4"),
+  STRIPE_ARTIST_PRO_PRICE_ID_MONTH:     z.string().default("price_1TOraYQRJTQEheTO3k4MS3PR"),
+  STRIPE_ARTIST_PRO_PRICE_ID_YEAR:      z.string().default("price_1TOraYQRJTQEheTOHNQL82m3"),
+  STRIPE_ARTIST_ICON_PRICE_ID_MONTH:    z.string().default("price_1TOraZQRJTQEheTOofBdpJwM"),
+  STRIPE_ARTIST_ICON_PRICE_ID_YEAR:     z.string().default("price_1TOraaQRJTQEheTOwDiBtF35"),
   // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
   STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
   STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
@@ -43,6 +50,14 @@ export const ENV = {
   isProduction: parsed.data.NODE_ENV === "production",
   stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
   stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
+  // Artist tier price IDs
+  stripeArtistAmateurPriceIdMonth: parsed.data.STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH,
+  stripeArtistAmateurPriceIdYear:  parsed.data.STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR,
+  stripeArtistProPriceIdMonth:     parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_MONTH,
+  stripeArtistProPriceIdYear:      parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_YEAR,
+  stripeArtistIconPriceIdMonth:    parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
+  stripeArtistIconPriceIdYear:     parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
+  // Client tier price IDs
   stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
   stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,
   resendApiKey: parsed.data.RESEND_API_KEY,
