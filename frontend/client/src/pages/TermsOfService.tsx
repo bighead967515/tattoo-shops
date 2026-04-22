@@ -96,7 +96,7 @@ export default function TermsOfService() {
                   4. Platform Liability Disclaimer (Crucial)
                 </h3>
                 <p className="text-muted-foreground mb-3">
-                  <strong>Ink Connect is strictly a venue and communication platform.</strong> We do not employ, endorse, or verify the medical or professional credentials of any tattoo artist, studio, or individual using our Service. We do not inspect studios for health code compliance, nor do we guarantee the quality, safety, legality, or outcome of any tattoo or service provided.
+                  <strong>Ink Connect is a curated marketplace that verifies and endorses the artists listed on our platform.</strong> As part of our onboarding process, we review artist portfolios and require profile information to maintain the quality of our directory. However, while we verify the identity and portfolio of artists, we do not employ them, and we do not inspect studios for health code compliance, nor do we guarantee the quality, safety, legality, or outcome of any tattoo or service provided. Verification and endorsement relate to an artist's presence on our platform — not to the specific tattoo service you receive.
                 </p>
                 <p className="text-muted-foreground mb-3">
                   <strong>Assumption of Risk:</strong> Getting a tattoo involves inherent medical and physical risks, including but not limited to infection, allergic reaction, scarring, and dissatisfaction with the result. By using Ink Connect to find or book an artist, you acknowledge and accept that you are assuming all such risks entirely on your own.

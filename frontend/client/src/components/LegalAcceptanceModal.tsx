@@ -76,11 +76,11 @@ export default function LegalAcceptanceModal({
           <div className="flex items-start gap-2">
             <Shield className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed">
-              <strong>Platform Disclaimer:</strong> Ink Connect is a venue only.
-              We do not employ, endorse, or verify the credentials of any artist.
-              We are not responsible for the quality, safety, or outcome of any
-              tattoo. All transactions and services are between you and the
-              artist directly.
+              <strong>Platform Disclaimer:</strong> Ink Connect verifies and
+              endorses the artists listed on our platform based on portfolio
+              review. However, we do not employ artists and are not responsible
+              for the quality, safety, or outcome of any tattoo service.
+              All transactions are between you and the artist directly.
             </p>
           </div>
           <div className="flex items-start gap-2">
@@ -132,7 +132,9 @@ export default function LegalAcceptanceModal({
               onCheckedChange={(v) => setCheckedDisclaimer(Boolean(v))}
             />
             <Label htmlFor="disclaimer" className="text-sm leading-snug cursor-pointer">
-              I understand that Ink Connect is a marketplace platform only. I
+              I understand that while Ink Connect verifies and endorses artists
+              on our platform, it does not employ them and is not responsible
+              for the quality, safety, or outcome of any tattoo service. I
               release Ink Connect from any liability related to tattoo services,
               artist conduct, or physical outcomes.
             </Label>
