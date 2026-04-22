@@ -19,6 +19,11 @@ import {
   getPublicUrl,
 } from "./_core/supabaseStorage";
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
+import { createArtistSubscriptionCheckout } from "./stripe";
+import { artists, users } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { getDb } from "./db";
+import { ENV } from "./_core/env";
 import { verificationRouter } from "./verificationRouter";
 import { healthRouter } from "./healthRouter";
 import { analyzePortfolioImage } from "./geminiVision";
@@ -70,6 +75,80 @@ export const appRouter = router({
     getAll: publicProcedure.query(async () => {
       return await db.getAllArtists();
     }),
+
+    /**
+     * Create a Stripe Checkout Session for an artist subscription upgrade.
+     * Returns the Checkout URL to redirect the artist to Stripe.
+     */
+    createSubscriptionCheckout: protectedProcedure
+      .input(
+        z.object({
+          tier: z.enum(["artist_amateur", "artist_pro", "artist_icon"]),
+          interval: z.enum(["month", "year"]).default("month"),
+          successUrl: z.string().url(),
+          cancelUrl: z.string().url(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Verify the user has an artist profile
+        const [artist] = await database
+          .select({ id: artists.id })
+          .from(artists)
+          .where(eq(artists.userId, ctx.user.id))
+          .limit(1);
+
+        if (!artist) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You must have an artist profile before subscribing.",
+          });
+        }
+
+        // Resolve the correct Stripe Price ID
+        const priceIdMap: Record<string, string | undefined> = {
+          artist_amateur_month: ENV.stripeArtistAmateurPriceIdMonth,
+          artist_amateur_year:  ENV.stripeArtistAmateurPriceIdYear,
+          artist_pro_month:     ENV.stripeArtistProPriceIdMonth,
+          artist_pro_year:      ENV.stripeArtistProPriceIdYear,
+          artist_icon_month:    ENV.stripeArtistIconPriceIdMonth,
+          artist_icon_year:     ENV.stripeArtistIconPriceIdYear,
+        };
+        const priceId = priceIdMap[`${input.tier}_${input.interval}`];
+
+        if (!priceId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Stripe price for ${input.tier} (${input.interval}) is not configured.`,
+          });
+        }
+
+        // Look up user for stripeCustomerId
+        const [user] = await database
+          .select({ email: users.email, stripeCustomerId: users.stripeCustomerId })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+
+        const session = await createArtistSubscriptionCheckout({
+          priceId,
+          customerEmail: user?.email ?? "",
+          stripeCustomerId: user?.stripeCustomerId ?? undefined,
+          metadata: {
+            userId: String(ctx.user.id),
+            artistId: String(artist.id),
+            tier: input.tier,
+            interval: input.interval,
+          },
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+        });
+
+        return { checkoutUrl: session.url };
+      }),
+
 
     search: publicProcedure
       .input(

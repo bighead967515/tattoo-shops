@@ -29,6 +29,9 @@ import {
   Sparkles,
   AlertTriangle,
   RefreshCw,
+  CreditCard,
+  Crown,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
@@ -37,7 +40,9 @@ import ArtistDashboardFeed from "@/components/ArtistDashboardFeed";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { Progress } from "@/components/ui/progress";
 import axios from "axios";
-import { isFreeArtistTier } from "@shared/tierCompat";
+import { isFreeArtistTier, toLegacyArtistTier, type ArtistCanonicalTier } from "@shared/tierCompat";
+import { TIER_LIMITS, TIER_PRICING, type ArtistTierKey } from "@shared/tierLimits";
+import { Link } from "wouter";
 
 export default function ArtistDashboard() {
   const [, setLocation] = useLocation();
@@ -216,7 +221,7 @@ export default function ArtistDashboard() {
         </div>
 
         <Tabs defaultValue="portfolio" className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-4">
+          <TabsList className="grid w-full max-w-2xl grid-cols-5">
             <TabsTrigger value="portfolio">
               <ImageIcon className="w-4 h-4 mr-2" />
               Portfolio
@@ -228,6 +233,10 @@ export default function ArtistDashboard() {
             <TabsTrigger value="bookings">
               <Calendar className="w-4 h-4 mr-2" />
               Bookings
+            </TabsTrigger>
+            <TabsTrigger value="billing">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Billing
             </TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="w-4 h-4 mr-2" />
@@ -480,6 +489,89 @@ export default function ArtistDashboard() {
                 ))
               )}
             </div>
+          </TabsContent>
+
+          {/* Billing Tab */}
+          <TabsContent value="billing" className="space-y-6">
+            <h2 className="text-2xl font-semibold">Subscription & Billing</h2>
+            {(() => {
+              const tier = (artist.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
+              const legacy = toLegacyArtistTier(tier);
+              const limits = TIER_LIMITS[legacy as ArtistTierKey];
+              const pricing = TIER_PRICING[legacy as ArtistTierKey];
+              const isFree = isFreeArtistTier(tier);
+              return (
+                <>
+                  {/* Current plan card */}
+                  <Card className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-full bg-primary/10">
+                          <Crown className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Current Plan</p>
+                          <h3 className="text-2xl font-bold">{limits.name}</h3>
+                          <p className="text-muted-foreground text-sm mt-1">
+                            {isFree
+                              ? "Free — upgrade to unlock more features"
+                              : `$${pricing.monthly / 100}/mo or $${pricing.yearly! / 100}/yr`}
+                          </p>
+                        </div>
+                      </div>
+                      <Link href="/artist/billing">
+                        <Button variant={isFree ? "default" : "outline"} className="gap-2">
+                          {isFree ? (
+                            <><Zap className="h-4 w-4" /> Upgrade Plan</>
+                          ) : (
+                            <><CreditCard className="h-4 w-4" /> Manage Plan</>
+                          )}
+                        </Button>
+                      </Link>
+                    </div>
+
+                    {/* Feature summary */}
+                    <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {[
+                        { label: "Portfolio Photos", value: limits.portfolioPhotos === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.portfolioPhotos) },
+                        { label: "Accept Bookings", value: limits.canAcceptBookings ? "Yes" : "No" },
+                        { label: "Analytics", value: limits.hasAnalytics ? "Yes" : "No" },
+                        { label: "Featured", value: limits.isFeatured ? "Yes" : "No" },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="p-3 rounded-lg bg-muted/40 border">
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                          <p className="font-semibold">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  {/* Upgrade CTA for free users */}
+                  {isFree && (
+                    <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-full bg-primary/20">
+                          <Sparkles className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold mb-2">Unlock Your Full Potential</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Upgrade to an Artist plan to accept bookings, show your contact info,
+                            get a verified badge, and appear higher in search results.
+                          </p>
+                          <Link href="/artist/billing">
+                            <Button className="gap-2">
+                              <Zap className="h-4 w-4" />
+                              View Plans & Pricing
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* Settings Tab */}
