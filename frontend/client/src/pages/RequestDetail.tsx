@@ -55,7 +55,10 @@ import {
   canUseAiBidAssistant,
   isFreeArtistTier,
   isFreeClientTier,
+  toLegacyArtistTier,
+  type ArtistCanonicalTier,
 } from "@shared/tierCompat";
+import { TIER_LIMITS, type ArtistTierKey } from "@shared/tierLimits";
 
 const FONT_FAMILY_OPTIONS = [
   { label: "System Sans", value: "ui-sans-serif, system-ui, sans-serif" },
@@ -240,10 +243,23 @@ export default function RequestDetail() {
   const hasAlreadyBid = request?.bids.some(
     (b: BidType) => b.artist.userId === user?.id,
   );
-  // New logic for "5 free bids"
-  const bidsRemaining = Math.max(0, 5 - (artistProfile?.bidsUsed ?? 0));
+  // Per-tier monthly bid quota logic
   const isFreeTier = isFreeArtistTier(artistProfile?.subscriptionTier);
-  const canBid = !isFreeTier || (isFreeTier && bidsRemaining > 0);
+  const canonicalTier = (artistProfile?.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
+  const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
+  const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
+  const bidsPerMonth = tierLimits.bidsPerMonth;
+  const isUnlimitedBids = bidsPerMonth === Number.MAX_SAFE_INTEGER;
+  // Auto-reset: if the stored month doesn't match current month, treat counter as 0
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const effectiveBidsThisMonth =
+    artistProfile?.bidsMonthYear === currentMonth
+      ? (artistProfile?.bidsThisMonth ?? 0)
+      : 0;
+  const bidsRemaining = isUnlimitedBids
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(0, bidsPerMonth - effectiveBidsThisMonth);
+  const canBid = bidsPerMonth > 0 && (isUnlimitedBids || bidsRemaining > 0);
 
   const detailTitleStyle: CSSProperties | undefined = isPaidClientOwner
     ? {
@@ -894,9 +910,19 @@ export default function RequestDetail() {
                   <CardTitle>Interested?</CardTitle>
                   <CardDescription>
                     Submit your proposal to work on this tattoo.
-                    {isFreeTier && canBid && (
+                    {!isFreeTier && !isUnlimitedBids && canBid && (
                       <span className="block font-semibold text-primary mt-1">
-                        You have {bidsRemaining} free bids remaining.
+                        {bidsRemaining} of {bidsPerMonth} bids remaining this month.
+                      </span>
+                    )}
+                    {!isFreeTier && !isUnlimitedBids && !canBid && (
+                      <span className="block font-semibold text-destructive mt-1">
+                        Monthly bid limit reached ({bidsPerMonth}/{bidsPerMonth}). Resets on the 1st.
+                      </span>
+                    )}
+                    {isUnlimitedBids && (
+                      <span className="block font-semibold text-primary mt-1">
+                        Unlimited bids — Icon plan.
                       </span>
                     )}
                   </CardDescription>
@@ -1050,10 +1076,15 @@ export default function RequestDetail() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                  ) : isFreeTier ? (
+                    <UpgradePrompt
+                      feature="Bid on Client Posts"
+                      description="Bidding on client tattoo idea posts requires a paid plan. Upgrade to the Artist plan ($9/mo) to submit up to 15 proposals per month."
+                    />
                   ) : (
                     <UpgradePrompt
-                      feature="Submit More Bids"
-                      description="You've used all your free bids. Upgrade to a paid plan to submit unlimited proposals and win more clients."
+                      feature="More Bids This Month"
+                      description={`You've used all ${bidsPerMonth} bids for this month. Upgrade your plan for a higher monthly quota, or wait until the 1st to get a fresh ${bidsPerMonth} bids.`}
                     />
                   )}
                 </CardContent>

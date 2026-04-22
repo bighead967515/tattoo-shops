@@ -120,6 +120,10 @@ export const artists = pgTable("artists", {
     .default("artist_free")
     .notNull(),
   bidsUsed: integer("bidsUsed").default(0).notNull(),
+  /** Number of bids submitted in the current calendar month (resets on 1st of each month) */
+  bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
+  /** Tracks which month the bidsThisMonth counter belongs to, format: YYYY-MM */
+  bidsMonthYear: varchar("bidsMonthYear", { length: 7 }).default("2000-01").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

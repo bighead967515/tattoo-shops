@@ -23,9 +23,16 @@ import { createSubscriptionCheckout } from "./stripe";
 import { ENV } from "./_core/env";
 import {
   CLIENT_TIER_PRICING,
+  TIER_LIMITS,
+  type ArtistTierKey,
   type ClientSubscriptionTier,
 } from "../shared/tierLimits";
-import { canUseAiBidAssistant, isFreeArtistTier } from "../shared/tierCompat";
+import {
+  canUseAiBidAssistant,
+  isFreeArtistTier,
+  toLegacyArtistTier,
+  type ArtistCanonicalTier,
+} from "../shared/tierCompat";
 import { buildClientOnboardingUserUpdate } from "./_core/onboarding";
 
 /**
@@ -847,13 +854,39 @@ export const bidsRouter = router({
         });
       }
 
-      // Implement "First 5 Bids Free" logic
-      if (isFreeArtistTier(artist.subscriptionTier)) {
-        if (artist.bidsUsed >= 5) {
+      // ── Per-tier monthly bid quota enforcement ──────────────────────────
+      const canonicalTier = (artist.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
+      const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
+      const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
+      const bidsPerMonth = tierLimits.bidsPerMonth;
+
+      // Free tier: bidding is completely blocked
+      if (bidsPerMonth === 0) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            "Bidding on client posts requires a paid plan. Upgrade to the Artist plan ($9/mo) to start submitting proposals.",
+        });
+      }
+
+      // Paid tiers with a finite monthly quota: check and auto-reset if new month
+      if (bidsPerMonth !== Number.MAX_SAFE_INTEGER) {
+        const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+        const isNewMonth = artist.bidsMonthYear !== currentMonth;
+
+        if (isNewMonth) {
+          await db
+            .update(artists)
+            .set({ bidsThisMonth: 0, bidsMonthYear: currentMonth })
+            .where(eq(artists.id, artist.id));
+          artist.bidsThisMonth = 0;
+          artist.bidsMonthYear = currentMonth;
+        }
+
+        if (artist.bidsThisMonth >= bidsPerMonth) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message:
-              "You have used all 5 of your free bids. Please upgrade to a paid plan to continue bidding.",
+            message: `You have reached your ${bidsPerMonth} bid limit for this month. Upgrade your plan or wait until next month to submit more proposals.`,
           });
         }
       }
@@ -913,11 +946,14 @@ export const bidsRouter = router({
         })
         .returning();
 
-      // If user is on free tier, increment their bid count
-      if (isFreeArtistTier(artist.subscriptionTier)) {
+      // Increment monthly bid counter for finite-quota tiers
+      if (bidsPerMonth !== Number.MAX_SAFE_INTEGER) {
         await db
           .update(artists)
-          .set({ bidsUsed: sql`${artists.bidsUsed} + 1` })
+          .set({
+            bidsThisMonth: sql`${artists.bidsThisMonth} + 1`,
+            bidsUsed: sql`${artists.bidsUsed} + 1`,
+          })
           .where(eq(artists.id, artist.id));
       }
 

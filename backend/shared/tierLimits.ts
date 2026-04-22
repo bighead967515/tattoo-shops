@@ -29,6 +29,8 @@ export const TIER_LIMITS = {
     showExactLocation: false,
     isFeatured: false,
     isVerifiedBadge: false,
+    /** Monthly bid quota — 0 means bidding is blocked on free tier */
+    bidsPerMonth: 0,
   },
   amateur: {
     name: "Artist", // "Amateur"
@@ -40,6 +42,8 @@ export const TIER_LIMITS = {
     showExactLocation: true,
     isFeatured: false,
     isVerifiedBadge: true, // Must be verified to pay
+    /** Monthly bid quota */
+    bidsPerMonth: 15,
   },
   professional: {
     name: "Professional",
@@ -51,6 +55,8 @@ export const TIER_LIMITS = {
     showExactLocation: true,
     isFeatured: false,
     isVerifiedBadge: true,
+    /** Monthly bid quota */
+    bidsPerMonth: 50,
   },
   frontPage: {
     name: "Icon", // "Front Page"
@@ -62,6 +68,8 @@ export const TIER_LIMITS = {
     showExactLocation: true,
     isFeatured: true, // <--- This triggers the Homepage Carousel logic
     isVerifiedBadge: true,
+    /** Monthly bid quota — MAX_SAFE_INTEGER means unlimited */
+    bidsPerMonth: Number.MAX_SAFE_INTEGER,
   },
 } as const;
 
