@@ -17,11 +17,16 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import LegalAcceptanceModal from "@/components/LegalAcceptanceModal";
 
 export default function ForArtists() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const createArtistMutation = trpc.artists.create.useMutation();
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
+  // Pending submit event stored so we can replay it after legal acceptance
+  const [pendingSubmit, setPendingSubmit] = useState<React.FormEvent | null>(null);
 
   const [formData, setFormData] = useState({
     artistName: "",
@@ -47,6 +52,13 @@ export default function ForArtists() {
     if (!user) {
       toast.error("Please sign in to register as an artist");
       window.location.href = getLoginUrl();
+      return;
+    }
+
+    // Gate: show legal modal if not yet accepted
+    if (!legalAccepted) {
+      setPendingSubmit(e);
+      setShowLegalModal(true);
       return;
     }
 
@@ -107,8 +119,23 @@ export default function ForArtists() {
     });
   };
 
+  const handleLegalAccept = () => {
+    setLegalAccepted(true);
+    setShowLegalModal(false);
+    // Replay the pending form submission now that legal is accepted
+    if (pendingSubmit) {
+      handleSubmit(pendingSubmit);
+      setPendingSubmit(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      <LegalAcceptanceModal
+        open={showLegalModal}
+        role="artist"
+        onAccept={handleLegalAccept}
+      />
       <Header />
 
       {/* Hero Section */}

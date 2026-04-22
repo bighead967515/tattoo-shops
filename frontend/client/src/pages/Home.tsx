@@ -348,13 +348,18 @@ export default function Home() {
               <h3 className="font-semibold mb-4">Legal</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="/terms" className="hover:text-primary">
+                  <Link href="/terms-of-service" className="hover:text-primary">
                     Terms of Service
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="hover:text-primary">
+                  <Link href="/privacy-policy" className="hover:text-primary">
                     Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms-of-service" className="hover:text-primary">
+                    Platform Disclaimer
                   </Link>
                 </li>
               </ul>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import LegalAcceptanceModal from "@/components/LegalAcceptanceModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,8 @@ export default function ClientOnboarding() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   const [formData, setFormData] = useState({
     displayName: "",
@@ -63,6 +66,20 @@ export default function ClientOnboarding() {
   };
 
   const handleSubmit = () => {
+    // Gate: show legal modal before creating profile
+    if (!legalAccepted) {
+      setShowLegalModal(true);
+      return;
+    }
+    createProfile.mutate({
+      ...formData,
+      preferredStyles: selectedStyles.join(","),
+    });
+  };
+
+  const handleLegalAccept = () => {
+    setLegalAccepted(true);
+    setShowLegalModal(false);
     createProfile.mutate({
       ...formData,
       preferredStyles: selectedStyles.join(","),
@@ -75,6 +92,11 @@ export default function ClientOnboarding() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted py-12 px-4">
+      <LegalAcceptanceModal
+        open={showLegalModal}
+        role="client"
+        onAccept={handleLegalAccept}
+      />
       <div className="max-w-2xl mx-auto">
         {/* Progress indicator */}
         <div className="flex items-center justify-center mb-8">
