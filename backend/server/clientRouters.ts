@@ -24,6 +24,7 @@ import { ENV } from "./_core/env";
 import {
   CLIENT_TIER_PRICING,
   TIER_LIMITS,
+  getTransactionFeeRate,
   type ArtistTierKey,
   type ClientSubscriptionTier,
 } from "../shared/tierLimits";
@@ -931,6 +932,10 @@ export const bidsRouter = router({
         });
       }
 
+      // Store the platform fee rate (in basis points) at bid creation time
+      const feeRate = getTransactionFeeRate(legacyTier);
+      const platformFeeRateBps = Math.round(feeRate * 10000); // e.g. 0.05 → 500 bps
+
       const [newBid] = await db
         .insert(bids)
         .values({
@@ -943,6 +948,7 @@ export const bidsRouter = router({
             ? new Date(input.availableDate)
             : null,
           portfolioLinks: input.portfolioLinks,
+          platformFeeRateBps,
         })
         .returning();
 
@@ -999,12 +1005,17 @@ export const bidsRouter = router({
         });
       }
 
+      // Calculate platform fee at acceptance time
+      const platformFeeAmountCents = bid.bid.platformFeeRateBps > 0
+        ? Math.round(bid.bid.priceEstimate * bid.bid.platformFeeRateBps / 10000)
+        : null;
+
       // Wrap all bid/request updates in a transaction
       await db.transaction(async (tx) => {
-        // Update bid status to accepted
+        // Update bid status to accepted + record the platform fee
         await tx
           .update(bids)
-          .set({ status: "accepted", updatedAt: new Date() })
+          .set({ status: "accepted", platformFeeAmountCents, updatedAt: new Date() })
           .where(eq(bids.id, input.bidId));
 
         // Reject all other bids for this request

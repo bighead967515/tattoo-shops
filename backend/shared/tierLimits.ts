@@ -1,11 +1,32 @@
 /**
  * Artist subscription tier limits and features
  *
- * NOTE: The canonical SubscriptionTier Zod enum lives in @shared/const.ts
- * (artist_free | artist_amateur | artist_pro | artist_icon |
- *  client_free | client_plus | client_elite).
- * The legacy keys below (free, amateur, professional, frontPage) are kept
- * for backward-compatibility with existing feature-flag look-ups.
+ * ── NEW 3-LAYER MONETIZATION MODEL ────────────────────────────────────────
+ *
+ * Layer 1 — Free (artist_free)
+ *   The artist acquisition funnel. No barriers to joining.
+ *   10 portfolio photos, directory listing, receive inquiries.
+ *   NO bidding access, NO booking calendar, NO payment processing.
+ *
+ * Layer 2 — Pro Subscription (artist_pro)
+ *   $19–29/mo (monthly) or $190–290/yr (annual, 2 months free).
+ *   Unlimited portfolio, bidding access, booking calendar, Stripe payments,
+ *   verified badge, messaging, analytics. Transaction fee: 5% on accepted bids.
+ *   Founding Artists: 6 months free, then $19/mo locked for life.
+ *
+ * Layer 3 — Pay-as-you-go (artist_payg)
+ *   $0/mo subscription. Bidding access with 10–12% transaction fee on
+ *   accepted bids. For artists who hate subscriptions.
+ *   Converts to Pro once they do the math.
+ *
+ * ── LEGACY KEY MAPPING ────────────────────────────────────────────────────
+ *   free         → artist_free  (Layer 1)
+ *   amateur      → artist_pro   (Layer 2 — Pro subscriber)
+ *   professional → artist_payg  (Layer 3 — Pay-as-you-go)
+ *   frontPage    → artist_founding (Founding Artist — Pro + badge)
+ *
+ * NOTE: The canonical SubscriptionTier Zod enum lives in @shared/const.ts.
+ * Legacy keys below are kept for backward-compatibility with feature-flag look-ups.
  */
 
 import {
@@ -18,10 +39,26 @@ import {
 export { SubscriptionTiers, UNIFIED_TIER_LIMITS };
 export type { SubscriptionTier };
 
+// ─── Transaction fee rates ────────────────────────────────────────────────────
+/** Platform fee as a decimal (e.g. 0.05 = 5%) charged on accepted bid transactions */
+export const TRANSACTION_FEE_RATES = {
+  /** Free tier — no bidding, no fee */
+  free: 0,
+  /** Pro subscriber — reduced fee as reward for subscription */
+  amateur: 0.05,  // 5%
+  /** Pay-as-you-go — higher fee, no subscription cost */
+  professional: 0.10, // 10%
+  /** Founding Artist — same as Pro (5%) */
+  frontPage: 0.05,  // 5%
+} as const;
+
 export const TIER_LIMITS = {
+  // ── Layer 1: Free (Artist Acquisition Funnel) ─────────────────────────────
   free: {
-    name: "Apprentice", // "Free"
-    portfolioPhotos: 3,
+    name: "Free",
+    displayName: "Free",
+    description: "Get discovered. Build your presence.",
+    portfolioPhotos: 10,
     canAcceptBookings: false,
     canShowDirectContact: false,
     canRespondToReviews: false,
@@ -29,47 +66,71 @@ export const TIER_LIMITS = {
     showExactLocation: false,
     isFeatured: false,
     isVerifiedBadge: false,
-    /** Monthly bid quota — 0 means bidding is blocked on free tier */
+    /** 0 = bidding completely blocked on free tier */
     bidsPerMonth: 0,
+    /** Platform transaction fee on accepted bids */
+    transactionFeeRate: TRANSACTION_FEE_RATES.free,
+    isFoundingArtist: false,
   },
+
+  // ── Layer 2: Pro Subscription ($19–29/mo) ─────────────────────────────────
   amateur: {
-    name: "Artist", // "Amateur"
-    portfolioPhotos: 15,
-    canAcceptBookings: true, // Unlocks booking
-    canShowDirectContact: true, // Unlocks social links
-    canRespondToReviews: false,
-    hasAnalytics: false,
-    showExactLocation: true,
-    isFeatured: false,
-    isVerifiedBadge: true, // Must be verified to pay
-    /** Monthly bid quota */
-    bidsPerMonth: 15,
-  },
-  professional: {
-    name: "Professional",
+    name: "Pro",
+    displayName: "Pro",
+    description: "The full toolkit. Grow your clientele.",
     portfolioPhotos: Number.MAX_SAFE_INTEGER, // Unlimited
     canAcceptBookings: true,
     canShowDirectContact: true,
-    canRespondToReviews: true, // Reputation management
-    hasAnalytics: true, // Business insights
+    canRespondToReviews: true,
+    hasAnalytics: true,
     showExactLocation: true,
     isFeatured: false,
     isVerifiedBadge: true,
-    /** Monthly bid quota */
-    bidsPerMonth: 50,
+    /** Unlimited bids for Pro subscribers */
+    bidsPerMonth: Number.MAX_SAFE_INTEGER,
+    /** Reduced 5% fee as reward for subscription */
+    transactionFeeRate: TRANSACTION_FEE_RATES.amateur,
+    isFoundingArtist: false,
   },
+
+  // ── Layer 3: Pay-as-you-go (No subscription, higher fee) ─────────────────
+  professional: {
+    name: "Pay-as-you-go",
+    displayName: "Pay-as-you-go",
+    description: "Bid on clients. Pay only when you win.",
+    portfolioPhotos: 10,
+    canAcceptBookings: false,
+    canShowDirectContact: false,
+    canRespondToReviews: false,
+    hasAnalytics: false,
+    showExactLocation: false,
+    isFeatured: false,
+    isVerifiedBadge: false,
+    /** Unlimited bids — they pay per transaction instead */
+    bidsPerMonth: Number.MAX_SAFE_INTEGER,
+    /** 10% fee on accepted bids — no subscription required */
+    transactionFeeRate: TRANSACTION_FEE_RATES.professional,
+    isFoundingArtist: false,
+  },
+
+  // ── Founding Artist: Pro features + lifetime $19/mo lock-in ──────────────
   frontPage: {
-    name: "Icon", // "Front Page"
+    name: "Founding Artist",
+    displayName: "Founding Artist",
+    description: "Founding member. Pro features. Locked-in rate for life.",
     portfolioPhotos: Number.MAX_SAFE_INTEGER,
     canAcceptBookings: true,
     canShowDirectContact: true,
     canRespondToReviews: true,
     hasAnalytics: true,
     showExactLocation: true,
-    isFeatured: true, // <--- This triggers the Homepage Carousel logic
+    isFeatured: true, // Featured badge on profile + homepage carousel
     isVerifiedBadge: true,
-    /** Monthly bid quota — MAX_SAFE_INTEGER means unlimited */
+    /** Unlimited bids — same as Pro */
     bidsPerMonth: Number.MAX_SAFE_INTEGER,
+    /** Same 5% fee as Pro */
+    transactionFeeRate: TRANSACTION_FEE_RATES.frontPage,
+    isFoundingArtist: true,
   },
 } as const;
 
@@ -82,22 +143,24 @@ export const TIER_PRICING = {
     stripePriceIdYear: null,
   },
   amateur: {
-    monthly: 900,   // $9.00/mo
-    yearly: 9000,   // $90.00/yr
-    stripePriceIdMonth: "price_1TOraXQRJTQEheTOvLHhTihz",
-    stripePriceIdYear:  "price_1TOraXQRJTQEheTOVr8zI9O4",
+    monthly: 2900,   // $29.00/mo (standard)
+    yearly: 23200,   // $232.00/yr ($19.33/mo — 2 months free)
+    stripePriceIdMonth: "price_1TPRL5QRJTQEheTOSH3mNyqG",
+    stripePriceIdYear:  "price_1TPRL5QRJTQEheTOSfZmYLxK",
   },
   professional: {
-    monthly: 1900,  // $19.00/mo
-    yearly: 19000,  // $190.00/yr
-    stripePriceIdMonth: "price_1TOraYQRJTQEheTO3k4MS3PR",
-    stripePriceIdYear:  "price_1TOraYQRJTQEheTOHNQL82m3",
+    // Pay-as-you-go: $0 subscription, 10% transaction fee
+    monthly: 0,
+    yearly: 0,
+    stripePriceIdMonth: null,
+    stripePriceIdYear: null,
   },
   frontPage: {
-    monthly: 3900,  // $39.00/mo
-    yearly: 39000,  // $390.00/yr
-    stripePriceIdMonth: "price_1TOraZQRJTQEheTOofBdpJwM",
-    stripePriceIdYear:  "price_1TOraaQRJTQEheTOwDiBtF35",
+    // Founding Artist: $19/mo locked for life
+    monthly: 1900,   // $19.00/mo (lifetime lock-in)
+    yearly: 19000,   // $190.00/yr
+    stripePriceIdMonth: "price_1TPRL7QRJTQEheTO4JP4apjA",
+    stripePriceIdYear:  "price_1TPRL8QRJTQEheTOrzqCXrTj",
   },
 } as const;
 
@@ -105,12 +168,30 @@ export const TIER_PRICING = {
 export type ArtistTierKey = keyof typeof TIER_LIMITS;
 
 export function getTierLimits(tier: ArtistTierKey) {
-  // Fallback to free if the tier string is invalid
   return TIER_LIMITS[tier] || TIER_LIMITS.free;
 }
 
 export function getTierPricing(tier: ArtistTierKey) {
   return TIER_PRICING[tier] || TIER_PRICING.free;
+}
+
+/**
+ * Returns the transaction fee rate (as a decimal) for a given tier.
+ * e.g. 0.05 = 5%, 0.10 = 10%, 0 = no fee (free tier, no bidding)
+ */
+export function getTransactionFeeRate(tier: ArtistTierKey): number {
+  return TIER_LIMITS[tier]?.transactionFeeRate ?? 0;
+}
+
+/**
+ * Calculates the platform fee amount in cents for a given bid price.
+ * @param priceInCents - The accepted bid price in cents
+ * @param tier - The artist's subscription tier
+ * @returns The platform fee in cents (rounded to nearest cent)
+ */
+export function calculatePlatformFee(priceInCents: number, tier: ArtistTierKey): number {
+  const rate = getTransactionFeeRate(tier);
+  return Math.round(priceInCents * rate);
 }
 
 export function canUploadMorePhotos(
@@ -159,12 +240,10 @@ export const CLIENT_TIER_PRICING = {
   },
   client_plus: {
     monthly: 900, // $9.00
-    // TODO: Create client_plus product in Stripe and set STRIPE_CLIENT_PLUS_PRICE_ID env var
     stripePriceIdMonth: process.env.STRIPE_CLIENT_PLUS_PRICE_ID ?? null,
   },
   client_elite: {
     monthly: 1900, // $19.00
-    // TODO: Create client_elite product in Stripe and set STRIPE_CLIENT_ELITE_PRICE_ID env var
     stripePriceIdMonth: process.env.STRIPE_CLIENT_ELITE_PRICE_ID ?? null,
   },
 } as const;

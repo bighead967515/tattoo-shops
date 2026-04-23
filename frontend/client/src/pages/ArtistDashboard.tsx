@@ -498,25 +498,29 @@ export default function ArtistDashboard() {
               const tier = (artist.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
               const legacy = toLegacyArtistTier(tier);
               const limits = TIER_LIMITS[legacy as ArtistTierKey];
-              const pricing = TIER_PRICING[legacy as ArtistTierKey];
               const isFree = isFreeArtistTier(tier);
+              const isPayg = tier === "artist_pro";
+              const isPro = tier === "artist_amateur";
+              const isFounder = tier === "artist_icon";
+
+              const planName = isFree ? "Free" : isPayg ? "Pay-as-you-go" : isPro ? "Pro" : "Founding Artist";
+              const planPrice = isFree || isPayg ? "$0/mo" : isPro ? "$29/mo or $232/yr" : "$19/mo locked for life";
+              const transactionFee = isFree ? "No bidding access" : isPayg ? "10% platform fee on accepted bids" : "5% platform fee on accepted bids";
+
               return (
                 <>
                   {/* Current plan card */}
                   <Card className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-primary/10">
-                          <Crown className="h-6 w-6 text-primary" />
+                        <div className={`p-3 rounded-full ${isFounder ? "bg-amber-100" : "bg-primary/10"}`}>
+                          <Crown className={`h-6 w-6 ${isFounder ? "text-amber-500" : "text-primary"}`} />
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Current Plan</p>
-                          <h3 className="text-2xl font-bold">{limits.name}</h3>
-                          <p className="text-muted-foreground text-sm mt-1">
-                            {isFree
-                              ? "Free — upgrade to unlock more features"
-                              : `$${pricing.monthly / 100}/mo or $${pricing.yearly! / 100}/yr`}
-                          </p>
+                          <h3 className="text-2xl font-bold">{planName}</h3>
+                          <p className="text-muted-foreground text-sm mt-1">{planPrice}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{transactionFee}</p>
                         </div>
                       </div>
                       <Link href="/artist/billing">
@@ -529,14 +533,13 @@ export default function ArtistDashboard() {
                         </Button>
                       </Link>
                     </div>
-
                     {/* Feature summary */}
                     <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {[
                         { label: "Portfolio Photos", value: limits.portfolioPhotos === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.portfolioPhotos) },
-                        { label: "Accept Bookings", value: limits.canAcceptBookings ? "Yes" : "No" },
+                        { label: "Bidding", value: isFree ? "Blocked" : "Unlimited" },
                         { label: "Analytics", value: limits.hasAnalytics ? "Yes" : "No" },
-                        { label: "Featured", value: limits.isFeatured ? "Yes" : "No" },
+                        { label: "Verified Badge", value: limits.isVerifiedBadge ? "Yes" : "No" },
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 rounded-lg bg-muted/40 border">
                           <p className="text-xs text-muted-foreground">{label}</p>
@@ -546,18 +549,48 @@ export default function ArtistDashboard() {
                     </div>
                   </Card>
 
-                  {/* Upgrade CTA for free users */}
-                  {isFree && (
+                  {/* Founding Artist banner for non-founders */}
+                  {!isFounder && (
+                    <Card className="p-5 border-amber-300 bg-amber-50/60 dark:bg-amber-950/10">
+                      <div className="flex items-start gap-4">
+                        <div className="p-2 rounded-full bg-amber-100">
+                          <Crown className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-amber-900 dark:text-amber-300 mb-1">
+                            🚀 Founding Artist Offer — First 100 Only
+                          </h3>
+                          <p className="text-sm text-amber-800 dark:text-amber-400 mb-3">
+                            Lock in <strong>$19/mo for life</strong> and get <strong>6 months free</strong>. Use code{" "}
+                            <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded font-mono text-xs">FOUNDING_ARTIST_6MO</code>{" "}
+                            at checkout.
+                          </p>
+                          <Link href="/artist/billing">
+                            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white border-0 gap-2">
+                              <Crown className="h-4 w-4" />
+                              Claim Founding Rate
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Upgrade CTA for free/payg users */}
+                  {(isFree || isPayg) && (
                     <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30">
                       <div className="flex items-start gap-4">
                         <div className="p-3 rounded-full bg-primary/20">
                           <Sparkles className="h-6 w-6 text-primary" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold mb-2">Unlock Your Full Potential</h3>
+                          <h3 className="text-lg font-semibold mb-2">
+                            {isPayg ? "Save on fees — upgrade to Pro" : "Unlock Your Full Potential"}
+                          </h3>
                           <p className="text-muted-foreground mb-4">
-                            Upgrade to an Artist plan to accept bookings, show your contact info,
-                            get a verified badge, and appear higher in search results.
+                            {isPayg
+                              ? "Pro members pay only 5% on accepted bids (vs. 10% pay-as-you-go). Win 3+ bids/month and Pro pays for itself."
+                              : "Upgrade to start bidding on client posts, accept bookings, get a verified badge, and grow your clientele."}
                           </p>
                           <Link href="/artist/billing">
                             <Button className="gap-2">

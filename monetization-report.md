@@ -1,112 +1,89 @@
 # Ink Connect Monetization Plan: Artist Tiers & Billing Report
 
-This document outlines the detailed feature sets, pricing structure, billing capabilities, and bidding quotas for the Ink Connect artist monetization system. The system employs a "freemium" model with one free tier and three paid tiers.
+This document outlines the detailed feature sets, pricing structure, billing capabilities, and transaction fees for the Ink Connect artist monetization system. The system employs a 3-layer monetization model designed to remove barriers to entry while aligning platform revenue with artist success.
 
 ---
 
-## 1. Annual Billing
+## 1. The 3-Layer Monetization Model
 
-Annual billing is fully wired and operational across the entire stack. Artists can toggle between monthly and yearly billing on the `/artist/billing` page. Choosing yearly billing saves the equivalent of two months' cost compared to paying monthly.
+The monetization strategy is built on three core pillars:
 
-| Tier | Monthly Price | Annual Price | Annual Savings |
-| :--- | :--- | :--- | :--- |
-| Apprentice | $0 | $0 | — |
-| Artist | $9.00/mo | $90.00/yr | $18 |
-| Professional | $19.00/mo | $190.00/yr | $38 |
-| Icon | $39.00/mo | $390.00/yr | $78 |
+1. **Layer 1: Free Tier (The Funnel)** — Removes all barriers to joining and fills the supply side fast. Free artists make the platform look alive to clients.
+2. **Layer 2: Pro Subscription (The Workhorse)** — Generates recurring revenue from serious artists who want tools that save them time and bring them clients.
+3. **Layer 3: Transaction Fee on Bids** — Aligns revenue with artist success. The platform earns a percentage of accepted bids. Artists who hate subscriptions can use the Pay-as-you-go path (higher fee, no monthly cost), while Pro subscribers get a reduced fee as a reward for their commitment.
 
 ---
 
-## 2. Bidding on Client Posts
+## 2. Tier Breakdown & Pricing
 
-Artists can browse and bid on client tattoo idea posts from the Request Board. Bidding is a core monetization gate — the free tier cannot bid at all, and paid tiers receive a monthly quota that resets automatically on the 1st of each calendar month.
+| Tier | Monthly Fee | Annual Fee | Transaction Fee | Who It's For |
+| :--- | :--- | :--- | :--- | :--- |
+| **Free** | $0 | $0 | N/A (no bidding) | New artists, hobbyists, exposure seekers |
+| **Pay-as-you-go** | $0 | $0 | **10%** on accepted bids | Artists who prefer pure success-fee models |
+| **Pro** | $29/mo | $232/yr | **5%** on accepted bids | Working artists, small studios |
+| **Founding Artist** | $19/mo (locked) | $190/yr | **5%** on accepted bids | First 100 early adopters |
 
-### Bid Quota by Tier
-
-| Tier | Monthly Bid Quota | Notes |
-| :--- | :---: | :--- |
-| Apprentice (Free) | **0** | Bidding is completely blocked. An upgrade prompt is shown in place of the bid form. |
-| Artist ($9/mo) | **15 bids/month** | Counter resets on the 1st. An upgrade prompt appears when the quota is exhausted. |
-| Professional ($19/mo) | **50 bids/month** | Counter resets on the 1st. An upgrade prompt appears when the quota is exhausted. |
-| Icon ($39/mo) | **Unlimited** | No monthly cap. The bid form always remains open. |
-
-### How Monthly Reset Works
-
-The system tracks two fields per artist profile: `bidsThisMonth` (the running counter) and `bidsMonthYear` (the calendar month the counter belongs to, stored as `YYYY-MM`). On every bid submission attempt, the backend compares `bidsMonthYear` to the current calendar month. If they differ, the counter is automatically reset to zero before the new bid is counted. This means no scheduled job or cron task is required — the reset happens lazily and precisely on the first bid attempt of a new month.
+*Note: Annual billing for Pro and Founding Artist tiers includes a built-in "2 months free" discount.*
 
 ---
 
-## 3. Detailed Tier Breakdown
+## 3. Detailed Tier Features
 
-### Apprentice (Free Tier)
+### Free Tier
+*Purpose: Artist acquisition engine. Never charge for it.*
 
-The Apprentice tier allows new artists to establish a basic presence on the platform without any financial commitment.
+- **Portfolio Limit:** 10 photos
+- **Directory Listing:** Yes (appears in search results)
+- **Client Inquiries:** Yes (manual, no automation)
+- **Profile:** Basic (style tags and location)
+- **Bidding:** **Blocked.** (Must upgrade to Pay-as-you-go or Pro to bid)
+- **Booking Calendar:** No
+- **Payment Processing:** No
+- **Verified Badge:** No
+- **Analytics:** No
 
-- **Pricing:** $0.00 (Free forever)
-- **Portfolio Limit:** 3 photos maximum.
-- **Bidding:** Blocked. An upgrade prompt is shown instead of the bid form.
-- **Booking Capabilities:** Disabled.
-- **Direct Contact:** Hidden.
-- **Review Management:** Disabled.
-- **Analytics:** Disabled.
-- **Verified Badge:** Not included.
-- **Homepage Feature:** No.
+### Pay-as-you-go (No Subscription)
+*Purpose: Provide a pure transaction path for artists who are skeptical of subscriptions.*
 
-### Artist (Amateur Tier)
+- **Pricing:** $0/month
+- **Transaction Fee:** **10%** on accepted bids
+- **Portfolio Limit:** 10 photos
+- **Bidding:** **Unlimited**
+- **Booking Calendar:** No
+- **Payment Processing:** No
+- **Verified Badge:** No
+- **Analytics:** No
 
-The Artist tier is the first paid step, designed for working professionals who want to actively acquire clients through the platform.
+### Pro Subscription
+*Purpose: The core recurring revenue engine.*
 
-- **Pricing:** $9.00/month or $90.00/year
-- **Portfolio Limit:** 15 photos.
-- **Bidding:** **15 bids per month.** Counter resets on the 1st of each month.
-- **Booking Capabilities:** Enabled.
-- **Direct Contact:** Visible (social links, email).
-- **Verified Badge:** Included.
-- **Review Management:** Disabled.
-- **Analytics:** Disabled.
-- **Homepage Feature:** No.
+- **Pricing:** $29/month (or $232/year)
+- **Transaction Fee:** **5%** on accepted bids (Reduced rate)
+- **Portfolio Limit:** Unlimited
+- **Bidding:** **Unlimited**
+- **Booking Calendar:** Yes (Integrated with deposit collection)
+- **Payment Processing:** Yes (Stripe-powered)
+- **Verified Badge:** Yes (After ID + credential check)
+- **Client Messaging:** Yes
+- **Analytics:** Yes (Profile views, conversion rate)
 
-### Professional (Pro Tier)
+### Founding Artist (Launch Special)
+*Purpose: Cold-start solution to get the first 50-100 artists emotionally invested and active.*
 
-The Professional tier is the most popular option, providing a comprehensive suite of tools for established artists.
-
-- **Pricing:** $19.00/month or $190.00/year
-- **Portfolio Limit:** Unlimited.
-- **Bidding:** **50 bids per month.** Counter resets on the 1st of each month.
-- **Booking Capabilities:** Enabled.
-- **Direct Contact:** Visible.
-- **Verified Badge:** Included.
-- **Review Management:** Enabled (can respond to client reviews publicly).
-- **Analytics:** Enabled (profile views, booking conversion metrics).
-- **Homepage Feature:** No.
-
-### Icon (Front Page Tier)
-
-The Icon tier is the premium offering, designed for top-tier artists who want maximum exposure and an unrestricted bidding pipeline.
-
-- **Pricing:** $39.00/month or $390.00/year
-- **Portfolio Limit:** Unlimited.
-- **Bidding:** **Unlimited.** No monthly cap.
-- **Booking Capabilities:** Enabled.
-- **Direct Contact:** Visible.
-- **Verified Badge:** Included.
-- **Review Management:** Enabled.
-- **Analytics:** Enabled.
-- **Homepage Feature:** Yes — featured in the Homepage Carousel.
+- **Pricing:** **$19/month locked for life** (vs. $29 future price)
+- **Special Offer:** First 6 months FREE (using promo code `FOUNDING_ARTIST_6MO`)
+- **Transaction Fee:** **5%** on accepted bids
+- **Features:** Everything in Pro
+- **Exclusives:** "Founding Artist" badge on profile, Homepage carousel placement
+- **Requirement:** Must set up full portfolio and respond to 3+ client bids in first 60 days
 
 ---
 
-## 4. Full Feature Comparison Matrix
+## 4. Transaction Fee Implementation
 
-| Feature | Apprentice (Free) | Artist ($9/mo) | Professional ($19/mo) | Icon ($39/mo) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Annual Price** | $0 | $90/yr | $190/yr | $390/yr |
-| **Annual Savings** | — | $18 | $38 | $78 |
-| **Portfolio Photos** | 3 | 15 | Unlimited | Unlimited |
-| **Monthly Bid Quota** | 0 (blocked) | 15 | 50 | Unlimited |
-| **Accept Bookings** | No | Yes | Yes | Yes |
-| **Direct Contact Info** | No | Yes | Yes | Yes |
-| **Verified Badge** | No | Yes | Yes | Yes |
-| **Respond to Reviews** | No | No | Yes | Yes |
-| **Profile Analytics** | No | No | Yes | Yes |
-| **Homepage Feature** | No | No | No | Yes |
+The transaction fee system is built directly into the bidding engine:
+
+1. **Fee Calculation:** When an artist submits a bid, the backend checks their current tier and calculates the `platformFeeRateBps` (basis points: 500 for 5%, 1000 for 10%). This rate is stored permanently on the bid record.
+2. **Fee Lock-in:** Storing the rate at the time of bidding ensures that if an artist changes tiers later, the fee applied to already-submitted bids remains fair and predictable.
+3. **Amount Calculation:** When a client accepts a bid, the backend calculates the exact `platformFeeAmountCents` based on the agreed bid price and the locked-in fee rate.
+4. **Collection:** This fee amount is then passed to Stripe during the final checkout/payment process, automatically routing the platform's cut to the Ink Connect connected account.

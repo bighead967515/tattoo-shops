@@ -476,6 +476,16 @@ export const bids = pgTable(
     availableDate: timestamp("availableDate"), // When artist can do the work
     portfolioLinks: text("portfolioLinks"), // Links to relevant portfolio pieces
     status: bidStatusEnum("status").default("pending").notNull(),
+    /**
+     * Platform transaction fee rate at bid creation time, stored in basis points.
+     * 500 = 5% (Pro subscriber), 1000 = 10% (Pay-as-you-go), 0 = free tier.
+     */
+    platformFeeRateBps: integer("platformFeeRateBps").default(0).notNull(),
+    /**
+     * Calculated platform fee in cents. Set when bid is accepted.
+     * = priceEstimate * platformFeeRateBps / 10000
+     */
+    platformFeeAmountCents: integer("platformFeeAmountCents"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
