@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 
-const BASE_URL = "https://tattoo-artist-directory.onrender.com";
+const BASE_URL = window.location.origin;
 
 // ── New 3-layer plan definitions ─────────────────────────────────────────────
 type TierKey = "free" | "payg" | "pro" | "founding";
