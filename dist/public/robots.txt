@@ -1,0 +1,31 @@
+# Robots.txt for Universal Inc Tattoo Artist Directory
+
+User-agent: *
+Allow: /
+
+# Allow search engines to crawl all public pages
+Allow: /artists
+Allow: /artist/*
+Allow: /artist-finder
+Allow: /for-artists
+Allow: /pricing
+Allow: /help
+Allow: /cancellation-policy
+Allow: /terms-of-service
+
+# Disallow private/authenticated pages
+Disallow: /dashboard
+Disallow: /artist-dashboard
+Disallow: /login
+Disallow: /auth/*
+Disallow: /payment/*
+Disallow: /license-upload
+
+# Disallow API routes
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://universalinc.com/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
