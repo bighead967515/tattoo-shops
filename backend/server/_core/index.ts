@@ -45,6 +45,10 @@ function isBundledDistRuntime(): boolean {
 
 const app = express();
 
+// Trust reverse proxy (required for Hostinger, Render, and other hosted environments)
+// This allows express-rate-limit to correctly identify client IPs via X-Forwarded-For
+app.set("trust proxy", 1);
+
 // Initialize Sentry early (must be before other middleware)
 initSentry();
 

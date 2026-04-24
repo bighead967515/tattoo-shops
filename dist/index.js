@@ -5031,6 +5031,7 @@ function isBundledDistRuntime() {
   return path6.basename(import.meta.dirname).toLowerCase() === "dist";
 }
 var app = express2();
+app.set("trust proxy", 1);
 initSentry();
 app.use(
   cors({
