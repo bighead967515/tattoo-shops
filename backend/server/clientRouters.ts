@@ -262,7 +262,7 @@ export const requestsRouter = router({
           )`.as("bidCount"),
         })
         .from(tattooRequests)
-        .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
+        .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
         .where(eq(tattooRequests.status, "open"))
         .orderBy(desc(tattooRequests.createdAt))
         .limit(filters.limit ?? 20)
@@ -322,7 +322,7 @@ export const requestsRouter = router({
           )`.as("bidCount"),
         })
         .from(tattooRequests)
-        .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
+        .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
         .where(eq(tattooRequests.status, "open"))
         .orderBy(desc(tattooRequests.createdAt))
         .limit(filters.limit ?? 20)
@@ -354,7 +354,7 @@ export const requestsRouter = router({
           )`.as("bidCount"),
       })
       .from(tattooRequests)
-      .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
+      .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
       .where(eq(tattooRequests.status, "open"))
       .orderBy(desc(tattooRequests.createdAt))
       .limit(8);
@@ -378,7 +378,7 @@ export const requestsRouter = router({
           client: clients,
         })
         .from(tattooRequests)
-        .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
+        .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
         .where(eq(tattooRequests.id, input.id))
         .limit(1);
 
@@ -739,7 +739,7 @@ export const bidsRouter = router({
       })
       .from(bids)
       .innerJoin(tattooRequests, eq(bids.requestId, tattooRequests.id))
-      .innerJoin(clients, eq(tattooRequests.clientId, clients.id))
+      .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
       .where(eq(bids.artistId, artist.id))
       .orderBy(desc(bids.createdAt));
 
