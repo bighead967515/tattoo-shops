@@ -282,6 +282,7 @@ export default function NewRequest() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedRequestId, setSubmittedRequestId] = useState<number | null>(null);
   const [selectedBudgetPreset, setSelectedBudgetPreset] = useState<
     number | null
   >(null);
@@ -422,7 +423,7 @@ export default function NewRequest() {
       }
 
       toast.success("Your idea has been posted!");
-      setLocation(`/requests/${newRequest.id}`);
+      setSubmittedRequestId(newRequest.id);
     } catch (error: any) {
       toast.error(error.message || "Something went wrong. Please try again.");
     } finally {
@@ -438,10 +439,87 @@ export default function NewRequest() {
 
   // ── Render ──────────────────────────────────────────────────────────────────────────
 
+  // Post-submit confirmation screen
+  if (submittedRequestId !== null) {
+    return (
+      <div className="min-h-screen bg-background py-8 px-4">
+        <div className="max-w-lg mx-auto text-center pt-20">
+          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold mb-3">Your idea is out there. 🎨</h1>
+          <p className="text-muted-foreground mb-8 leading-relaxed">
+            Artists near you can now see your request and send quotes. We'll notify you when someone reaches out — usually within a day or two, sometimes faster.
+            <br /><br />
+            Sit tight, and feel free to browse artist portfolios while you wait.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              className="h-11 px-6 font-semibold"
+              onClick={() => setLocation("/artists")}
+            >
+              Browse Artists
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11 px-6"
+              onClick={() => setLocation(`/requests/${submittedRequestId}`)}
+            >
+              View My Request
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Page Header */}
+      <div className="max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Sidebar trust block */}
+          <aside className="lg:col-span-1 order-last lg:order-first">
+            <div className="sticky top-8 space-y-4">
+              <Card className="bg-card border-border/60">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">How this works</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-xs font-bold text-primary">1</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Post your idea</p>
+                      <p className="text-xs text-muted-foreground">Describe your vision and upload any references you have.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-xs font-bold text-primary">2</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Artists reach out</p>
+                      <p className="text-xs text-muted-foreground">Local artists who do your style will send you quotes.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-xs font-bold text-primary">3</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">You choose</p>
+                      <p className="text-xs text-muted-foreground">Pick the artist that fits your vision and your budget. No obligation until you book.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </aside>
+
+          {/* Main form */}          <div className="lg:col-span-2">
+
+          {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -449,16 +527,16 @@ export default function NewRequest() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                Post a Tattoo Idea
+                Tell Us About Your Tattoo Idea
               </h1>
               <p className="text-sm text-muted-foreground">
-                Describe your vision — artists will send you custom quotes
+                Describe your vision, drop some reference photos, and we'll put it in front of artists who actually do this style. You'll get real quotes, no pressure, no commitment yet.
               </p>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
           {/* Card 1: The Idea */}
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
@@ -469,11 +547,11 @@ export default function NewRequest() {
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="title" className="text-sm font-medium">
-                  Project Title <span className="text-primary">*</span>
+                  What are you thinking? <span className="text-primary">*</span>
                 </Label>
                 <Input
                   id="title"
-                  placeholder='e.g., "Neo-traditional sleeve" or "Minimalist wolf"'
+                  placeholder='e.g., "Black and grey wolf howling at the moon, forearm-sized"'
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
@@ -485,11 +563,14 @@ export default function NewRequest() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="description" className="text-sm font-medium">
-                  Description <span className="text-primary">*</span>
+                  Tell us more <span className="text-primary">*</span>
                 </Label>
+                <p className="text-xs text-muted-foreground -mt-1 mb-1.5">
+                  Don't overthink it. "A black and grey wolf howling at the moon, kind of realistic, maybe forearm-sized" is a great start. The more detail you give, the better the quotes you'll get.
+                </p>
                 <Textarea
                   id="description"
-                  placeholder="Describe your vision in detail — elements, meaning, mood, color palette, any references you love…"
+                  placeholder="Describe the tattoo, style, subject, mood, size, placement... whatever you've got."
                   rows={5}
                   value={formData.description}
                   onChange={(e) =>
@@ -522,8 +603,11 @@ export default function NewRequest() {
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
-                Design Details
+                Where are you putting it, and how big?
               </CardTitle>
+              <p className="text-xs text-muted-foreground pt-1">
+                Placement and size affect the quote a lot. Even a rough answer helps — "half sleeve" or "something around 4 inches on my forearm" works fine.
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -621,10 +705,10 @@ export default function NewRequest() {
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
-                Budget Range
+                What's your budget range?
               </CardTitle>
               <CardDescription className="text-xs">
-                Select a preset or enter a custom range
+                There's no wrong answer here. Being upfront about your budget helps artists send you quotes that actually work for both sides. You can always discuss it further once they reach out.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -685,10 +769,10 @@ export default function NewRequest() {
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
-                Reference Images
+                Got reference photos? Upload them here.
               </CardTitle>
               <CardDescription className="text-xs">
-                Upload up to 3 photos for inspiration (optional)
+                Screenshots, Pinterest saves, artist work you love — anything that helps show what you're going for. You can upload multiple images.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -716,7 +800,7 @@ export default function NewRequest() {
                 <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border/50 rounded-xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
                   <ImagePlus className="h-7 w-7 text-muted-foreground mb-1.5" />
                   <span className="text-sm text-muted-foreground">
-                    Click to upload
+                    Add Photos (Optional)
                   </span>
                   <span className="text-xs text-muted-foreground/60 mt-0.5">
                     {uploadedImages.length}/3 images · PNG, JPG, WEBP
@@ -733,22 +817,15 @@ export default function NewRequest() {
             </CardContent>
           </Card>
 
-          {/* Card 5: Guest Email (only shown when not logged in) */}
+          {/* Pre-submit account gate (only shown when not logged in) */}
           {!user && (
-            <Card className="bg-card border-border/60 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">
-                  Get Notified{" "}
-                  <span className="text-xs font-normal text-muted-foreground ml-1">
-                    optional
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Leave your email and we'll send you artist bids when they come in
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1.5">
+            <Card className="bg-primary/5 border-primary/30 shadow-sm">
+              <CardContent className="pt-5 pb-5">
+                <h3 className="font-semibold text-base mb-1">Almost there — save your idea so artists can find it.</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create a free account to post your request to the local artist feed. It takes about 30 seconds, and your idea will be waiting right here when you're done.
+                </p>
+                <div className="space-y-1.5 mb-4">
                   <Label htmlFor="guestEmail" className="text-sm font-medium">
                     Email Address
                   </Label>
@@ -761,6 +838,10 @@ export default function NewRequest() {
                     className="bg-background/50 border-border/60 focus:border-primary"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Already have an account?{" "}
+                  <a href="/login" className="text-primary underline underline-offset-2">Sign in</a>
+                </p>
               </CardContent>
             </Card>
           )}
@@ -872,18 +953,17 @@ export default function NewRequest() {
               )}
             </Button>
 
-            {/* Vibe Curator note */}
+            {/* Trust line */}
             <div className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
               <ShieldCheck className="w-4 h-4 text-primary mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Your idea will be reviewed by a{" "}
-                <span className="text-primary font-medium">Vibe Curator</span>{" "}
-                to ensure it reaches the right artists. Expect bids within
-                24–48 hours.
+                Your request is visible to verified artists on Ink Connect. We don't share your contact info until you decide to move forward.
               </p>
             </div>
           </div>
-        </form>
+          </form>
+          </div>{/* end main form col */}
+        </div>{/* end grid */}
       </div>
     </div>
   );
