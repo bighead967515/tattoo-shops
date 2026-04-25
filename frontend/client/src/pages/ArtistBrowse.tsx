@@ -408,19 +408,42 @@ export default function ArtistBrowse() {
                 </div>
               </>
             ) : (
-              <Card className="p-12 text-center">
-                <h3 className="text-lg font-semibold mb-2">No artists found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {isDiscoveryMode
-                    ? "Try describing your tattoo idea differently, or switch to filters"
-                    : "Try adjusting your filters to see more results"}
-                </p>
-                {isDiscoveryMode ? (
-                  <Button onClick={handleClearSearch}>Switch to Filters</Button>
-                ) : (
-                  <Button onClick={handleClearFilters}>Clear Filters</Button>
-                )}
-              </Card>
+              <div className="space-y-6">
+                <Card className="p-12 text-center">
+                  <h3 className="text-lg font-semibold mb-2">No artists found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {isDiscoveryMode
+                      ? "Try describing your tattoo idea differently, or switch to filters"
+                      : "Try adjusting your filters to see more results"}
+                  </p>
+                  {isDiscoveryMode ? (
+                    <Button onClick={handleClearSearch}>Switch to Filters</Button>
+                  ) : (
+                    <Button onClick={handleClearFilters}>Clear Filters</Button>
+                  )}
+                </Card>
+                <Card className="p-8 text-center border-primary/30 bg-primary/5">
+                  <div className="text-4xl mb-3">🎨</div>
+                  <h3 className="text-xl font-bold mb-2">Are you a tattoo artist?</h3>
+                  <p className="text-muted-foreground mb-5 max-w-md mx-auto">
+                    Be one of the first artists listed on Ink Connect. Join free — clients in your city are already posting ideas.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button
+                      onClick={() => setLocation("/artist/register")}
+                      className="shadow-md shadow-primary/20"
+                    >
+                      Join as an Artist
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setLocation("/for-artists")}
+                    >
+                      Learn More
+                    </Button>
+                  </div>
+                </Card>
+              </div>
             )}
           </div>
         </div>

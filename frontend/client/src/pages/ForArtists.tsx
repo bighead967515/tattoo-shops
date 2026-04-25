@@ -55,7 +55,7 @@ export default function ForArtists() {
               className="text-lg px-10 py-6 shadow-lg shadow-primary/20"
               onClick={() => setLocation("/artist/register")}
             >
-              Apply as a Founding Artist
+              Join as a Founding Artist
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
             <Button
@@ -260,14 +260,14 @@ export default function ForArtists() {
           <Palette className="w-12 h-12 text-primary mx-auto" />
           <h2 className="text-4xl font-bold">Ready to grow your clientele?</h2>
           <p className="text-xl text-muted-foreground">
-            Join 8 artists already on Ink Connect. Takes less than 2 minutes to apply.
+            Join 8 artists already on Ink Connect. Takes less than 2 minutes to get started.
           </p>
           <Button
             size="lg"
             className="text-lg px-12 py-6 shadow-lg shadow-primary/20"
             onClick={() => setLocation("/artist/register")}
           >
-            Apply as a Founding Artist
+            Create Your Artist Profile
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <p className="text-sm text-muted-foreground">
