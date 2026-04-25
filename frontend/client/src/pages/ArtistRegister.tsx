@@ -185,18 +185,17 @@ export default function ArtistRegister() {
       for (const file of s2.portfolioFiles) {
         try {
           const ext = file.name.split(".").pop() || "jpg";
-          const key = `${artist.id}/${Date.now()}_${uploadedCount}.${ext}`;
-          const { uploadUrl, fileKey } = await getUploadUrlMutation.mutateAsync({
-            fileKey: key,
+          const { signedUrl, path: filePath } = await getUploadUrlMutation.mutateAsync({
+            artistId: artist.id,
+            fileName: `${Date.now()}_${uploadedCount}.${ext}`,
             contentType: file.type,
           });
-          await axios.put(uploadUrl, file, {
+          await axios.put(signedUrl, file, {
             headers: { "Content-Type": file.type },
           });
           await addPortfolioImageMutation.mutateAsync({
             artistId: artist.id,
-            imageKey: fileKey,
-            isMainImage: uploadedCount === 0,
+            imageKey: filePath,
           });
           uploadedCount++;
         } catch (err) {
