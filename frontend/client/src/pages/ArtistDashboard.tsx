@@ -220,6 +220,71 @@ export default function ArtistDashboard() {
           </Button>
         </div>
 
+        {/* Onboarding Checklist — shown until all steps complete */}
+        {(() => {
+          const portfolioCount = portfolio?.length ?? 0;
+          const hasPortfolio = portfolioCount >= 3;
+          const hasBio = !!(artist.bio && artist.bio.trim().length > 20);
+          const hasInstagram = !!artist.instagram;
+          const hasSubscription = !!(artist.subscriptionTier && artist.subscriptionTier !== "artist_free");
+          const steps = [
+            { id: "portfolio", label: "Upload 3+ portfolio photos", done: hasPortfolio, cta: "Add Photos", tab: "portfolio" },
+            { id: "bio", label: "Write a bio (20+ characters)", done: hasBio, cta: "Edit Profile", tab: "settings" },
+            { id: "instagram", label: "Add your Instagram handle", done: hasInstagram, cta: "Add Instagram", tab: "settings" },
+            { id: "subscription", label: "Upgrade to Pro for bidding access", done: hasSubscription, cta: "Upgrade", tab: "billing" },
+          ];
+          const completedCount = steps.filter(s => s.done).length;
+          const allDone = completedCount === steps.length;
+          if (allDone) return null;
+          return (
+            <Card className="mb-8 p-6 border-primary/30 bg-primary/5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-bold text-lg">Complete Your Profile</h2>
+                  <p className="text-sm text-muted-foreground">{completedCount} of {steps.length} steps done</p>
+                </div>
+                <span className="text-2xl font-bold text-primary">{Math.round((completedCount / steps.length) * 100)}%</span>
+              </div>
+              <Progress value={(completedCount / steps.length) * 100} className="h-2 mb-5" />
+              <div className="space-y-3">
+                {steps.map(step => (
+                  <div key={step.id} className={`flex items-center justify-between p-3 rounded-lg border ${
+                    step.done ? "border-primary/20 bg-primary/5 opacity-60" : "border-border bg-background"
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                        step.done ? "bg-primary" : "border-2 border-muted-foreground"
+                      }`}>
+                        {step.done && (
+                          <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`text-sm ${step.done ? "line-through text-muted-foreground" : "font-medium"}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {!step.done && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7 px-3 shrink-0"
+                        onClick={() => {
+                          const tabEl = document.querySelector(`[data-value="${step.tab}"]`) as HTMLElement;
+                          tabEl?.click();
+                        }}
+                      >
+                        {step.cta}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })()}
+
         <Tabs defaultValue="portfolio" className="space-y-6">
           <TabsList className="grid w-full max-w-2xl grid-cols-5">
             <TabsTrigger value="portfolio">

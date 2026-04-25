@@ -32,6 +32,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ArtistBilling from "./pages/ArtistBilling";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import ArtistRegister from "./pages/ArtistRegister";
 
 function Router() {
   return (
@@ -64,6 +65,8 @@ function Router() {
       <Route path="/requests" component={RequestBoard} />
       <Route path="/requests/:id" component={RequestDetail} />
       <Route path="/client/design-lab" component={DesignLab} />
+      {/* Artist registration flow */}
+      <Route path="/artist/register" component={ArtistRegister} />
       {/* Artist billing routes */}
       <Route path="/artist/billing" component={ArtistBilling} />
       <Route path="/artist/billing/success" component={SubscriptionSuccess} />

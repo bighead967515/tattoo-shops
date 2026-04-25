@@ -14,6 +14,7 @@ import {
   CheckCircle,
   Award,
   Sparkles,
+  Palette,
 } from "lucide-react";
 
 const suggestionTags = [
@@ -105,6 +106,30 @@ export default function Home() {
                 Post a Request
               </Button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Artist CTA Strip */}
+      <div className="border-b border-primary/20 bg-primary/5">
+        <div className="container py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 max-w-4xl mx-auto">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <Palette className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-sm md:text-base font-medium">
+                <span className="text-primary font-semibold">Are you a tattoo artist?</span>{" "}
+                Join free — get discovered by clients in your city.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="shrink-0 px-6"
+              onClick={() => setLocation("/for-artists")}
+            >
+              Join as an Artist →
+            </Button>
           </div>
         </div>
       </div>
