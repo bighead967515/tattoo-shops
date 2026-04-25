@@ -19,7 +19,11 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [location] = useLocation();
+  const [isSignUp, setIsSignUp] = useState(() => {
+    const params = new URLSearchParams(search);
+    return params.get("mode") === "signup" || location === "/signup";
+  });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

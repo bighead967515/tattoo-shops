@@ -44,6 +44,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/artist-dashboard" component={ArtistDashboard} />
       <Route path="/login" component={Login} />
+      <Route path="/signup" component={Login} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/auth/reset-password" component={ResetPassword} />
