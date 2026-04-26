@@ -70,13 +70,13 @@ export async function getDb() {
       // Supabase transaction pooler (port 6543 / pooler.supabase.com) does NOT
       // support prepared statements — postgres.js must use simple query protocol.
       const dbUrl = process.env.DATABASE_URL;
-      const usePooler =
-        dbUrl.includes(":6543/") || dbUrl.includes("pooler.supabase");
+      // Supabase always routes through Supavisor/PgBouncer — prepared statements
+      // must be disabled unconditionally regardless of which connection URL is used.
       _sqlClient = postgres(dbUrl, {
         max: 20, // Max connections in pool
         idle_timeout: 30, // Close idle connections after 30 seconds
         connect_timeout: 5, // 5 second connection timeout
-        prepare: !usePooler, // Disable prepared statements for PgBouncer/Supabase pooler
+        prepare: false, // MUST be false for Supabase (Supavisor/PgBouncer incompatible)
         onnotice: (notice) => {
           logger.debug("Database notice", { message: notice.message });
         },
