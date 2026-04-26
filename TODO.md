@@ -1,6 +1,6 @@
 # Production Readiness Tracker
 
-Last updated: 2026-03-31
+Last updated: 2026-04-26
 
 ## Completed Baseline (Verified In Code)
 
@@ -19,7 +19,7 @@ Last updated: 2026-03-31
 
 ### Environment And Secrets
 
-- [ ] Configure all production environment variables in hosting platform
+- [ ] Configure all production environment variables in Hostinger
   - DATABASE_URL, JWT_SECRET
   - SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
   - VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
@@ -27,12 +27,14 @@ Last updated: 2026-03-31
   - STRIPE_CLIENT_PLUS_PRICE_ID, STRIPE_CLIENT_ELITE_PRICE_ID
   - RESEND_API_KEY
   - GROQ_API_KEY, HUGGINGFACE_API_KEY
-- [ ] Verify production domain allowlist/cookies/CORS behavior
+- [ ] Verify Hostinger domain allowlist/cookies/CORS behavior
 - [ ] Rotate any previously shared test keys
 
 ### Deployment And Reliability
 
 - [ ] Configure uptime monitor for /api/health with paging alerts
+- [ ] Confirm Hostinger build/start commands and runtime Node version match the repo
+- [ ] Verify Hostinger reverse proxy/SSL configuration for app traffic and Stripe webhooks
 - [ ] Add alerting for Stripe webhook failures and queue backlog growth
 - [ ] Validate Sentry alerts route to on-call channel
 - [ ] Confirm backups and recovery process for PostgreSQL/Supabase
@@ -98,6 +100,7 @@ Last updated: 2026-03-31
 
 - [ ] All Critical Before Launch items completed
 - [ ] Rollback plan tested and documented
+- [ ] Hostinger deployment steps documented for repeatable redeploys
 - [ ] Terms, privacy, and compliance pages published
 
 ### Go-Live Day

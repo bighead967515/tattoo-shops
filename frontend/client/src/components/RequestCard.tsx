@@ -18,6 +18,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const mainImage =
     request.images.find((img: TattooRequest["images"][0]) => img.isMainImage) ||
     request.images[0];
+  const clientDisplayName = request.client?.displayName ?? "Unknown client";
 
   return (
     <Link href={`/requests/${request.id}`} className="block group">
@@ -40,7 +41,7 @@ export default function RequestCard({ request }: RequestCardProps) {
             {request.title}
           </h3>
           <p className="text-sm text-muted-foreground mt-1 flex-grow">
-            by {request.client.displayName}
+            by {clientDisplayName}
           </p>
           <div className="flex items-center justify-between mt-4">
             <Badge variant="secondary">{request.style || "Any Style"}</Badge>

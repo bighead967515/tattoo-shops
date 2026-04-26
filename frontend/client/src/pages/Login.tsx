@@ -29,7 +29,7 @@ function GitHubIcon() {
 }
 
 export default function Login() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const search = useSearch();
   const { isAuthenticated, loading } = useAuth();
   const { signInWithEmail, signUpWithEmail, signInWithOAuth } =
@@ -37,7 +37,6 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [location] = useLocation();
   const [isSignUp, setIsSignUp] = useState(() => {
     const params = new URLSearchParams(search);
     return params.get("mode") === "signup" || location === "/signup";
@@ -46,10 +45,10 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (isAuthenticated) {
       setLocation("/dashboard");
     }
-  }, [loading, isAuthenticated, setLocation]);
+  }, [isAuthenticated, setLocation]);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -59,6 +58,11 @@ export default function Login() {
       setError(oauthError);
     }
   }, [search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    setIsSignUp(params.get("mode") === "signup" || location === "/signup");
+  }, [search, location]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,14 +91,6 @@ export default function Login() {
       setError(err.message || "OAuth login failed");
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-primary/5 flex items-center justify-center p-4">
@@ -215,8 +211,8 @@ export default function Login() {
                 variant="ghost"
                 className="w-full"
                 onClick={() => {
-                  setIsSignUp(!isSignUp);
                   setError(null);
+                  setLocation(isSignUp ? "/login" : "/login?mode=signup");
                 }}
               >
                 {isSignUp

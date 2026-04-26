@@ -83,7 +83,9 @@ export default function ArtistDashboardFeed() {
               <h3 className="font-semibold text-lg">{request.title}</h3>
               <p className="text-sm text-muted-foreground">
                 Posted on {format(new Date(request.createdAt), "MMM d, yyyy")} •{" "}
-                {request.client.city}, {request.client.state}
+                {request.client?.city && request.client?.state
+                  ? `${request.client.city}, ${request.client.state}`
+                  : "Location unavailable"}
               </p>
             </div>
             <Link href={`/requests/${request.id}`}>

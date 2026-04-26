@@ -1,409 +1,484 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/_core/hooks/useAuth";
 import HomepageFeed from "@/components/HomepageFeed";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
-  Search,
-  MapPin,
+  ArrowRight,
   Calendar,
+  CheckCircle,
+  FileText,
+  MapPin,
+  MessageSquare,
+  Palette,
   Shield,
   Star,
-  CheckCircle,
   Award,
-  Sparkles,
-  Palette,
+  Wallet,
 } from "lucide-react";
 
-const suggestionTags = [
-  "Norse mythology",
-  "Tattoos for couples",
-  "Fineline roses on my thigh",
-  "An eagle on the chest",
-  "Japanese dragon backpiece",
+const audienceLanes = [
+  {
+    title: "Looking for a tattoo artist?",
+    body:
+      "Describe your idea, upload a few references, and let local artists come to you. Compare portfolios, styles, and real quotes, then pick the one that feels right.",
+    cta: "Post a Request",
+    href: "/client/new-request",
+    icon: FileText,
+  },
+  {
+    title: "Looking to fill your books?",
+    body:
+      "Browse client requests that match your style, send quotes on projects you actually want, and grow your client base without chasing leads or paying for ads.",
+    cta: "Apply as an Artist",
+    href: "/artist/register",
+    icon: Palette,
+  },
+];
+
+const clientSteps = [
+  {
+    title: "Describe your idea",
+    body:
+      "Tell us what you're thinking, style, placement, size, vibe. Upload any references you've got. The more detail, the better the quotes.",
+    icon: FileText,
+  },
+  {
+    title: "Get quotes from real artists",
+    body:
+      "Artists near you who do your style will review your post and send quotes. You'll see their portfolio, their message, and their price, all in one place.",
+    icon: MessageSquare,
+  },
+  {
+    title: "Book the right one",
+    body:
+      "Pick the artist that feels like the best fit. No commitment until you're ready. No pressure.",
+    icon: CheckCircle,
+  },
+];
+
+const artistSteps = [
+  {
+    title: "Build your profile",
+    body:
+      "Showcase your portfolio, tag your styles, and set your location. We review every artist before they go live, so the clients who find you know you're the real deal.",
+    icon: Palette,
+  },
+  {
+    title: "Browse client requests",
+    body:
+      "See what people in your area are looking for. Filter by style, placement, and budget. Send a quote when you see a project worth your time.",
+    icon: MapPin,
+  },
+  {
+    title: "Grow your books your way",
+    body:
+      "You set your price. You choose your projects. Ink Connect just connects the dots.",
+    icon: Calendar,
+  },
+];
+
+const whyInkConnect = [
+  {
+    title: "Hand-picked artists",
+    body:
+      "Every artist on the platform is individually reviewed. No random listings, no unvetted accounts.",
+    icon: Star,
+  },
+  {
+    title: "Real quotes, not estimates",
+    body:
+      "Artists send quotes based on your actual idea, not a generic price list. You know what you're getting into before you book.",
+    icon: Wallet,
+  },
+  {
+    title: "You're in control",
+    body:
+      "Browse at your own pace. Compare as many quotes as you want. Nobody's pushing you to book before you're ready.",
+    icon: Award,
+  },
+  {
+    title: "Safe studios, verified work",
+    body:
+      "All listed studios meet health and safety standards. Verified reviews come from clients with real bookings, not anonymous posts.",
+    icon: Shield,
+  },
+];
+
+const clientTestimonials = [
+  {
+    quote:
+      '"I posted my idea on a Tuesday and had three quotes by Thursday. The artist I picked nailed exactly what I had in mind."',
+    byline: "Client Name, City",
+  },
+  {
+    quote:
+      "\"I'd been trying to find someone who does Japanese traditional for months. Posted on Ink Connect and found them in two days.\"",
+    byline: "Client Name, City",
+  },
+  {
+    quote:
+      '"It made the whole process way less stressful. I could compare portfolios and prices without feeling pressured."',
+    byline: "Client Name, City",
+  },
+];
+
+const artistTestimonials = [
+  {
+    quote:
+      '"I get to pick the projects I actually want to do. That alone is worth it."',
+    byline: "Artist Name, Style, City",
+  },
+  {
+    quote:
+      '"My books have been full for three months straight. Most of those bookings came through Ink Connect."',
+    byline: "Artist Name, Style, City",
+  },
+];
+
+const faqs = [
+  {
+    question: "Is it really free to post a request?",
+    answer:
+      "Yes. Posting your tattoo idea and receiving quotes is completely free for clients.",
+  },
+  {
+    question: "How are artists vetted?",
+    answer:
+      "Every artist goes through a manual review before their profile goes live. We check portfolio quality, professionalism, and studio standards, not just follower counts.",
+  },
+  {
+    question: "Do I have to book once I get quotes?",
+    answer:
+      "Not at all. You can receive quotes, compare artists, and take your time. There's no obligation until you decide to move forward.",
+  },
+  {
+    question: "I'm an artist, is there a commission on bookings?",
+    answer:
+      "No commission on quotes. You work out the booking details directly with your client through Ink Connect.",
+  },
 ];
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      setLocation(`/artists?search=${encodeURIComponent(searchQuery)}`);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section with Value Proposition */}
-      <div className="relative bg-gradient-to-br from-background via-background to-primary/5 border-b">
-        <div className="container py-20 md:py-32">
+      <div className="relative overflow-hidden border-b bg-gradient-to-br from-background via-background to-primary/10">
+        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,_rgba(112,255,112,0.18),_transparent_60%)]" />
+        <div className="container relative py-20 md:py-28">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              Find Your Perfect Tattoo Artist
+            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.28em] text-primary/80">
+              Ink Connect
+            </p>
+            <h1 className="mb-6 text-4xl font-bold leading-tight md:text-6xl">
+              Your next tattoo starts with the right artist.
             </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8">
-              <span className="text-primary font-semibold">Ink Connect</span> — browse portfolios, post your tattoo idea, and get bids from top-rated artists and shops
+            <p className="mx-auto mb-8 max-w-3xl text-lg text-muted-foreground md:text-2xl">
+              Post your idea, get quotes from vetted artists near you, and book the one that fits your style and your budget. No guesswork. No cold DMs.
             </p>
 
-            {/* Search Bar */}
-            <div className="max-w-2xl mx-auto mb-8">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary w-5 h-5" />
-                  <Input
-                    type="text"
-                    placeholder="Describe your dream tattoo... AI will find matching artists"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="pl-10 h-14 text-lg"
-                  />
-                </div>
-                <Button size="lg" onClick={handleSearch} className="h-14 px-8">
-                  <Search className="w-5 h-5 mr-2" />
-                  Discover
-                </Button>
-              </div>
-
-              {/* Suggestion Tags */}
-              <div className="flex flex-wrap gap-2 justify-center mt-4">
-                {suggestionTags.map((tag, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setSearchQuery(tag);
-                      setLocation(`/artists?search=${encodeURIComponent(tag)}`);
-                    }}
-                    className="px-4 py-2 bg-muted hover:bg-primary/10 rounded-full text-sm transition-colors"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Primary CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button
                 size="lg"
-                onClick={() => setLocation("/artists")}
-                className="text-lg px-8 py-6"
-              >
-                <Search className="w-5 h-5 mr-2" />
-                Browse Artists
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
                 onClick={() => setLocation("/client/new-request")}
-                className="text-lg px-8 py-6"
+                className="px-8 py-6 text-lg"
               >
-                <MapPin className="w-5 h-5 mr-2" />
-                Post a Request
+                Post Your Idea, It's Free
+              </Button>
+              <Button
+                size="lg"
+                variant="link"
+                onClick={() => setLocation("/artists")}
+                className="h-auto px-0 text-base text-foreground"
+              >
+                Browse Artist Portfolios
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
+
+            <p className="mt-5 text-sm text-muted-foreground">
+              Clients in Louisiana and beyond are already getting quotes. Join them.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Artist CTA Strip */}
-      <div className="border-b border-primary/20 bg-primary/5">
-        <div className="container py-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 max-w-4xl mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <Palette className="w-4 h-4 text-primary" />
+      <section className="border-b bg-muted/20">
+        <div className="container py-16">
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+            {audienceLanes.map(({ title, body, cta, href, icon: Icon }) => (
+              <Card
+                key={title}
+                className="rounded-3xl border-border/60 bg-background/90 p-8 shadow-sm"
+              >
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                  <Icon className="h-6 w-6 text-primary" />
+                </div>
+                <h2 className="mb-3 text-2xl font-bold">{title}</h2>
+                <p className="mb-6 text-muted-foreground">{body}</p>
+                <Button
+                  variant="link"
+                  className="h-auto px-0 text-base"
+                  onClick={() => setLocation(href)}
+                >
+                  {cta}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="container py-20">
+        <div className="mx-auto mb-12 max-w-3xl text-center">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Here's how it works for clients
+          </h2>
+        </div>
+
+        <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
+          {clientSteps.map(({ title, body, icon: Icon }, index) => (
+            <Card key={title} className="rounded-3xl border-border/60 p-8">
+              <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Icon className="h-7 w-7" />
               </div>
-              <p className="text-sm md:text-base font-medium">
-                <span className="text-primary font-semibold">Are you a tattoo artist?</span>{" "}
-                Join free — get discovered by clients in your city.
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-primary/80">
+                Step {index + 1}
               </p>
-            </div>
-            <Button
-              size="sm"
-              className="shrink-0 px-6"
-              onClick={() => setLocation("/for-artists")}
-            >
-              Join as an Artist →
+              <h3 className="mb-3 text-xl font-semibold">{title}</h3>
+              <p className="text-muted-foreground">{body}</p>
+            </Card>
+          ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
+            Post Your Idea, It's Free
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </section>
+
+      <section className="border-y bg-muted/30">
+        <div className="container py-20">
+          <div className="mx-auto mb-12 max-w-3xl text-center">
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+              Here's how it works for artists
+            </h2>
+          </div>
+
+          <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
+            {artistSteps.map(({ title, body, icon: Icon }, index) => (
+              <Card key={title} className="rounded-3xl border-border/60 bg-background p-8">
+                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Icon className="h-7 w-7" />
+                </div>
+                <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-primary/80">
+                  Step {index + 1}
+                </p>
+                <h3 className="mb-3 text-xl font-semibold">{title}</h3>
+                <p className="text-muted-foreground">{body}</p>
+              </Card>
+            ))}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Button size="lg" variant="outline" onClick={() => setLocation("/artist/register")}> 
+              Apply to Join as an Artist
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Value Proposition Cards */}
-      <div className="border-b bg-muted/30">
-        <div className="container py-14">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {/* Card 1 — Hand-Picked Artists */}
-            <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(112,255,112,0.08)] transition-all duration-300 group">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
-                <Star className="w-7 h-7 text-primary" />
+      <section className="container py-20">
+        <div className="mx-auto mb-12 max-w-3xl text-center">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Why people use Ink Connect
+          </h2>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {whyInkConnect.map(({ title, body, icon: Icon }) => (
+            <Card key={title} className="rounded-3xl border-border/60 p-8">
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Icon className="h-7 w-7" />
               </div>
-              <h3 className="text-lg font-bold mb-2">Hand-Picked Artists</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">Every artist on Ink Connect is individually reviewed for quality, professionalism, and portfolio excellence.</p>
-            </div>
-            {/* Card 2 — Custom Designs */}
-            <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(112,255,112,0.08)] transition-all duration-300 group">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
-                <Sparkles className="w-7 h-7 text-primary" />
-              </div>
-              <h3 className="text-lg font-bold mb-2">Custom Designs</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">Post your idea and receive unique design concepts tailored specifically to your vision from multiple artists.</p>
-            </div>
-            {/* Card 3 — Safe & Sanitary Studios */}
-            <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(112,255,112,0.08)] transition-all duration-300 group">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
-                <Shield className="w-7 h-7 text-primary" />
-              </div>
-              <h3 className="text-lg font-bold mb-2">Safe &amp; Sanitary Studios</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">All listed studios follow strict health and safety standards, so you can focus on your art, not your safety.</p>
-            </div>
+              <h3 className="mb-3 text-xl font-semibold">{title}</h3>
+              <p className="text-sm leading-6 text-muted-foreground">{body}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="border-y bg-muted/20">
+        <div className="container py-20">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+              What clients are saying
+            </h2>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {clientTestimonials.map(({ quote, byline }) => (
+              <Card key={quote} className="rounded-3xl border-border/60 bg-background p-8">
+                <p className="mb-5 text-lg leading-8">{quote}</p>
+                <p className="text-sm font-medium text-muted-foreground">{byline}</p>
+              </Card>
+            ))}
+          </div>
+
+          <div className="mt-20 mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+              What artists are saying
+            </h2>
+          </div>
+
+          <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+            {artistTestimonials.map(({ quote, byline }) => (
+              <Card key={quote} className="rounded-3xl border-border/60 bg-background p-8">
+                <p className="mb-5 text-lg leading-8">{quote}</p>
+                <p className="text-sm font-medium text-muted-foreground">{byline}</p>
+              </Card>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* How It Works Section */}
-      <div className="container py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get your dream tattoo in three simple steps
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          <Card className="p-8 text-center hover:shadow-lg transition-shadow">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Search className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3">1. Post Your Idea</h3>
-            <p className="text-muted-foreground">
-              Describe your desired tattoo, upload reference images, and set
-              your budget.
-            </p>
-          </Card>
-
-          <Card className="p-8 text-center hover:shadow-lg transition-shadow">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Calendar className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3">2. Book Appointment</h3>
-            <p className="text-muted-foreground">
-              Choose your preferred date and time and book your appointment
-              seamlessly.
-            </p>
-          </Card>
-
-          <Card className="p-8 text-center hover:shadow-lg transition-shadow">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3">
-              3. Book & Get Tattooed
-            </h3>
-            <p className="text-muted-foreground">
-              Accept your favorite bid, book the appointment, and get the tattoo
-              of your dreams.
-            </p>
-          </Card>
-        </div>
-      </div>
-
-      {/* Latest Tattoo Requests */}
-      <div className="container py-20 border-t">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Latest Tattoo Requests
+      <section className="container py-20 border-b">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Latest ideas from the community
           </h2>
-          <p className="text-xl text-muted-foreground">
-            Browse ideas from the community or{" "}
-            <button
-              onClick={() => setLocation("/client/new-request")}
-              className="text-primary hover:underline font-medium"
-            >
-              post your own request
-            </button>{" "}
-            to get bids from artists.
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+            These are real requests from real people looking for artists right now.
           </p>
         </div>
 
         <HomepageFeed />
-      </div>
 
-      {/* Why Choose Us Section */}
-      <div className="bg-muted/30 border-y">
-        <div className="container py-20">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Why Choose Ink Connect
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              The trusted platform for finding and booking tattoo artists and shops
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Verified Artists</h3>
-              <p className="text-sm text-muted-foreground">
-                All artists are verified and background-checked for your safety
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Verified Reviews</h3>
-              <p className="text-sm text-muted-foreground">
-                Read authentic reviews from customers with verified bookings
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Secure Payments</h3>
-              <p className="text-sm text-muted-foreground">
-                SSL encrypted payments with full PCI compliance protection
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Quality Guarantee</h3>
-              <p className="text-sm text-muted-foreground">
-                Top-rated artists with proven portfolios and experience
-              </p>
-            </div>
-          </div>
+        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <Button size="lg" variant="outline" onClick={() => setLocation("/requests")}> 
+            See All Open Requests
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
+            Post Your Own Idea
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
-      </div>
+      </section>
 
-      {/* CTA Section */}
-      <div className="container py-20">
-        <Card className="p-12 text-center bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Get Your Dream Tattoo?
+      <section className="container py-20">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            A few things people ask before signing up
           </h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of satisfied customers who found their perfect artist
-            on Ink Connect
+        </div>
+
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+          {faqs.map(({ question, answer }) => (
+            <Card key={question} className="rounded-3xl border-border/60 p-8">
+              <h3 className="mb-3 text-lg font-semibold">{question}</h3>
+              <p className="text-muted-foreground">{answer}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="container pb-20">
+        <Card className="rounded-[2rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-12 text-center">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Ready to find your match?
+          </h2>
+          <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground">
+            Whether you're looking for your next tattoo or your next client, Ink Connect is where that starts.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col justify-center gap-4 sm:flex-row">
+            <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
+              Post Your Idea, It's Free
+            </Button>
             <Button
               size="lg"
-              onClick={() => setLocation("/artists")}
-              className="text-lg px-8"
+              variant="outline"
+              onClick={() => setLocation("/artist/register")}
             >
-              Browse Artists
+              Apply as an Artist
             </Button>
-            {!isAuthenticated && (
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => setLocation("/login")}
-                className="text-lg px-8"
-              >
-                Sign Up Free
-              </Button>
-            )}
           </div>
+          <p className="mt-5 text-sm text-muted-foreground">
+            No pressure. No spam. Just the right connection.
+          </p>
         </Card>
-      </div>
+      </section>
 
-      {/* Footer */}
       <footer className="border-t bg-muted/30">
         <div className="container py-12">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid gap-8 md:grid-cols-[1.2fr_2fr] md:items-start">
             <div>
-              <h3 className="font-semibold mb-4">About</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <Link href="/about" className="hover:text-primary">
-                    About Us
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/for-artists" className="hover:text-primary">
-                    For Artists
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="hover:text-primary">
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Support</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <Link href="/help" className="hover:text-primary">
-                    Help Center
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/faq" className="hover:text-primary">
-                    FAQ
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/cancellation-policy"
-                    className="hover:text-primary"
-                  >
-                    Cancellation Policy
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <Link href="/terms-of-service" className="hover:text-primary">
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy-policy" className="hover:text-primary">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terms-of-service" className="hover:text-primary">
-                    Platform Disclaimer
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Secure Payments</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                All transactions are encrypted and PCI compliant
+              <h3 className="mb-3 text-2xl font-bold">Ink Connect</h3>
+              <p className="text-muted-foreground">
+                Ink Connect, Where ideas meet artists.
               </p>
-              <div className="flex gap-2">
-                <div className="px-3 py-2 bg-background border rounded text-xs font-semibold">
-                  VISA
-                </div>
-                <div className="px-3 py-2 bg-background border rounded text-xs font-semibold">
-                  MC
-                </div>
-                <div className="px-3 py-2 bg-background border rounded text-xs font-semibold">
-                  AMEX
-                </div>
+            </div>
+
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <h4 className="mb-4 font-semibold">Explore</h4>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>
+                    <Link href="/artists" className="hover:text-primary">
+                      Browse Artists
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/client/new-request" className="hover:text-primary">
+                      Post a Request
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/for-artists" className="hover:text-primary">
+                      For Artists
+                    </Link>
+                  </li>
+                  <li>
+                    <a href="/#how-it-works" className="hover:text-primary">
+                      How It Works
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="mb-4 font-semibold">Support</h4>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>
+                    <Link href="/help" className="hover:text-primary">
+                      Help Center
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/privacy-policy" className="hover:text-primary">
+                      Privacy Policy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/terms-of-service" className="hover:text-primary">
+                      Terms of Service
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="mb-4 font-semibold">Contact</h4>
+                <a
+                  href="mailto:hello@universalinc.pro"
+                  className="text-sm text-muted-foreground hover:text-primary"
+                >
+                  hello@universalinc.pro
+                </a>
               </div>
             </div>
           </div>

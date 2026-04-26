@@ -5,9 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { APP_LOGO } from "@/const";
 import { Button } from "@/components/ui/button";
 import {
-  Compass,
   Users,
-  MapPin,
   Palette,
   LayoutDashboard,
   LogOut,
@@ -17,19 +15,10 @@ import {
   Sun,
   Menu,
   X,
-  Lightbulb,
   HelpCircle,
   ChevronDown,
   Settings2,
 } from "lucide-react";
-
-const navLinks = [
-  { href: "/", label: "Explore", icon: Compass },
-  { href: "/artists", label: "Browse Artists", icon: Users },
-  { href: "/artist-finder", label: "Find Artists & Shops", icon: MapPin },
-  { href: "/for-artists", label: "For Artists", icon: Palette },
-  { href: "/requests", label: "Request Board", icon: LayoutDashboard },
-];
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -53,6 +42,20 @@ export default function Sidebar() {
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
 
+  const navLinks = isAuthenticated
+    ? [
+        { href: "/artists", label: "Browse Artists", icon: Users },
+        { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
+        { href: "/for-artists", label: "For Artists", icon: Palette },
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      ]
+    : [
+        { href: "/artists", label: "Browse Artists", icon: Users },
+        { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
+        { href: "/for-artists", label: "For Artists", icon: Palette },
+        { href: "/login", label: "Sign In", icon: LogIn },
+      ];
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -69,42 +72,69 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      {/* Post an Idea CTA */}
+      {/* Primary CTA */}
       <div className="px-3 py-4 border-b border-border/40">
-        <Link href="/client/new-request" onClick={() => setMobileOpen(false)}>
-          <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-[0_0_15px_rgba(112,255,112,0.35)] hover:shadow-[0_0_25px_rgba(112,255,112,0.6)] transition-all duration-300">
-            <Lightbulb className="h-4 w-4" />
-            Post an Idea
-          </Button>
-        </Link>
+        {isAuthenticated ? (
+          <Link href="/client/new-request" onClick={() => setMobileOpen(false)}>
+            <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-[0_0_15px_rgba(112,255,112,0.35)] hover:shadow-[0_0_25px_rgba(112,255,112,0.6)] transition-all duration-300">
+              <UserPlus className="h-4 w-4" />
+              Post Your Idea
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/login?mode=signup" onClick={() => setMobileOpen(false)}>
+            <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-[0_0_15px_rgba(112,255,112,0.35)] hover:shadow-[0_0_25px_rgba(112,255,112,0.6)] transition-all duration-300">
+              <UserPlus className="h-4 w-4" />
+              Sign Up Free
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Primary Navigation Links — always visible, takes all available space */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navLinks.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
-              isActive(href)
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            <Icon
-              className={`h-4 w-4 flex-shrink-0 transition-colors ${
-                isActive(href)
-                  ? "text-primary"
-                  : "text-muted-foreground group-hover:text-foreground"
-              }`}
-            />
-            {label}
-            {isActive(href) && (
-              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-            )}
-          </Link>
-        ))}
+        {navLinks.map(({ href, label, icon: Icon }) => {
+          const active = href.includes("#") ? location === "/" : isActive(href);
+          const className = `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+            active
+              ? "bg-primary/15 text-primary"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`;
+
+          const content = (
+            <>
+              <Icon
+                className={`h-4 w-4 flex-shrink-0 transition-colors ${
+                  active
+                    ? "text-primary"
+                    : "text-muted-foreground group-hover:text-foreground"
+                }`}
+              />
+              {label}
+              {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
+            </>
+          );
+
+          return href.includes("#") ? (
+            <a
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={className}
+            >
+              {content}
+            </a>
+          ) : (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={className}
+            >
+              {content}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* ── Collapsible Bottom Accordion ── */}
@@ -181,15 +211,7 @@ export default function Sidebar() {
             ) : (
               <>
                 <Link
-                  href="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
-                >
-                  <LogIn className="h-4 w-4" />
-                  Sign In
-                </Link>
-                <Link
-                  href="/signup"
+                  href="/login?mode=signup"
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-all duration-200"
                 >
@@ -220,13 +242,13 @@ export default function Sidebar() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          <Link href="/client/new-request">
+          <Link href={isAuthenticated ? "/client/new-request" : "/login?mode=signup"}>
             <Button
               size="sm"
               className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold"
             >
-              <Lightbulb className="h-3.5 w-3.5" />
-              Post Idea
+              <UserPlus className="h-3.5 w-3.5" />
+              {isAuthenticated ? "Post Idea" : "Sign Up Free"}
             </Button>
           </Link>
           <Button

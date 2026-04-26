@@ -1,9 +1,10 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import HomeHeader from "./components/HomeHeader";
 import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import ArtistFinder from "./pages/ArtistFinder";
@@ -79,21 +80,52 @@ function Router() {
   );
 }
 
+function usesPageHeader(path: string) {
+  return (
+    path === "/artist-finder" ||
+    path === "/artists" ||
+    path.startsWith("/artist/") ||
+    path === "/for-artists" ||
+    path === "/dashboard" ||
+    path === "/artist-dashboard" ||
+    path === "/help" ||
+    path === "/cancellation-policy" ||
+    path === "/terms-of-service" ||
+    path === "/terms" ||
+    path === "/privacy-policy" ||
+    path === "/privacy" ||
+    path === "/pricing" ||
+    path === "/client/design-lab" ||
+    path === "/artist/billing" ||
+    path === "/artist/billing/success" ||
+    path === "/404"
+  );
+}
+
 // NOTE: About Theme
 // - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
 //   to keep consistent foreground/background color across components
 // - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
+  const [location] = useLocation();
+  const showMarketingHomeHeader = location === "/";
+  const showSidebarShell = !showMarketingHomeHeader && !usesPageHeader(location);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          {/* Fixed left sidebar (desktop) / top bar + drawer (mobile) */}
-          <Sidebar />
-          {/* Main content area — offset by sidebar width on desktop, top bar height on mobile */}
-          <main className="md:ml-60 pt-14 md:pt-0 min-h-screen">
+          {showMarketingHomeHeader && <HomeHeader />}
+          {showSidebarShell && <Sidebar />}
+          <main
+            className={
+              showSidebarShell
+                ? "md:ml-60 pt-14 md:pt-0 min-h-screen"
+                : "min-h-screen"
+            }
+          >
             <Router />
           </main>
         </TooltipProvider>

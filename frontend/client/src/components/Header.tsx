@@ -115,7 +115,7 @@ export default function Header() {
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                 </Button>
               </Link>
-              <Link href="/signup">
+              <Link href="/login?mode=signup">
                 <Button
                   variant="default"
                   className="relative overflow-hidden group hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(112,255,112,0.4)] hover:shadow-[0_0_25px_rgba(112,255,112,0.8)] bg-primary hover:bg-primary/90"

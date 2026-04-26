@@ -230,9 +230,12 @@ export default function RequestDetail() {
 
   const isClient = user?.role === "client";
   const isArtist = user?.role === "artist";
-  const isOwner = request?.client.userId === user?.id;
+  const requestClient = request?.client ?? null;
+  const requestClientName = requestClient?.displayName ?? "Unknown client";
+  const requestClientInitials = requestClientName.slice(0, 2).toUpperCase();
+  const isOwner = requestClient?.userId === user?.id;
   const ownerTier = (user?.subscriptionTier ??
-    request?.client.subscriptionTier ??
+    requestClient?.subscriptionTier ??
     "client_free") as string | null | undefined;
   const isPaidClientOwner = Boolean(
     isClient && isOwner && !isFreeClientTier(ownerTier),
@@ -345,7 +348,7 @@ export default function RequestDetail() {
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-2">
                     <User className="h-4 w-4" />
-                    Posted by {request.client.displayName}
+                    Posted by {requestClientName}
                   </CardDescription>
                 </div>
                 <Badge
@@ -1110,22 +1113,20 @@ export default function RequestDetail() {
             <CardContent>
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarFallback>
-                    {request.client.displayName.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarFallback>{requestClientInitials}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-semibold">{request.client.displayName}</p>
-                  {request.client.city && request.client.state && (
+                  <p className="font-semibold">{requestClientName}</p>
+                  {requestClient?.city && requestClient?.state && (
                     <p className="text-sm text-muted-foreground">
-                      {request.client.city}, {request.client.state}
+                      {requestClient.city}, {requestClient.state}
                     </p>
                   )}
                 </div>
               </div>
-              {request.client.bio && (
+              {requestClient?.bio && (
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {request.client.bio}
+                  {requestClient.bio}
                 </p>
               )}
             </CardContent>

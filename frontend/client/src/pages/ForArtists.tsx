@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,8 @@ export default function ForArtists() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
+
       {/* Hero */}
       <section className="relative bg-gradient-to-br from-background via-background to-primary/10 border-b py-24">
         <div className="container max-w-5xl mx-auto text-center space-y-6 px-4">

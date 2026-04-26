@@ -16,7 +16,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | **AI**         | Groq + Hugging Face (design generation, vision tagging, NLP discovery, review moderation, license OCR, bid drafting) |
 | **Email**      | Resend (booking confirmations, artist invitations)                                                                       |
 | **Monitoring** | Sentry, Winston logging, health check endpoint                                                                           |
-| **Deployment** | Vercel (static + serverless) / Railway                                                                                   |
+| **Deployment** | Hostinger (active), with legacy provider configs still present in-repo                                                   |
 | **Testing**    | Vitest (unit), Playwright (e2e), Artillery (load)                                                                        |
 
 ## Project Structure
@@ -44,8 +44,8 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 ├── frontend/
 │   └── client/
 │       └── src/
-│           ├── pages/          # 21 route-based pages
-│           ├── components/     # 15 reusable UI components + shadcn/ui library
+│           ├── pages/          # Route-based pages for browse, booking, onboarding, billing, and admin flows
+│           ├── components/     # App shell, reusable UI components, and shadcn/ui primitives
 │           ├── hooks/          # Custom React hooks
 │           ├── contexts/       # Theme context
 │           └── lib/            # Utilities, tRPC client
@@ -55,7 +55,9 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 │   ├── e2e/              # Playwright performance tests
 │   ├── integration/      # User flow tests
 │   └── load/             # Artillery load test configs
-└── vercel.json           # Deployment configuration
+├── railway.json          # Legacy Railway config
+├── render.yaml           # Legacy Render config
+└── vercel.json           # Legacy Vercel config
 ```
 
 ## Features
@@ -132,12 +134,13 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 
 ## Database Schema
 
-13 tables managed by Drizzle ORM:
+14 tables managed by Drizzle ORM:
 
 | Table                   | Purpose                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------------------ |
 | `users`                 | Supabase Auth users — role, verification status, Stripe customer ID                        |
 | `artists`               | Artist profiles — specialties, location, ratings, subscription tier                        |
+| `shops`                 | Shop catalog records — name, address, city/state, verification/claim status                |
 | `portfolioImages`       | Portfolio gallery — image URL, caption, style tag, AI-detected styles/tags/quality         |
 | `verificationDocuments` | Uploaded licenses/permits — document metadata, OCR extracted data, AI verification verdict |
 | `reviews`               | 1–5 star ratings, comments, helpful votes, artist responses, AI moderation scores          |
@@ -155,9 +158,9 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | Tier                  | Price  | Portfolio Photos | Bookings | Direct Contact | Reviews | Analytics | Featured |
 | --------------------- | ------ | ---------------- | -------- | -------------- | ------- | --------- | -------- |
 | **Apprentice** (Free) | $0/mo  | 3                | —        | —              | —       | —         | —        |
-| **Artist** (Amateur)  | $9/mo  | 15               | ✓        | ✓              | —       | —         | —        |
+| **Artist**            | $9/mo  | 15               | ✓        | ✓              | —       | —         | —        |
 | **Professional**      | $19/mo | Unlimited        | ✓        | ✓              | ✓       | ✓         | —        |
-| **Icon** (Front Page) | $39/mo | Unlimited        | ✓        | ✓              | ✓       | ✓         | ✓        |
+| **Icon**              | $39/mo | Unlimited        | ✓        | ✓              | ✓       | ✓         | ✓        |
 
 ## Getting Started
 
@@ -175,9 +178,8 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 # Clone and install
 pnpm install
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your credentials
+# Create a local .env file from the variables listed below
+# Then fill in your credentials before running the app
 ```
 
 ### Environment Variables
@@ -268,11 +270,25 @@ The API uses [tRPC](https://trpc.io) for type-safe client-server communication.
 
 ## Deployment
 
-Configured for **Vercel** (`vercel.json`) and **Railway** (`railway.json`):
+The active deployment target is **Hostinger**.
 
-**Vercel**: Frontend served as static files from Vite build, backend runs as serverless function, API routes proxied to `/api/*`.
+Recommended Hostinger deployment flow:
 
-**Railway**: Railpack builder, V2 runtime, multi-region support (europe-west4), auto-restart on failure (max 10 retries).
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
+```
+
+Hostinger should run the bundled Node server from `dist/index.js`, with the frontend served from `dist/public` by the Express app.
+
+Required deployment notes:
+
+- Configure all environment variables in the Hostinger dashboard or server environment.
+- Ensure the public app URL, CORS settings, and Stripe webhook endpoint match the Hostinger domain.
+- Keep uploads and document storage in Supabase Storage; the app should not rely on local filesystem persistence.
+
+Legacy deployment configs for Vercel, Railway, and Render still exist in the repo, but they are not the active deployment target.
 
 ## Additional Documentation
 

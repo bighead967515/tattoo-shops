@@ -73,7 +73,7 @@ export default function HomepageFeed() {
           onClick={() => setLocation("/requests")}
           className="px-8"
         >
-          View All Requests
+          See All Open Requests
         </Button>
       </div>
     </>

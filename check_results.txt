@@ -1,0 +1,4 @@
+﻿
+> universalinc@1.0.0 check C:\Users\dillo\OneDrive\code\tattoo-shops-main\tattoo-shops-main
+> tsc --noEmit
+
