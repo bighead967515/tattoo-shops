@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import {
   Search,
   MapPin,
-  Calendar,
   Shield,
   Star,
   CheckCircle,
@@ -189,12 +188,11 @@ export default function Home() {
 
           <Card className="p-8 text-center hover:shadow-lg transition-shadow">
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Calendar className="w-8 h-8 text-primary" />
+              <Star className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-3">2. Book Appointment</h3>
+            <h3 className="text-xl font-semibold mb-3">2. Receive Artist Bids</h3>
             <p className="text-muted-foreground">
-              Choose your preferred date and time and book your appointment
-              seamlessly.
+              Interested artists review your idea and send you personalised bids — compare portfolios, styles, and prices.
             </p>
           </Card>
 
@@ -202,12 +200,9 @@ export default function Home() {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-3">
-              3. Book & Get Tattooed
-            </h3>
+            <h3 className="text-xl font-semibold mb-3">3. Book &amp; Get Inked</h3>
             <p className="text-muted-foreground">
-              Accept your favorite bid, book the appointment, and get the tattoo
-              of your dreams.
+              Pick your favourite artist, confirm the appointment, and walk out with the tattoo of your dreams.
             </p>
           </Card>
         </div>
@@ -297,8 +292,8 @@ export default function Home() {
             Ready to Get Your Dream Tattoo?
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of satisfied customers who found their perfect artist
-            on Ink Connect
+            Post your idea, get bids from hand-picked artists, and book the
+            tattoo you've always imagined — all in one place.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
@@ -312,7 +307,7 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => setLocation("/login")}
+                onClick={() => setLocation("/signup")}
                 className="text-lg px-8"
               >
                 Sign Up Free
