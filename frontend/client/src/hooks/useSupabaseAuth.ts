@@ -73,18 +73,29 @@ export function useSupabaseAuth() {
     accessToken: string,
     refreshToken?: string,
   ) {
-    try {
-      await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        }),
-      });
-    } catch (error) {
-      console.error("[Auth] Failed to sync session with backend:", error);
+    const response = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      let message = "Failed to create app session";
+
+      try {
+        const payload = await response.json();
+        if (payload?.error && typeof payload.error === "string") {
+          message = payload.error;
+        }
+      } catch {
+        // Ignore JSON parse failures and use the default message.
+      }
+
+      throw new Error(message);
     }
   }
 
@@ -98,6 +109,19 @@ export function useSupabaseAuth() {
     });
 
     if (error) throw error;
+
+    if (data.session?.access_token) {
+      try {
+        await syncSessionWithBackend(
+          data.session.access_token,
+          data.session.refresh_token,
+        );
+      } catch (syncError) {
+        await supabase.auth.signOut();
+        throw syncError;
+      }
+    }
+
     return data;
   }
 
@@ -118,6 +142,19 @@ export function useSupabaseAuth() {
     });
 
     if (error) throw error;
+
+    if (data.session?.access_token) {
+      try {
+        await syncSessionWithBackend(
+          data.session.access_token,
+          data.session.refresh_token,
+        );
+      } catch (syncError) {
+        await supabase.auth.signOut();
+        throw syncError;
+      }
+    }
+
     return data;
   }
 
