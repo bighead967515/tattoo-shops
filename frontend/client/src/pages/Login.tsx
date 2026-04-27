@@ -31,7 +31,7 @@ function GitHubIcon() {
 export default function Login() {
   const [location, setLocation] = useLocation();
   const search = useSearch();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, refresh } = useAuth();
   const { signInWithEmail, signUpWithEmail, signInWithOAuth } =
     useSupabaseAuth();
 
@@ -44,25 +44,26 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      setLocation("/dashboard");
-    }
-  }, [isAuthenticated, setLocation]);
+  const params = new URLSearchParams(search);
+  const redirectTarget = params.get("redirect") || "/dashboard";
 
   useEffect(() => {
-    const params = new URLSearchParams(search);
+    if (isAuthenticated) {
+      setLocation(redirectTarget);
+    }
+  }, [isAuthenticated, redirectTarget, setLocation]);
+
+  useEffect(() => {
     const oauthError = params.get("oauth_error");
 
     if (oauthError) {
       setError(oauthError);
     }
-  }, [search]);
+  }, [params]);
 
   useEffect(() => {
-    const params = new URLSearchParams(search);
     setIsSignUp(params.get("mode") === "signup" || location === "/signup");
-  }, [search, location]);
+  }, [location, params]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +76,8 @@ export default function Login() {
         setError("Check your email for confirmation link!");
       } else {
         await signInWithEmail(email, password);
+        await refresh();
+        setLocation(redirectTarget);
       }
     } catch (err: any) {
       setError(err.message || "Authentication failed");
