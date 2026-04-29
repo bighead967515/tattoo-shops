@@ -205,7 +205,7 @@ export async function createArtist(artist: InsertArtist) {
       .set(buildArtistOnboardingUserUpdate())
       .where(eq(users.id, artist.userId));
 
-    const [created] = await tx.insert(artists).values(artist).returning();
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
     return created;
   });
 }
@@ -239,6 +239,28 @@ export async function getAllArtists() {
   if (!db) return [];
 
   return await db.select().from(artists).where(eq(artists.isApproved, true));
+}
+
+export async function getAllArtistsAdmin() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      id: artists.id,
+      shopName: artists.shopName,
+      city: artists.city,
+      state: artists.state,
+      isApproved: artists.isApproved,
+      createdAt: artists.createdAt,
+      userId: artists.userId,
+      userName: users.name,
+      userEmail: users.email,
+      verificationStatus: users.verificationStatus,
+    })
+    .from(artists)
+    .innerJoin(users, eq(artists.userId, users.id))
+    .orderBy(desc(artists.createdAt));
 }
 
 export async function searchArtists(filters: {

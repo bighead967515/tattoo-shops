@@ -14,7 +14,6 @@ const tierOrder: ArtistCanonicalTier[] = [
   "artist_free",
   "artist_amateur",
   "artist_pro",
-  "artist_icon",
 ];
 
 export default function Pricing() {
@@ -30,21 +29,20 @@ export default function Pricing() {
               Choose Your <span className="text-primary">Artist Plan</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-12">
-              From a free basic listing to a full-feature professional plan, we
-              have the right tools to help you grow your client base and manage
-              your business.
+              Start free, upgrade to Pro, or stay flexible with pay-as-you-go.
+              Pick the model that matches how you run your studio.
             </p>
           </div>
         </section>
 
         {/* Pricing Cards */}
         <section className="py-16 container">
-          <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8 max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
             {tierOrder.map((tier) => {
               const legacyTier = toLegacyArtistTier(tier);
               const limits = TIER_LIMITS[legacyTier];
               const pricing = TIER_PRICING[legacyTier];
-              const isMostPopular = tier === "artist_pro";
+              const isMostPopular = tier === "artist_amateur";
 
               return (
                 <Card
@@ -75,12 +73,10 @@ export default function Pricing() {
                     </div>
                     <p className="text-muted-foreground text-sm h-10">
                       {tier === "artist_free"
-                        ? "A free profile to get you started"
+                        ? "A free profile to get discovered"
                         : tier === "artist_amateur"
-                          ? "Unlock bookings and direct contact"
-                          : tier === "artist_pro"
-                            ? "Full suite for growing your business"
-                            : "Maximum visibility and front page feature"}
+                          ? "Subscription plan with lower transaction fees"
+                          : "No subscription. Bid and pay per win."}
                     </p>
                   </div>
 
@@ -89,9 +85,9 @@ export default function Pricing() {
                     variant={isMostPopular ? "default" : "outline"}
                     asChild
                   >
-                    <Link href="/for-artists">
+                    <Link href="/artist/billing">
                       <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                      {tier === "artist_free" ? "Get Started" : "Choose Plan"}
+                      {tier === "artist_free" ? "Start Free" : "Choose Plan"}
                     </Link>
                   </Button>
 
@@ -144,17 +140,26 @@ export default function Pricing() {
                       <span>Profile Analytics</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {limits.isFeatured ? (
-                        <Check className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <X className="w-5 h-5 text-destructive" />
-                      )}
-                      <span>Homepage Feature</span>
+                      <Check className="w-5 h-5" />
+                      <span>
+                        Transaction Fee: <b>{Math.round((limits.transactionFeeRate ?? 0) * 100)}%</b>
+                      </span>
                     </div>
                   </div>
                 </Card>
               );
             })}
+          </div>
+
+          <div className="mt-12 max-w-5xl mx-auto rounded-xl border border-amber-300 bg-amber-50/70 p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-900">Founding Artist Offer (First 50-100 Artists)</h3>
+            </div>
+            <p className="text-sm text-amber-900/90">
+              Get Pro access free for 6 months, then lock in $19/month for life, plus a Founding Artist badge.
+              Eligibility requires a complete portfolio and at least 3 bid responses in the first 60 days.
+            </p>
           </div>
         </section>
       </main>

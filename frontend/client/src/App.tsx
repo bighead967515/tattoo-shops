@@ -28,6 +28,7 @@ import NewRequest from "./pages/NewRequest";
 import RequestBoard from "./pages/RequestBoard";
 import RequestDetail from "./pages/RequestDetail";
 import AdminModeration from "./pages/AdminModeration";
+import AdminDashboard from "./pages/AdminDashboard";
 import DesignLab from "./pages/DesignLab";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -72,6 +73,7 @@ function Router() {
       <Route path="/artist/billing" component={ArtistBilling} />
       <Route path="/artist/billing/success" component={SubscriptionSuccess} />
       {/* Admin routes */}
+      <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/moderation" component={AdminModeration} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

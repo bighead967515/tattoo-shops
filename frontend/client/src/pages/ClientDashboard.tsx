@@ -12,10 +12,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   Plus,
   FileText,
-  MessageSquare,
   DollarSign,
   Clock,
   CheckCircle,
@@ -23,6 +23,7 @@ import {
   Eye,
   Gavel,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 
 function formatCurrency(cents: number): string {
@@ -47,28 +48,22 @@ function getStatusColor(status: string) {
   }
 }
 
-function getBidStatusColor(status: string) {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-    case "accepted":
-      return "bg-green-500/10 text-green-600 border-green-500/20";
-    case "rejected":
-      return "bg-red-500/10 text-red-600 border-red-500/20";
-    case "withdrawn":
-      return "bg-gray-500/10 text-gray-600 border-gray-500/20";
-    default:
-      return "";
-  }
-}
 
 export default function ClientDashboard() {
   const { user, loading: authLoading } = useAuth();
 
-  const { data: myRequests, isLoading: requestsLoading } =
+  const { data: myRequests, isLoading: requestsLoading, refetch: refetchRequests } =
     trpc.requests.getMyRequests.useQuery(undefined, {
       enabled: user?.role === "client",
     });
+
+  const cancelRequestMutation = trpc.requests.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Request cancelled");
+      void refetchRequests();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   if (authLoading) {
     return <DashboardSkeleton />;
@@ -228,7 +223,7 @@ export default function ClientDashboard() {
         </TabsList>
 
         <TabsContent value="open">
-          <RequestList requests={openRequests} loading={requestsLoading} />
+          <RequestList requests={openRequests} loading={requestsLoading} onCancel={(id) => cancelRequestMutation.mutate({ requestId: id, status: "cancelled" })} />
         </TabsContent>
 
         <TabsContent value="in_progress">
@@ -246,6 +241,7 @@ export default function ClientDashboard() {
           <RequestList
             requests={allProcessedRequests}
             loading={requestsLoading}
+            onCancel={(id) => cancelRequestMutation.mutate({ requestId: id, status: "cancelled" })}
           />
         </TabsContent>
       </Tabs>
@@ -267,20 +263,12 @@ interface RequestListProps {
     viewCount: number;
     bidCount: number;
     createdAt: Date;
-    bids?: {
-      id: number;
-      status: string;
-      proposedPrice: number;
-      artist: {
-        displayName: string;
-        profileImageUrl: string | null;
-      } | null;
-    }[];
   }[];
   loading: boolean;
+  onCancel?: (id: number) => void;
 }
 
-function RequestList({ requests, loading }: RequestListProps) {
+function RequestList({ requests, loading, onCancel }: RequestListProps) {
   if (loading) {
     return (
       <div className="space-y-4">
@@ -320,89 +308,84 @@ function RequestList({ requests, loading }: RequestListProps) {
   return (
     <div className="space-y-4">
       {requests.map((request) => {
-        const pendingBids =
-          request.bids?.filter((b) => b.status === "pending") ?? [];
         return (
-          <Link key={request.id} href={`/requests/${request.id}`}>
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold truncate">
-                        {request.title}
-                      </h3>
-                      <Badge
-                        variant="outline"
-                        className={getStatusColor(request.status)}
-                      >
-                        {request.status.replace("_", " ")}
-                      </Badge>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                      {request.description}
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {request.style && (
-                        <Badge variant="secondary">{request.style}</Badge>
-                      )}
-                      <Badge variant="secondary">{request.placement}</Badge>
-                      <Badge variant="secondary">{request.size}</Badge>
-                      {request.budgetMax && (
-                        <Badge variant="outline">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          {request.budgetMin
-                            ? formatCurrency(request.budgetMin) + " - "
-                            : "Up to "}
-                          {formatCurrency(request.budgetMax)}
-                        </Badge>
-                      )}
-                    </div>
+          <Card key={request.id} className="hover:bg-muted/50 transition-colors">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold truncate">
+                      {request.title}
+                    </h3>
+                    <Badge
+                      variant="outline"
+                      className={getStatusColor(request.status)}
+                    >
+                      {request.status.replace("_", " ")}
+                    </Badge>
                   </div>
 
-                  <div className="flex md:flex-col items-center md:items-end gap-4 md:gap-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Eye className="h-4 w-4" />
-                      <span>{request.viewCount} views</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Gavel className="h-4 w-4" />
-                      <span className="font-medium text-foreground">
-                        {request.bidCount} bids
-                      </span>
-                    </div>
-                    <p className="text-xs">
-                      {new Date(request.createdAt).toLocaleDateString()}
-                    </p>
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {request.description}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {request.style && (
+                      <Badge variant="secondary">{request.style}</Badge>
+                    )}
+                    <Badge variant="secondary">{request.placement}</Badge>
+                    <Badge variant="secondary">{request.size}</Badge>
+                    {request.budgetMax && (
+                      <Badge variant="outline">
+                        <DollarSign className="h-3 w-3 mr-1" />
+                        {request.budgetMin
+                          ? formatCurrency(request.budgetMin) + " – "
+                          : "Up to "}
+                        {formatCurrency(request.budgetMax)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
-                {/* Show pending bids preview */}
-                {pendingBids.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm font-medium mb-2">
-                      Pending Bids ({pendingBids.length})
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {pendingBids.slice(0, 3).map((bid) => (
-                        <Badge key={bid.id} variant="outline" className="gap-1">
-                          {bid.artist?.displayName ?? "Artist"} -{" "}
-                          {formatCurrency(bid.proposedPrice)}
-                        </Badge>
-                      ))}
-                      {pendingBids.length > 3 && (
-                        <Badge variant="outline">
-                          +{pendingBids.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
+                <div className="flex md:flex-col items-center md:items-end gap-4 md:gap-2 text-sm text-muted-foreground shrink-0">
+                  <div className="flex items-center gap-1">
+                    <Eye className="h-4 w-4" />
+                    <span>{request.viewCount} views</span>
                   </div>
+                  <div className="flex items-center gap-1">
+                    <Gavel className="h-4 w-4" />
+                    <span className="font-medium text-foreground">
+                      {request.bidCount} bids
+                    </span>
+                  </div>
+                  <p className="text-xs">
+                    {new Date(request.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions row */}
+              <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                <Link href={`/requests/${request.id}`}>
+                  <Button size="sm" variant="outline">
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    {request.bidCount > 0 ? `View ${request.bidCount} Bid${request.bidCount !== 1 ? "s" : ""}` : "View Request"}
+                  </Button>
+                </Link>
+                {request.status === "open" && onCancel && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => onCancel(request.id)}
+                  >
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Cancel
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
-          </Link>
+              </div>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

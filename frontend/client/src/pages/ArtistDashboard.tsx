@@ -32,6 +32,12 @@ import {
   CreditCard,
   Crown,
   Zap,
+  Gavel,
+  TrendingUp,
+  DollarSign,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
@@ -94,6 +100,17 @@ export default function ArtistDashboard() {
       refetchPortfolio();
       toast.success("Image removed from portfolio");
     },
+  });
+
+  const { data: myBids, isLoading: bidsLoading, refetch: refetchBids } =
+    trpc.bids.getMyBids.useQuery(undefined, { enabled: !!artist });
+
+  const withdrawBidMutation = trpc.bids.withdraw.useMutation({
+    onSuccess: () => {
+      toast.success("Bid withdrawn");
+      refetchBids();
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const updateBookingStatusMutation = trpc.bookings.updateStatus.useMutation({
@@ -285,8 +302,44 @@ export default function ArtistDashboard() {
           );
         })()}
 
+        {/* Analytics strip */}
+        {(() => {
+          const totalBids = myBids?.length ?? 0;
+          const acceptedBids = myBids?.filter((b) => b.status === "accepted").length ?? 0;
+          const pendingBids = myBids?.filter((b) => b.status === "pending").length ?? 0;
+          const winRate = totalBids > 0 ? Math.round((acceptedBids / totalBids) * 100) : 0;
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <Card className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg"><Gavel className="w-5 h-5 text-primary" /></div>
+                  <div><p className="text-2xl font-bold">{totalBids}</p><p className="text-xs text-muted-foreground">Total Bids</p></div>
+                </div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-yellow-500/10 rounded-lg"><Clock className="w-5 h-5 text-yellow-600" /></div>
+                  <div><p className="text-2xl font-bold">{pendingBids}</p><p className="text-xs text-muted-foreground">Pending</p></div>
+                </div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/10 rounded-lg"><CheckCircle2 className="w-5 h-5 text-green-600" /></div>
+                  <div><p className="text-2xl font-bold">{acceptedBids}</p><p className="text-xs text-muted-foreground">Accepted</p></div>
+                </div>
+              </Card>
+              <Card className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg"><TrendingUp className="w-5 h-5 text-blue-600" /></div>
+                  <div><p className="text-2xl font-bold">{winRate}%</p><p className="text-xs text-muted-foreground">Win Rate</p></div>
+                </div>
+              </Card>
+            </div>
+          );
+        })()}
+
         <Tabs defaultValue="portfolio" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-5">
+          <TabsList className="grid w-full max-w-3xl grid-cols-6">
             <TabsTrigger value="portfolio">
               <ImageIcon className="w-4 h-4 mr-2" />
               Portfolio
@@ -294,6 +347,15 @@ export default function ArtistDashboard() {
             <TabsTrigger value="requests">
               <Briefcase className="w-4 h-4 mr-2" />
               Requests
+            </TabsTrigger>
+            <TabsTrigger value="my-bids">
+              <Gavel className="w-4 h-4 mr-2" />
+              My Bids
+              {(myBids?.filter((b) => b.status === "pending").length ?? 0) > 0 && (
+                <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  {myBids!.filter((b) => b.status === "pending").length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="bookings">
               <Calendar className="w-4 h-4 mr-2" />
@@ -462,6 +524,93 @@ export default function ArtistDashboard() {
               />
             ) : (
               <ArtistDashboardFeed />
+            )}
+          </TabsContent>
+
+          {/* My Bids Tab */}
+          <TabsContent value="my-bids" className="space-y-4">
+            <h2 className="text-2xl font-semibold">My Submitted Bids</h2>
+            {bidsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !myBids || myBids.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
+                <Gavel className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">No bids yet</p>
+                <p className="text-sm mt-1">Browse open requests and submit your first bid.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {myBids.map((bid) => {
+                  const statusColors: Record<string, string> = {
+                    pending: "bg-yellow-500/10 text-yellow-700 border-yellow-400/30",
+                    accepted: "bg-green-500/10 text-green-700 border-green-400/30",
+                    rejected: "bg-red-500/10 text-red-700 border-red-400/30",
+                    withdrawn: "bg-gray-500/10 text-gray-600 border-gray-400/30",
+                  };
+                  const colorClass = statusColors[bid.status] ?? "";
+                  return (
+                    <Card key={bid.id} className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-semibold truncate">
+                              {bid.request?.title ?? "Untitled Request"}
+                            </span>
+                            <Badge variant="outline" className={`text-xs ${colorClass}`}>
+                              {bid.status}
+                            </Badge>
+                            {bid.status === "accepted" && (
+                              <Badge className="bg-green-600 text-white text-xs">
+                                <CheckCircle2 className="w-3 h-3 mr-1" /> Won
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              ${((bid.priceEstimate ?? 0) / 100).toLocaleString()}
+                            </span>
+                            {bid.estimatedHours && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {bid.estimatedHours}h estimated
+                              </span>
+                            )}
+                            <span>
+                              Submitted {new Date(bid.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {bid.message && (
+                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2 bg-muted/30 rounded p-2">
+                              {bid.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Link href={`/requests/${bid.requestId}`}>
+                            <Button size="sm" variant="outline">
+                              <ExternalLink className="w-3 h-3 mr-1" /> View
+                            </Button>
+                          </Link>
+                          {bid.status === "pending" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10"
+                              disabled={withdrawBidMutation.isPending}
+                              onClick={() => withdrawBidMutation.mutate({ bidId: bid.id })}
+                            >
+                              <XCircle className="w-3 h-3 mr-1" /> Withdraw
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
             )}
           </TabsContent>
 

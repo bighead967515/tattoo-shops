@@ -76,6 +76,19 @@ export const appRouter = router({
       return await db.getAllArtists();
     }),
 
+    /** Admin: list all artists (approved + unapproved) with user info */
+    adminGetAll: adminProcedure.query(async () => {
+      return await db.getAllArtistsAdmin();
+    }),
+
+    /** Admin: approve or reject an artist */
+    adminSetApproval: adminProcedure
+      .input(z.object({ artistId: z.number(), approved: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await db.updateArtist(input.artistId, { isApproved: input.approved });
+        return { success: true };
+      }),
+
     /**
      * Create a Stripe Checkout Session for an artist subscription upgrade.
      * Returns the Checkout URL to redirect the artist to Stripe.
@@ -253,6 +266,67 @@ export const appRouter = router({
         const { id, ...data } = input;
         return await db.updateArtist(id, data);
       }),
+
+    /**
+     * Enable the no-subscription transaction plan.
+     * Sets canonical tier to artist_pro (mapped to pay-as-you-go fee logic).
+     */
+    enablePayAsYouGo: protectedProcedure.mutation(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable",
+        });
+      }
+
+      const [artist] = await database
+        .select({ id: artists.id })
+        .from(artists)
+        .where(eq(artists.userId, ctx.user.id))
+        .limit(1);
+
+      if (!artist) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must have an artist profile first.",
+        });
+      }
+
+      const [userRow] = await database
+        .select({
+          stripeSubscriptionId: users.stripeSubscriptionId,
+          subscriptionTier: users.subscriptionTier,
+        })
+        .from(users)
+        .where(eq(users.id, ctx.user.id))
+        .limit(1);
+
+      if (!userRow) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      }
+
+      if (userRow.stripeSubscriptionId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "You already have an active subscription. Cancel it first before switching to pay-as-you-go.",
+        });
+      }
+
+      await database
+        .update(users)
+        .set({ subscriptionTier: "artist_pro" })
+        .where(eq(users.id, ctx.user.id));
+
+      // Keep deprecated mirror field in sync during migration period.
+      await database
+        .update(artists)
+        .set({ subscriptionTier: "artist_pro" })
+        .where(eq(artists.id, artist.id));
+
+      return { success: true, tier: "artist_pro" as const };
+    }),
   }),
 
   portfolio: router({

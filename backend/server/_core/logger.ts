@@ -19,16 +19,22 @@ const transports: winston.transport[] = [
 
 // In production, also log to file
 if (ENV.isProduction) {
-  transports.push(
-    new winston.transports.File({
-      filename: "/var/log/app-error.log",
-      level: "error",
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json(),
-      ),
-    }),
-  );
+  try {
+    transports.push(
+      new winston.transports.File({
+        // Render and similar hosts may not allow writing to /var/log.
+        // Keep the file in app working directory so startup does not crash.
+        filename: process.env.LOG_FILE_PATH || "app-error.log",
+        level: "error",
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.json(),
+        ),
+      }),
+    );
+  } catch {
+    // Continue with console logging only if file transport fails.
+  }
 }
 
 export const logger = winston.createLogger({

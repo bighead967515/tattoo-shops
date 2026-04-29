@@ -141,7 +141,7 @@ export default function ArtistBilling() {
   const [yearly, setYearly] = useState(false);
   const [loadingTier, setLoadingTier] = useState<TierKey | null>(null);
 
-  const { data: artist, isLoading: artistLoading } =
+  const { data: artist, isLoading: artistLoading, refetch: refetchArtist } =
     trpc.artists.getByUserId.useQuery(undefined, { enabled: !!user });
 
   const checkoutMutation = trpc.artists.createSubscriptionCheckout.useMutation({
@@ -152,6 +152,18 @@ export default function ArtistBilling() {
     },
     onError: (err) => {
       toast.error(err.message || "Failed to start checkout. Please try again.");
+      setLoadingTier(null);
+    },
+  });
+
+  const paygMutation = trpc.artists.enablePayAsYouGo.useMutation({
+    onSuccess: async () => {
+      toast.success("Pay-as-you-go enabled. You can now bid with transaction fees.");
+      await refetchArtist();
+      setLoadingTier(null);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to enable pay-as-you-go.");
       setLoadingTier(null);
     },
   });
@@ -194,6 +206,12 @@ export default function ArtistBilling() {
   const currentPlan = PLANS.find((p) => p.canonicalTier === currentCanonical) ?? PLANS[0];
 
   const handleSubscribe = async (plan: PlanDef) => {
+    if (plan.key === "payg") {
+      setLoadingTier(plan.key);
+      await paygMutation.mutateAsync();
+      return;
+    }
+
     if (!plan.stripeTierArg) return;
     setLoadingTier(plan.key);
     await checkoutMutation.mutateAsync({
