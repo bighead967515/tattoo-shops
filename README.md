@@ -71,7 +71,8 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 - **Request board** — browse client tattoo requests and submit bids
 - **AI Bid Assistant** — Professional/Icon tier artists get AI-drafted bid responses with suggested pricing, estimated hours, and personalized pitch messages
 - **License verification** — upload documents for verified artist status with AI-powered OCR that extracts names, license numbers, and expiration dates
-- **Subscription tiers** — Apprentice (Free), Artist ($9/mo), Professional ($19/mo), Icon ($39/mo)
+- **Subscription tiers** — Free, Pro ($29/mo), Pay-as-you-go (0$/mo + 10% fee), Founding Artist ($19/mo locked, first 100 only)
+- **Bid dashboard** — My Bids tab with status, analytics strip (total/pending/accepted/win-rate), and withdraw actions
 - **Analytics & reviews** — ratings, review responses, helpful votes
 
 ### For Clients
@@ -84,7 +85,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 - **Bid system** — receive and compare bids from multiple artists
 - **Booking & payments** — book appointments with Stripe-powered deposits
 - **Favorites** — save and track preferred artists
-- **Dashboard** — manage requests, track bids, view booking history
+- **Dashboard** — manage requests, track bids, view booking history, cancel open requests
 - **Client onboarding** — guided setup with preferred styles and location
 
 ### Platform
@@ -102,7 +103,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
   - **Bid Assistant** — drafts personalized artist proposals with suggested pricing
   - **License OCR** — extracts and verifies document data from uploaded licenses
   - **Review Moderation** — toxicity/spam/fraud scoring with auto-flagging
-- **Admin Moderation Dashboard** — pending license verifications (OCR results, confidence scores) and flagged reviews (toxicity/spam/fraud scores, one-click approve/hide)
+- **Admin Dashboard (`/admin`)** — approve/revoke artists, pending license verifications (OCR results, confidence scores), flagged reviews (toxicity/spam/fraud scores), summary stats
 - **SEO** — meta tags, structured data, sitemap
 - **Dark/light mode** — theme toggle with system preference detection
 
@@ -129,7 +130,9 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | `/client/dashboard`    | Client Dashboard         | Client        |
 | `/client/new-request`  | New Tattoo Request       | Client        |
 | `/client/design-lab`   | AI Design Lab            | Client        |
-| `/admin/moderation`    | Admin Moderation         | Admin         |
+| `/admin`               | Admin Dashboard          | Admin         |
+| `/admin/moderation`    | Admin Review Moderation  | Admin         |
+| `/artist/billing`      | Artist Billing & Plans   | Artist        |
 | `*` (fallback)         | 404 Not Found            | Public        |
 
 ## Database Schema
@@ -153,14 +156,18 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | `requestMessages`       | Client ↔ artist messaging on requests                                                     |
 | `webhookQueue`          | Stripe webhook retry queue with exponential backoff                                        |
 
-## Subscription Tiers
+## Artist Subscription Tiers
 
-| Tier                  | Price  | Portfolio Photos | Bookings | Direct Contact | Reviews | Analytics | Featured |
-| --------------------- | ------ | ---------------- | -------- | -------------- | ------- | --------- | -------- |
-| **Apprentice** (Free) | $0/mo  | 3                | —        | —              | —       | —         | —        |
-| **Artist**            | $9/mo  | 15               | ✓        | ✓              | —       | —         | —        |
-| **Professional**      | $19/mo | Unlimited        | ✓        | ✓              | ✓       | ✓         | —        |
-| **Icon**              | $39/mo | Unlimited        | ✓        | ✓              | ✓       | ✓         | ✓        |
+| Tier                      | Price             | Bid Fee | Portfolio | Bookings | Verified Badge | Featured |
+| ------------------------- | ----------------- | ------- | --------- | -------- | -------------- | -------- |
+| **Free**                  | $0/mo             | —       | 10 photos | —        | —              | —        |
+| **Pro**                   | $29/mo (or $232/yr) | 5%    | Unlimited | ✓        | ✓              | —        |
+| **Pay-as-you-go**         | $0/mo             | 10%     | 10 photos | —        | —              | —        |
+| **Founding Artist**       | $19/mo locked     | 5%      | Unlimited | ✓        | ✓              | ✓        |
+
+> **Founding Artist** is limited to the first 100 artists. Requires: complete portfolio + 3 bid responses within 60 days. Badge is revocable if activity drops.
+>
+> **Pro break-even**: At ~$580/month in accepted bids, the 5% Pro fee costs the same as the $29 subscription vs. 10% pay-as-you-go fee.
 
 ## Getting Started
 
@@ -249,6 +256,8 @@ The API uses [tRPC](https://trpc.io) for type-safe client-server communication.
 - `bookings.*` — create, list, update status
 - `favorites.*` — add, remove, check
 - `moderation.*` — admin: flagged reviews, update status, re-analyze
+- `artists.adminGetAll`, `artists.adminSetApproval` — admin: list all artists, approve/revoke
+- `artists.enablePayAsYouGo` — activate no-subscription transaction path
 
 **Client marketplace routes**:
 

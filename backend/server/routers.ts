@@ -96,7 +96,7 @@ export const appRouter = router({
     createSubscriptionCheckout: protectedProcedure
       .input(
         z.object({
-          tier: z.enum(["artist_amateur", "artist_pro", "artist_icon"]),
+          tier: z.enum(["artist_amateur", "artist_icon"]),
           interval: z.enum(["month", "year"]).default("month"),
           successUrl: z.string().url(),
           cancelUrl: z.string().url(),
@@ -124,8 +124,6 @@ export const appRouter = router({
         const priceIdMap: Record<string, string | undefined> = {
           artist_amateur_month: ENV.stripeArtistAmateurPriceIdMonth,
           artist_amateur_year:  ENV.stripeArtistAmateurPriceIdYear,
-          artist_pro_month:     ENV.stripeArtistProPriceIdMonth,
-          artist_pro_year:      ENV.stripeArtistProPriceIdYear,
           artist_icon_month:    ENV.stripeArtistIconPriceIdMonth,
           artist_icon_year:     ENV.stripeArtistIconPriceIdYear,
         };

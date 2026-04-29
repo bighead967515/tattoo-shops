@@ -28,10 +28,20 @@ export const TIER_LIMITS: Record<
   SubscriptionTier,
   { portfolioMax: number; aiCredits: number; canBook: boolean }
 > = {
-  artist_free: { portfolioMax: 3, aiCredits: 0, canBook: false },
-  artist_amateur: { portfolioMax: 15, aiCredits: 0, canBook: true },
-  artist_pro: { portfolioMax: 999, aiCredits: 0, canBook: true },
-  artist_icon: { portfolioMax: 999, aiCredits: 0, canBook: true },
+  // Artist tiers: canonical model
+  artist_free: { portfolioMax: 10, aiCredits: 0, canBook: false },
+  artist_amateur: {
+    portfolioMax: Number.MAX_SAFE_INTEGER,
+    aiCredits: 0,
+    canBook: true,
+  },
+  // Pay-as-you-go: no subscription, bidding enabled, bookings remain off
+  artist_pro: { portfolioMax: 10, aiCredits: 0, canBook: false },
+  artist_icon: {
+    portfolioMax: Number.MAX_SAFE_INTEGER,
+    aiCredits: 0,
+    canBook: true,
+  },
 
   client_free: { portfolioMax: 0, aiCredits: 0, canBook: true },
   client_plus: { portfolioMax: 0, aiCredits: 10, canBook: true },

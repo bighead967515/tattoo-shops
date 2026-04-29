@@ -866,7 +866,7 @@ export const bidsRouter = router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message:
-            "Bidding on client posts requires a paid plan. Upgrade to the Artist plan ($9/mo) to start submitting proposals.",
+            "Bidding on client posts requires a paid plan. Upgrade to Pro or switch to pay-as-you-go to start submitting proposals.",
         });
       }
 
