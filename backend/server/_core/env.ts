@@ -30,6 +30,8 @@ const envSchema = z.object({
   HUGGINGFACE_IMAGE_MODEL: z.string().optional(),
   HUGGINGFACE_CAPTION_MODEL: z.string().optional(),
   HUGGINGFACE_OCR_MODEL: z.string().optional(),
+  CORS_ALLOWED_ORIGINS: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().url().optional(),
   PORT: z.string().default("3000"),
 });
 
@@ -71,6 +73,8 @@ export const ENV = {
   huggingFaceImageModel: parsed.data.HUGGINGFACE_IMAGE_MODEL,
   huggingFaceCaptionModel: parsed.data.HUGGINGFACE_CAPTION_MODEL,
   huggingFaceOcrModel: parsed.data.HUGGINGFACE_OCR_MODEL,
+  corsAllowedOrigins: parsed.data.CORS_ALLOWED_ORIGINS,
+  publicBaseUrl: parsed.data.PUBLIC_BASE_URL,
   nodeEnv: parsed.data.NODE_ENV,
   port: parseInt(parsed.data.PORT, 10),
 };

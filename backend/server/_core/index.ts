@@ -44,6 +44,28 @@ function isBundledDistRuntime(): boolean {
   return path.basename(import.meta.dirname).toLowerCase() === "dist";
 }
 
+function parseAllowedOrigins(): string[] {
+  const fromEnv = ENV.corsAllowedOrigins
+    ?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (fromEnv && fromEnv.length > 0) {
+    return fromEnv;
+  }
+
+  return ENV.isProduction
+    ? [
+        "https://universalinc.pro",
+        "https://www.universalinc.pro",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+      ]
+    : ["http://localhost:3000", "http://localhost:5173"];
+}
+
+const allowedOrigins = parseAllowedOrigins();
+
 const app = express();
 
 // Trust reverse proxy (required for Hostinger, Render, and other hosted environments)
@@ -56,9 +78,15 @@ initSentry();
 // CORS configuration
 app.use(
   cors({
-    origin: ENV.isProduction
-      ? ["https://universalinc.pro", "https://www.universalinc.pro"]
-      : ["http://localhost:3000", "http://localhost:5173"],
+    origin(origin, callback) {
+      // Allow non-browser and same-origin requests with no Origin header.
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, allowedOrigins.includes(origin));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   }),
@@ -153,7 +181,9 @@ app.get("/sitemap.xml", async (_req, res) => {
   try {
     const { getAllArtists } = await import("../db");
     const artists = await getAllArtists();
-    const baseUrl = "https://universalinc.pro";
+    const protocol = res.req.protocol || "http";
+    const host = res.req.get("host");
+    const baseUrl = ENV.publicBaseUrl || (host ? `${protocol}://${host}` : "http://localhost:3000");
 
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },
@@ -277,9 +307,15 @@ app.use(
       serveStatic(app);
     }
 
-    const port = await findAvailablePort(parseInt(process.env.PORT || "3000"));
-    server.listen(port, () => {
-      logger.info(`Server running on http://localhost:${port}/`);
+    const requestedPort = parseInt(process.env.PORT || String(ENV.port || 3000), 10);
+    const isHostedRuntime = ENV.isProduction;
+    const port = isHostedRuntime
+      ? requestedPort
+      : await findAvailablePort(requestedPort);
+    const host = isHostedRuntime ? "0.0.0.0" : "127.0.0.1";
+
+    server.listen(port, host, () => {
+      logger.info(`Server running on http://${host}:${port}/`);
     });
   };
 

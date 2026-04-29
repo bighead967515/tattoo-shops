@@ -42,6 +42,8 @@ var init_env = __esm({
       HUGGINGFACE_IMAGE_MODEL: z.string().optional(),
       HUGGINGFACE_CAPTION_MODEL: z.string().optional(),
       HUGGINGFACE_OCR_MODEL: z.string().optional(),
+      CORS_ALLOWED_ORIGINS: z.string().optional(),
+      PUBLIC_BASE_URL: z.string().url().optional(),
       PORT: z.string().default("3000")
     });
     parsed = envSchema.safeParse(process.env);
@@ -80,6 +82,8 @@ var init_env = __esm({
       huggingFaceImageModel: parsed.data.HUGGINGFACE_IMAGE_MODEL,
       huggingFaceCaptionModel: parsed.data.HUGGINGFACE_CAPTION_MODEL,
       huggingFaceOcrModel: parsed.data.HUGGINGFACE_OCR_MODEL,
+      corsAllowedOrigins: parsed.data.CORS_ALLOWED_ORIGINS,
+      publicBaseUrl: parsed.data.PUBLIC_BASE_URL,
       nodeEnv: parsed.data.NODE_ENV,
       port: parseInt(parsed.data.PORT, 10)
     };
@@ -5034,12 +5038,31 @@ async function findAvailablePort(startPort = 3e3) {
 function isBundledDistRuntime() {
   return path6.basename(import.meta.dirname).toLowerCase() === "dist";
 }
+function parseAllowedOrigins() {
+  const fromEnv = ENV.corsAllowedOrigins?.split(",").map((origin) => origin.trim()).filter(Boolean);
+  if (fromEnv && fromEnv.length > 0) {
+    return fromEnv;
+  }
+  return ENV.isProduction ? [
+    "https://universalinc.pro",
+    "https://www.universalinc.pro",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+  ] : ["http://localhost:3000", "http://localhost:5173"];
+}
+var allowedOrigins = parseAllowedOrigins();
 var app = express2();
 app.set("trust proxy", 1);
 initSentry();
 app.use(
   cors({
-    origin: ENV.isProduction ? ["https://universalinc.pro", "https://www.universalinc.pro"] : ["http://localhost:3000", "http://localhost:5173"],
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      callback(null, allowedOrigins.includes(origin));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
   })
@@ -5113,7 +5136,9 @@ app.get("/sitemap.xml", async (_req, res) => {
   try {
     const { getAllArtists: getAllArtists2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const artists2 = await getAllArtists2();
-    const baseUrl = "https://universalinc.pro";
+    const protocol = res.req.protocol || "http";
+    const host = res.req.get("host");
+    const baseUrl = ENV.publicBaseUrl || (host ? `${protocol}://${host}` : "http://localhost:3000");
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },
       { loc: "/artists", changefreq: "daily", priority: "0.9" },
@@ -5201,9 +5226,12 @@ app.use(
     } else {
       serveStatic(app);
     }
-    const port = await findAvailablePort(parseInt(process.env.PORT || "3000"));
-    server.listen(port, () => {
-      logger.info(`Server running on http://localhost:${port}/`);
+    const requestedPort = parseInt(process.env.PORT || String(ENV.port || 3e3), 10);
+    const isHostedRuntime = ENV.isProduction;
+    const port = isHostedRuntime ? requestedPort : await findAvailablePort(requestedPort);
+    const host = isHostedRuntime ? "0.0.0.0" : "127.0.0.1";
+    server.listen(port, host, () => {
+      logger.info(`Server running on http://${host}:${port}/`);
     });
   };
   startServer().catch((error) => {
