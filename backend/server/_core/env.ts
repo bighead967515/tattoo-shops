@@ -16,6 +16,8 @@ const envSchema = z.object({
   STRIPE_ARTIST_PRO_PRICE_ID_YEAR:      z.string().default("price_1TOraYQRJTQEheTOHNQL82m3"),
   STRIPE_ARTIST_ICON_PRICE_ID_MONTH:    z.string().default("price_1TOraZQRJTQEheTOofBdpJwM"),
   STRIPE_ARTIST_ICON_PRICE_ID_YEAR:     z.string().default("price_1TOraaQRJTQEheTOwDiBtF35"),
+  // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
+  STRIPE_FOUNDING_ARTIST_PRICE_ID:      z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
   // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
   STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
   STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
@@ -59,6 +61,7 @@ export const ENV = {
   stripeArtistProPriceIdYear:      parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_YEAR,
   stripeArtistIconPriceIdMonth:    parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
   stripeArtistIconPriceIdYear:     parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
+  stripeFoundingArtistPriceId:     parsed.data.STRIPE_FOUNDING_ARTIST_PRICE_ID,
   // Client tier price IDs
   stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
   stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,

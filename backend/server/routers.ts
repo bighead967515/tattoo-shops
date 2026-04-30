@@ -19,7 +19,7 @@ import {
   getPublicUrl,
 } from "./_core/supabaseStorage";
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
-import { createArtistSubscriptionCheckout } from "./stripe";
+import { createArtistSubscriptionCheckout, createFoundingArtistCheckout } from "./stripe";
 import { artists, users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
@@ -160,6 +160,66 @@ export const appRouter = router({
         return { checkoutUrl: session.url };
       }),
 
+    /**
+     * Start the Founding Artist checkout:
+     * - 180-day free trial then $19/mo locked rate
+     * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
+     */
+    startFoundingCheckout: protectedProcedure
+      .input(
+        z.object({
+          successUrl: z.string().url(),
+          cancelUrl: z.string().url(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        const [artist] = await database
+          .select({ id: artists.id })
+          .from(artists)
+          .where(eq(artists.userId, ctx.user.id))
+          .limit(1);
+
+        if (!artist) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You must have an artist profile before joining the Founding Artist offer.",
+          });
+        }
+
+        const [user] = await database
+          .select({ email: users.email, stripeCustomerId: users.stripeCustomerId })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+
+        const priceId = ENV.stripeFoundingArtistPriceId;
+        if (!priceId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Founding Artist price is not configured.",
+          });
+        }
+
+        const session = await createFoundingArtistCheckout({
+          priceId,
+          customerEmail: user?.email ?? "",
+          stripeCustomerId: user?.stripeCustomerId ?? undefined,
+          metadata: {
+            userId: String(ctx.user.id),
+            artistId: String(artist.id),
+            tier: "artist_amateur",
+            interval: "month",
+            isFoundingArtist: "true",
+          },
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+        });
+
+        return { checkoutUrl: session.url };
+      }),
 
     search: publicProcedure
       .input(

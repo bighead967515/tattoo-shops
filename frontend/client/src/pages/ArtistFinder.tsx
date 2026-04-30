@@ -24,6 +24,7 @@ import {
   type TattooShop,
 } from "@/lib/tattooShops";
 import BookingDialog from "@/components/BookingDialog";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 export default function ArtistFinder() {
   const [searchCity, setSearchCity] = useState("");
@@ -81,6 +82,12 @@ export default function ArtistFinder() {
 
   const artistCount = allEntries.filter((e) => e.source === "artist").length;
   const shopCount = allEntries.filter((e) => e.source === "shop").length;
+
+  usePageSeo({
+    title: "Find Tattoo Artists & Shops Near You | Ink Connect",
+    description:
+      "Browse verified tattoo artists and shops by city. Compare styles, portfolios, and ratings to book your next tattoo on Ink Connect.",
+  });
 
   return (
     <div className="min-h-screen bg-background">

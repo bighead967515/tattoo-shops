@@ -174,6 +174,48 @@ export async function createArtistSubscriptionCheckout({
   });
 }
 
+/**
+ * Create a Stripe Checkout Session for the Founding Artist offer.
+ * - Uses the artist_amateur price ID at $19/mo
+ * - Adds a 180-day (6-month) free trial via trial_period_days
+ * - Stores isFoundingArtist: "true" in metadata so the webhook can mark the artist
+ */
+export async function createFoundingArtistCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl,
+}: {
+  priceId: string;
+  customerEmail: string;
+  stripeCustomerId?: string;
+  metadata: Record<string, string>;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      ...(stripeCustomerId
+        ? { customer: stripeCustomerId }
+        : { customer_email: customerEmail }),
+      metadata: { ...metadata, isFoundingArtist: "true" },
+      subscription_data: {
+        trial_period_days: 180,
+        metadata: { ...metadata, isFoundingArtist: "true" },
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: false, // Founding offer IS the promo — no stacking
+    });
+    return session;
+  });
+}
+
 export async function constructWebhookEvent(
   payload: string | Buffer,
   signature: string,

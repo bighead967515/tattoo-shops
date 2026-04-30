@@ -69,14 +69,16 @@ export async function getDb() {
       // Create PostgreSQL connection with connection pooling.
       // Supabase transaction pooler (port 6543 / pooler.supabase.com) does NOT
       // support prepared statements — postgres.js must use simple query protocol.
-      const dbUrl = process.env.DATABASE_URL;
+      // Strip accidental double-prefix (e.g. "DATABASE_URL=postgresql://...")
+      const dbUrl = process.env.DATABASE_URL!.replace(/^DATABASE_URL=/, "");
       // Supabase always routes through Supavisor/PgBouncer — prepared statements
       // must be disabled unconditionally regardless of which connection URL is used.
       _sqlClient = postgres(dbUrl, {
-        max: 20, // Max connections in pool
+        max: 10, // Supabase free tier has a 60 connection limit; keep pool small
         idle_timeout: 30, // Close idle connections after 30 seconds
-        connect_timeout: 5, // 5 second connection timeout
+        connect_timeout: 10, // 10 second connection timeout (Render cold starts are slow)
         prepare: false, // MUST be false for Supabase (Supavisor/PgBouncer incompatible)
+        ssl: dbUrl.includes("supabase") ? "require" : undefined, // Supabase pooler requires SSL
         onnotice: (notice) => {
           logger.debug("Database notice", { message: notice.message });
         },
@@ -238,7 +240,15 @@ export async function getAllArtists() {
   const db = await getDb();
   if (!db) return [];
 
-  return await db.select().from(artists).where(eq(artists.isApproved, true));
+  return await db
+    .select()
+    .from(artists)
+    .where(eq(artists.isApproved, true))
+    .orderBy(
+      // Founding artists appear first
+      sql`${artists.isFoundingArtist} DESC`,
+      desc(artists.createdAt),
+    );
 }
 
 export async function getAllArtistsAdmin() {
@@ -307,7 +317,11 @@ export async function searchArtists(filters: {
   return await db
     .select()
     .from(artists)
-    .where(and(...conditions));
+    .where(and(...conditions))
+    .orderBy(
+      sql`${artists.isFoundingArtist} DESC`,
+      desc(artists.averageRating),
+    );
 }
 
 /**

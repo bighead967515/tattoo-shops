@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -27,12 +27,14 @@ import {
   Upload,
   Sparkles,
   ShieldCheck,
+  Crown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import ReviewCard from "@/components/ReviewCard";
 import ReviewFilters from "@/components/ReviewFilters";
 import BookingDialog from "@/components/BookingDialog";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 export default function ArtistProfile() {
   const { id } = useParams();
@@ -121,6 +123,36 @@ export default function ArtistProfile() {
     setShowBookingDialog(true);
   };
 
+  const seo = useMemo(() => {
+    const fallbackTitle = "Tattoo Artist Profile | Ink Connect";
+    const fallbackDescription =
+      "View tattoo artist portfolios, reviews, specialties, and booking availability on Ink Connect.";
+
+    if (!artist) {
+      return { title: fallbackTitle, description: fallbackDescription };
+    }
+
+    const name = artist.shopName?.trim() || "Tattoo Artist";
+    const location = [artist.city, artist.state].filter(Boolean).join(", ");
+
+    const primarySpecialty =
+      artist.styles?.split(",")[0]?.trim() ||
+      artist.specialties?.split(",")[0]?.trim() ||
+      "Custom Tattoos";
+
+    const title = location
+      ? `${name}, ${primarySpecialty} in ${location} | Ink Connect`
+      : `${name}, ${primarySpecialty} | Ink Connect`;
+
+    const description = location
+      ? `Book a tattoo with ${name} in ${location}. Specializing in ${primarySpecialty}. View portfolio, reviews, and pricing on Ink Connect.`
+      : `Book a tattoo with ${name}. Specializing in ${primarySpecialty}. View portfolio, reviews, and pricing on Ink Connect.`;
+
+    return { title, description };
+  }, [artist]);
+
+  usePageSeo(seo);
+
   if (artistLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -163,6 +195,12 @@ export default function ArtistProfile() {
                   <Badge className="bg-primary/15 text-primary border border-primary/30 gap-1.5 px-3 py-1 text-sm font-semibold">
                     <ShieldCheck className="w-4 h-4" />
                     Vibe Verified
+                  </Badge>
+                )}
+                {artist.isFoundingArtist && (
+                  <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 gap-1.5 px-3 py-1 text-sm font-semibold">
+                    <Crown className="w-4 h-4" />
+                    Founding Artist
                   </Badge>
                 )}
               </div>

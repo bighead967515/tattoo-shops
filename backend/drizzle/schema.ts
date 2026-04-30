@@ -124,6 +124,10 @@ export const artists = pgTable("artists", {
   bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
   /** Tracks which month the bidsThisMonth counter belongs to, format: YYYY-MM */
   bidsMonthYear: varchar("bidsMonthYear", { length: 7 }).default("2000-01").notNull(),
+  /** True if this artist signed up during the Founding Artist offer period */
+  isFoundingArtist: boolean("isFoundingArtist").default(false).notNull(),
+  /** When the 6-month free trial ends; null for non-founding artists */
+  foundingTrialEndsAt: timestamp("foundingTrialEndsAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

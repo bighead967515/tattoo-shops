@@ -439,9 +439,24 @@ async function handleArtistSubscriptionChange(
       .set({ stripeCustomerId, subscriptionTier: tier, stripeSubscriptionId: subscription.id, updatedAt: new Date() })
       .where(eq(users.id, user.id));
 
+    const isFoundingArtist = subscription.metadata?.isFoundingArtist === "true";
+    const artistUpdate: {
+      subscriptionTier: typeof tier;
+      updatedAt: Date;
+      isFoundingArtist?: boolean;
+      foundingTrialEndsAt?: Date | null;
+    } = { subscriptionTier: tier, updatedAt: new Date() };
+
+    if (isFoundingArtist) {
+      artistUpdate.isFoundingArtist = true;
+      // trial_end from Stripe is a Unix timestamp in seconds
+      const trialEnd = subscription.trial_end;
+      artistUpdate.foundingTrialEndsAt = trialEnd ? new Date(trialEnd * 1000) : null;
+    }
+
     await tx
       .update(artists)
-      .set({ subscriptionTier: tier, updatedAt: new Date() })
+      .set(artistUpdate)
       .where(eq(artists.userId, user.id));
   });
 
