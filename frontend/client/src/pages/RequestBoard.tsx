@@ -193,9 +193,23 @@ export default function RequestBoard() {
                     <CardTitle className="text-lg line-clamp-1">
                       {request.title}
                     </CardTitle>
-                    {request.style && (
-                      <Badge variant="secondary">{request.style}</Badge>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5 justify-end">
+                      {request.style && (
+                        <Badge variant="secondary">{request.style}</Badge>
+                      )}
+                      {request.addOnPaymentStatus === "paid" &&
+                        request.addOnFeaturedBadge && (
+                          <Badge className="bg-amber-500/15 text-amber-300 border border-amber-400/30">
+                            Featured
+                          </Badge>
+                        )}
+                      {request.addOnPaymentStatus === "paid" &&
+                        request.addOnPriorityBoost && (
+                          <Badge className="bg-sky-500/15 text-sky-300 border border-sky-400/30">
+                            Boosted
+                          </Badge>
+                        )}
+                    </div>
                   </div>
                   <CardDescription className="line-clamp-2">
                     {request.description}

@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockConstructWebhookEvent,
   mockStripePriceToClientTier,
+  mockStripePriceToArtistTier,
   mockGetBookingById,
   mockWithTransaction,
   mockUpdateBooking,
@@ -14,6 +15,7 @@ const {
 } = vi.hoisted(() => ({
   mockConstructWebhookEvent: vi.fn(),
   mockStripePriceToClientTier: vi.fn(),
+  mockStripePriceToArtistTier: vi.fn(),
   mockGetBookingById: vi.fn(),
   mockWithTransaction: vi.fn(),
   mockUpdateBooking: vi.fn(),
@@ -32,6 +34,7 @@ const {
 vi.mock("../../backend/server/stripe", () => ({
   constructWebhookEvent: mockConstructWebhookEvent,
   stripePriceToClientTier: mockStripePriceToClientTier,
+  stripePriceToArtistTier: mockStripePriceToArtistTier,
 }));
 
 vi.mock("../../backend/server/db", () => ({
@@ -79,8 +82,13 @@ function createRes(): MockRes {
   return response as MockRes;
 }
 
-function createDbForSubscription(user: Record<string, unknown>) {
-  const limit = vi.fn(async () => [user]);
+function createDbForSubscription(user: Record<string, unknown>, isArtist = false) {
+  // First select returns the user (stripeCustomerId lookup).
+  // Second select returns an artist row only if isArtist=true, else []
+  // (handleSubscriptionCancelled does an extra artist-lookup to branch the downgrade path).
+  const limit = vi.fn()
+    .mockResolvedValueOnce([user])
+    .mockResolvedValue(isArtist ? [{ id: 99 }] : []);
 
   const updateCalls: Array<{ table: unknown; setPayload: unknown }> = [];
 

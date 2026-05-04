@@ -18,8 +18,9 @@ import {
 import { TRPCError } from "@trpc/server";
 import { logger } from "./_core/logger";
 import path from "path";
+import { sanitizeInput } from "./_core/sanitize";
 import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
-import { createSubscriptionCheckout } from "./stripe";
+import { createCheckoutSession, createSubscriptionCheckout } from "./stripe";
 import { ENV } from "./_core/env";
 import {
   CLIENT_TIER_PRICING,
@@ -35,6 +36,11 @@ import {
   type ArtistCanonicalTier,
 } from "../shared/tierCompat";
 import { buildClientOnboardingUserUpdate } from "./_core/onboarding";
+import {
+  REQUEST_ADDON_PAYMENT_STATUSES,
+  calculateRequestAddonTotalCents,
+  clampDirectMessageCredits,
+} from "@shared/requestAddons";
 
 /**
  * Sanitize a filename to prevent path traversal attacks.
@@ -121,6 +127,9 @@ export const clientsRouter = router({
           .values({
             userId: ctx.user.id,
             ...input,
+            displayName: sanitizeInput(input.displayName, 255),
+            bio: input.bio ? sanitizeInput(input.bio, 1000) : undefined,
+            preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : undefined,
             onboardingCompleted: true,
           })
           .returning();
@@ -147,7 +156,13 @@ export const clientsRouter = router({
       const db = await requireDb();
       const [updated] = await db
         .update(clients)
-        .set({ ...input, updatedAt: new Date() })
+        .set({
+          ...input,
+          displayName: input.displayName ? sanitizeInput(input.displayName, 255) : undefined,
+          bio: input.bio ? sanitizeInput(input.bio, 1000) : undefined,
+          preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : undefined,
+          updatedAt: new Date(),
+        })
         .where(eq(clients.userId, ctx.user.id))
         .returning();
 
@@ -264,7 +279,12 @@ export const requestsRouter = router({
         .from(tattooRequests)
         .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
         .where(eq(tattooRequests.status, "open"))
-        .orderBy(desc(tattooRequests.createdAt))
+        .orderBy(
+          desc(
+            sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+          ),
+          desc(tattooRequests.createdAt),
+        )
         .limit(filters.limit ?? 20)
         .offset(filters.offset ?? 0);
 
@@ -292,14 +312,16 @@ export const requestsRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await requireDb();
 
-      // 1. Verify user is a paid artist
+      // 1. Verify user is a paid artist (use canonical users.subscriptionTier)
       const [artist] = await db
-        .select({ subscriptionTier: artists.subscriptionTier })
+        .select({ id: artists.id })
         .from(artists)
         .where(eq(artists.userId, ctx.user.id))
         .limit(1);
 
-      if (!artist || isFreeArtistTier(artist.subscriptionTier)) {
+      const canonicalTierForDashboard = ctx.user.subscriptionTier ?? "artist_free";
+
+      if (!artist || isFreeArtistTier(canonicalTierForDashboard)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "This feature is only available for paid artist plans.",
@@ -324,7 +346,12 @@ export const requestsRouter = router({
         .from(tattooRequests)
         .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
         .where(eq(tattooRequests.status, "open"))
-        .orderBy(desc(tattooRequests.createdAt))
+        .orderBy(
+          desc(
+            sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+          ),
+          desc(tattooRequests.createdAt),
+        )
         .limit(filters.limit ?? 20)
         .offset(filters.offset ?? 0);
 
@@ -356,7 +383,12 @@ export const requestsRouter = router({
       .from(tattooRequests)
       .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
       .where(eq(tattooRequests.status, "open"))
-      .orderBy(desc(tattooRequests.createdAt))
+      .orderBy(
+        desc(
+          sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+        ),
+        desc(tattooRequests.createdAt),
+      )
       .limit(8);
 
     return results.map((r: (typeof results)[number]) => ({
@@ -472,14 +504,32 @@ export const requestsRouter = router({
         preferredState: z.string().max(50).optional(),
         willingToTravel: z.boolean().default(false),
         desiredTimeframe: z.string().max(100).optional(),
+        addOns: z
+          .object({
+            priorityBoost: z.boolean().default(false),
+            featuredBadge: z.boolean().default(false),
+            directMessageCredits: z.number().int().min(0).max(20).default(0),
+          })
+          .optional(),
         guestEmail: z.string().email().max(255).optional(), // guests can optionally leave contact info
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const { guestEmail, ...requestInput } = input;
+      const { guestEmail, addOns, ...requestInput } = input;
+
+      const normalizedAddOns = {
+        priorityBoost: addOns?.priorityBoost ?? false,
+        featuredBadge: addOns?.featuredBadge ?? false,
+        directMessageCredits: clampDirectMessageCredits(
+          addOns?.directMessageCredits ?? 0,
+        ),
+      };
+      const addOnTotalCents = calculateRequestAddonTotalCents(normalizedAddOns);
+
       // If user is logged in, try to link to their client profile
       let clientId: number | null = null;
+      let userEmail = "";
       if (ctx.user) {
         const [client] = await db
           .select({ id: clients.id })
@@ -487,16 +537,96 @@ export const requestsRouter = router({
           .where(eq(clients.userId, ctx.user.id))
           .limit(1);
         if (client) clientId = client.id;
+
+        const [userRow] = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+        userEmail = userRow?.email ?? "";
       }
+
       const [newRequest] = await db
         .insert(tattooRequests)
         .values({
           clientId,
           guestEmail: clientId ? null : (guestEmail ?? null),
+          addOnPriorityBoost: normalizedAddOns.priorityBoost,
+          addOnFeaturedBadge: normalizedAddOns.featuredBadge,
+          addOnDirectMessageCredits: normalizedAddOns.directMessageCredits,
+          addOnTotalCents,
+          addOnPaymentStatus:
+            addOnTotalCents > 0
+              ? REQUEST_ADDON_PAYMENT_STATUSES.CHECKOUT_PENDING
+              : REQUEST_ADDON_PAYMENT_STATUSES.NOT_REQUESTED,
           ...requestInput,
+          title: sanitizeInput(requestInput.title, 255),
+          description: sanitizeInput(requestInput.description, 5000),
         })
         .returning();
-      return newRequest;
+
+      if (addOnTotalCents <= 0) {
+        return {
+          ...newRequest,
+          addOnPaymentRequired: false,
+          addOnCheckoutUrl: null,
+        };
+      }
+
+      const checkoutEmail = userEmail || guestEmail || "";
+      if (!checkoutEmail) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "An email is required to purchase add-ons.",
+        });
+      }
+
+      const baseUrl = ENV.publicBaseUrl || "http://localhost:3000";
+
+      try {
+        const session = await createCheckoutSession({
+          priceInCents: addOnTotalCents,
+          productName: "Ink Connect Request Add-ons",
+          productDescription:
+            "Optional visibility and messaging add-ons for your tattoo request.",
+          customerEmail: checkoutEmail,
+          metadata: {
+            paymentType: "request_addons",
+            requestId: String(newRequest.id),
+            userId: ctx.user ? String(ctx.user.id) : "guest",
+          },
+          successUrl: `${baseUrl}/requests/${newRequest.id}?addons=success`,
+          cancelUrl: `${baseUrl}/requests/${newRequest.id}?addons=cancel`,
+        });
+
+        await db
+          .update(tattooRequests)
+          .set({
+            addOnStripeCheckoutSessionId: session.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(tattooRequests.id, newRequest.id));
+
+        return {
+          ...newRequest,
+          addOnPaymentRequired: true,
+          addOnCheckoutUrl: session.url,
+        };
+      } catch (error) {
+        await db
+          .update(tattooRequests)
+          .set({
+            addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.FAILED,
+            updatedAt: new Date(),
+          })
+          .where(eq(tattooRequests.id, newRequest.id));
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to initialize add-on payment. Please try again.",
+          cause: error,
+        });
+      }
     }),
 
   // AI Prompt Refiner — open to everyone including guests
@@ -770,7 +900,9 @@ export const bidsRouter = router({
         });
       }
 
-      if (!canUseAiBidAssistant(artist.subscriptionTier)) {
+      const canonicalTierForDraft = ctx.user.subscriptionTier ?? "artist_free";
+
+      if (!canUseAiBidAssistant(canonicalTierForDraft)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message:
@@ -856,7 +988,9 @@ export const bidsRouter = router({
       }
 
       // ── Per-tier monthly bid quota enforcement ──────────────────────────
-      const canonicalTier = (artist.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
+      // Use canonical users.subscriptionTier (updated by Stripe webhook) rather
+      // than the deprecated artists.subscriptionTier column.
+      const canonicalTier = (ctx.user.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
       const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
       const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
       const bidsPerMonth = tierLimits.bidsPerMonth;
@@ -943,7 +1077,7 @@ export const bidsRouter = router({
           artistId: artist.id,
           priceEstimate: input.priceEstimate,
           estimatedHours: input.estimatedHours,
-          message: input.message,
+          message: sanitizeInput(input.message, 2000),
           availableDate: input.availableDate
             ? new Date(input.availableDate)
             : null,

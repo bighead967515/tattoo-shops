@@ -297,6 +297,9 @@ export const appRouter = router({
         return await db.createArtist({
           userId: ctx.user.id,
           ...input,
+          shopName: sanitizeInput(input.shopName, 255),
+          bio: input.bio ? sanitizeInput(input.bio, 2000) : undefined,
+          specialties: input.specialties ? sanitizeInput(input.specialties, 500) : undefined,
         });
       }),
 
@@ -322,7 +325,12 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
-        return await db.updateArtist(id, data);
+        return await db.updateArtist(id, {
+          ...data,
+          shopName: data.shopName ? sanitizeInput(data.shopName, 255) : undefined,
+          bio: data.bio ? sanitizeInput(data.bio, 2000) : undefined,
+          specialties: data.specialties ? sanitizeInput(data.specialties, 500) : undefined,
+        });
       }),
 
     /**
@@ -509,12 +517,12 @@ export const appRouter = router({
       .input(z.object({ id: z.number(), artistId: z.number() }))
       .mutation(async ({ input }) => {
         const image = await db.getPortfolioImageById(input.id);
-        if (!image) throw new Error("Portfolio image not found");
-        if (image.artistId !== input.artistId) throw new Error("Forbidden");
+        if (!image) throw new TRPCError({ code: "NOT_FOUND", message: "Portfolio image not found" });
+        if (image.artistId !== input.artistId) throw new TRPCError({ code: "FORBIDDEN", message: "Forbidden" });
 
         const analysis = await analyzePortfolioImage(image.imageUrl);
         if (analysis.qualityScore === 0) {
-          throw new Error("AI analysis failed — please try again later");
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI analysis failed — please try again later" });
         }
 
         await db.updatePortfolioImageAI(input.id, {
@@ -537,15 +545,13 @@ export const appRouter = router({
         const image = await db.getPortfolioImageById(input.id);
 
         if (!image) {
-          throw new Error("Portfolio image not found");
+          throw new TRPCError({ code: "NOT_FOUND", message: "Portfolio image not found" });
         }
 
         // Get artist to verify ownership
         const artist = await db.getArtistById(image.artistId);
         if (!artist || artist.userId !== ctx.user.id) {
-          throw new Error(
-            "Forbidden: You can only delete your own portfolio images",
-          );
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only delete your own portfolio images" });
         }
 
         // Delete from Supabase storage
@@ -642,7 +648,7 @@ export const appRouter = router({
         // Sanitize all user inputs
         const sanitizedEmail = sanitizeEmail(input.customerEmail);
         if (!sanitizedEmail) {
-          throw new Error("Invalid email address");
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid email address" });
         }
 
         return await db.createBooking({
@@ -682,7 +688,7 @@ export const appRouter = router({
         // Get booking and verify ownership
         const booking = await db.getBookingById(input.id);
         if (!booking) {
-          throw new Error("Booking not found");
+          throw new TRPCError({ code: "NOT_FOUND", message: "Booking not found" });
         }
 
         // Check if user is either the customer or owns the artist profile
@@ -695,9 +701,10 @@ export const appRouter = router({
         }
 
         if (!isCustomer && !isArtist) {
-          throw new Error(
-            "Forbidden: You can only update your own bookings or bookings for your artist profile",
-          );
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only update your own bookings or bookings for your artist profile",
+          });
         }
 
         return await db.updateBooking(input.id, { status: input.status });
@@ -772,7 +779,7 @@ export const appRouter = router({
       .input(z.object({ reviewId: z.number() }))
       .mutation(async ({ input }) => {
         const review = await db.getReviewById(input.reviewId);
-        if (!review) throw new Error("Review not found");
+        if (!review) throw new TRPCError({ code: "NOT_FOUND", message: "Review not found" });
 
         const analysis = await analyzeReviewSentiment({
           rating: review.rating,

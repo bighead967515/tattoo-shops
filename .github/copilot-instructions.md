@@ -192,6 +192,8 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 | isApproved | boolean | Admin approval |
 | subscriptionTier | varchar(30) | **DEPRECATED** — read from users.subscriptionTier |
 | bidsUsed | int | Free tier bid counter (resets monthly) |
+| isFoundingArtist | boolean | Founding Artist cohort flag (badge + search priority boost) |
+| foundingTrialEndsAt | timestamp | End of 180-day Founding Artist trial period |
 | createdAt, updatedAt | timestamp | |
 
 **`clients`** — Client profiles (extends users via userId FK)
@@ -397,6 +399,9 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 - `artists.getByUserId` (protected query) — current user's profile
 - `artists.create` (protected mutation)
 - `artists.update` (artistOwner mutation)
+- `artists.createSubscriptionCheckout` (protected mutation) — paid artist subscription checkout (amateur/icon)
+- `artists.startFoundingCheckout` (protected mutation) — Founding Artist offer checkout (180-day trial)
+- `artists.enablePayAsYouGo` (protected mutation) — switches user to pay-as-you-go tier (artist_pro)
 
 **portfolio** — Portfolio images
 
@@ -546,14 +551,24 @@ Frontend                          Backend                         Supabase
 
 ### Artist Tiers
 
-| Canonical Value | Name         | Portfolio | Bookings | Contact | Reviews | Analytics | Featured |
-| --------------- | ------------ | --------- | -------- | ------- | ------- | --------- | -------- |
-| artist_free     | Apprentice   | 3         | No       | No      | No      | No        | No       |
-| artist_amateur  | Artist       | 15        | Yes      | Yes     | No      | No        | No       |
-| artist_pro      | Professional | Unlimited | Yes      | Yes     | Yes     | Yes       | No       |
-| artist_icon     | Icon         | Unlimited | Yes      | Yes     | Yes     | Yes       | Yes      |
+| Canonical Value | Name               | Portfolio | Bookings | Contact | Reviews | Analytics | Featured | Platform Fee |
+| --------------- | ------------------ | --------- | -------- | ------- | ------- | --------- | -------- | ------------ |
+| artist_free     | Apprentice         | 10        | No       | No      | No      | No        | No       | 0%           |
+| artist_amateur  | Pro (Subscription) | Unlimited | Yes      | Yes     | Yes     | Yes       | No       | 5%           |
+| artist_pro      | Pay-as-you-go      | 10        | No       | No      | No      | No        | No       | 10%          |
+| artist_icon     | Founding Artist    | Unlimited | Yes      | Yes     | Yes     | Yes       | Yes      | 5%           |
 
-**Pricing**: Free / $9 mo ($90/yr) / $19 mo ($190/yr) / $39 mo ($390/yr)
+**Pricing**: Free / $29 mo ($232/yr) / $0 subscription (pay per win) / $19 mo locked after founding trial
+
+### Founding Artist Offer (Overlay)
+
+The Founding Artist offer is an overlay on top of artist subscriptions (not a separate canonical tier value):
+
+- 180-day free trial via Stripe subscription trial
+- Locked-in $19/mo after trial using founding-specific Stripe price ID
+- `artists.isFoundingArtist = true` set from Stripe webhook metadata
+- `artists.foundingTrialEndsAt` stores Stripe `trial_end`
+- Founding artists get profile badge + search priority boost
 
 ### Client Tiers
 
@@ -598,7 +613,8 @@ Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in 
 ### Stripe
 
 - **Checkout**: `backend/server/stripe.ts` — subscription checkout sessions
-- **Webhooks**: `backend/server/webhookHandler.ts` — processes subscription events, updates `users.subscriptionTier`
+- **Founding checkout**: `backend/server/stripe.ts` — `createFoundingArtistCheckout()` with `trial_period_days: 180`
+- **Webhooks**: `backend/server/webhookHandler.ts` — processes subscription events, updates `users.subscriptionTier`, and sets founding artist fields from subscription metadata
 - **Retry queue**: `backend/server/webhookQueue.ts` — failed webhook retry with backoff
 
 ### Groq + Hugging Face AI

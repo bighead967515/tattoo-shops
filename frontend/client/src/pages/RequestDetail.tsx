@@ -59,6 +59,7 @@ import {
   type ArtistCanonicalTier,
 } from "@shared/tierCompat";
 import { TIER_LIMITS, type ArtistTierKey } from "@shared/tierLimits";
+import { REQUEST_ADDON_PRICING } from "@shared/requestAddons";
 
 const FONT_FAMILY_OPTIONS = [
   { label: "System Sans", value: "ui-sans-serif, system-ui, sans-serif" },
@@ -210,6 +211,7 @@ export default function RequestDetail() {
   };
 
   const formatPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`;
+  const formatUsd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   type BidType = NonNullable<typeof request>["bids"][number];
   type ImageType = NonNullable<typeof request>["images"][number];
@@ -505,6 +507,56 @@ export default function RequestDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {request.addOnPaymentStatus === "paid" &&
+            (request.addOnPriorityBoost ||
+              request.addOnFeaturedBadge ||
+              request.addOnDirectMessageCredits > 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Request Add-ons</CardTitle>
+                  <CardDescription>
+                    These optional upgrades were purchased for this request.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {request.addOnPriorityBoost && (
+                    <div className="flex items-center justify-between">
+                      <span>Priority Boost (48h)</span>
+                      <span className="font-medium">
+                        {formatUsd(REQUEST_ADDON_PRICING.priorityBoostCents)}
+                      </span>
+                    </div>
+                  )}
+                  {request.addOnFeaturedBadge && (
+                    <div className="flex items-center justify-between">
+                      <span>Featured Request Badge</span>
+                      <span className="font-medium">
+                        {formatUsd(REQUEST_ADDON_PRICING.featuredBadgeCents)}
+                      </span>
+                    </div>
+                  )}
+                  {request.addOnDirectMessageCredits > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span>
+                        Direct Message Credits ({request.addOnDirectMessageCredits})
+                      </span>
+                      <span className="font-medium">
+                        {formatUsd(
+                          request.addOnDirectMessageCredits *
+                            REQUEST_ADDON_PRICING.directMessageCreditCents,
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <Separator className="my-1" />
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>Total Add-ons</span>
+                    <span>{formatUsd(request.addOnTotalCents ?? 0)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {/* Bids section */}
           <Card>

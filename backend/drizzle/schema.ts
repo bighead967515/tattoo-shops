@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SubscriptionTier } from "@shared/const";
+import type { RequestAddonPaymentStatus } from "@shared/requestAddons";
 
 /**
  * Core user table backing auth flow.
@@ -418,6 +419,23 @@ export const tattooRequests = pgTable(
     preferredState: varchar("preferredState", { length: 50 }),
     willingToTravel: boolean("willingToTravel").default(false),
     desiredTimeframe: varchar("desiredTimeframe", { length: 100 }), // e.g., "ASAP", "Within 1 month", "Flexible"
+    addOnPriorityBoost: boolean("addOnPriorityBoost").default(false).notNull(),
+    addOnFeaturedBadge: boolean("addOnFeaturedBadge").default(false).notNull(),
+    addOnDirectMessageCredits: integer("addOnDirectMessageCredits")
+      .default(0)
+      .notNull(),
+    addOnTotalCents: integer("addOnTotalCents").default(0).notNull(),
+    addOnPaymentStatus: varchar("addOnPaymentStatus", { length: 30 })
+      .$type<RequestAddonPaymentStatus>()
+      .default("not_requested")
+      .notNull(),
+    addOnStripeCheckoutSessionId: varchar("addOnStripeCheckoutSessionId", {
+      length: 255,
+    }),
+    addOnStripePaymentIntentId: varchar("addOnStripePaymentIntentId", {
+      length: 255,
+    }),
+    addOnPaidAt: timestamp("addOnPaidAt"),
     status: requestStatusEnum("status").default("open").notNull(),
     selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
     viewCount: integer("viewCount").default(0),

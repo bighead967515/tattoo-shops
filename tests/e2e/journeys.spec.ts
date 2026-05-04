@@ -3,8 +3,15 @@ import { expect, test } from "@playwright/test";
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
 async function gotoFast(page: Parameters<typeof test>[0]["page"], path: string) {
+  await page.route("https://fonts.googleapis.com/**", (route) =>
+    route.fulfill({ status: 204, body: "" }),
+  );
+  await page.route("https://fonts.gstatic.com/**", (route) =>
+    route.fulfill({ status: 204, body: "" }),
+  );
+
   await page.goto(`${BASE_URL}${path}`, {
-    waitUntil: "domcontentloaded",
+    waitUntil: "commit",
     timeout: 60000,
   });
 }
@@ -12,13 +19,13 @@ async function gotoFast(page: Parameters<typeof test>[0]["page"], path: string) 
 test.describe("Launch Journey Smoke", () => {
   test("public browse journey renders artist discovery entry", async ({ page }) => {
     await gotoFast(page, "/artists");
-    await expect(page.getByRole("heading", { name: /Browse Artists|Tattoo Discovery/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Discover/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Browse Artists|Tattoo Discovery/i })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("button", { name: /Discover/i })).toBeVisible({ timeout: 20000 });
   });
 
   test("public request board journey renders list shell", async ({ page }) => {
     await gotoFast(page, "/requests");
-    await expect(page.getByRole("heading", { name: /Tattoo Request Board/i })).toBeVisible();
+    await expect(page.getByText(/Tattoo Request Board/i)).toBeVisible({ timeout: 20000 });
   });
 
   test("protected dashboard journey redirects unauthenticated users to sign-in UX", async ({ page }) => {

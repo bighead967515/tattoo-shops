@@ -34,6 +34,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  REQUEST_ADDON_PRICING,
+  calculateRequestAddonTotalCents,
+  clampDirectMessageCredits,
+} from "@shared/requestAddons";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -303,6 +308,11 @@ export default function NewRequest() {
     willingToTravel: false,
     desiredTimeframe: "",
   });
+  const [addOns, setAddOns] = useState({
+    priorityBoost: false,
+    featuredBadge: false,
+    directMessageCredits: 0,
+  });
 
   const [uploadedImages, setUploadedImages] = useState<
     { file: File; preview: string }[]
@@ -320,6 +330,13 @@ export default function NewRequest() {
   const createRequest = trpc.requests.create.useMutation();
   const getUploadUrl = trpc.requests.getUploadUrl.useMutation();
   const addImageToRequest = trpc.requests.addImage.useMutation();
+
+  const addOnTotalCents = calculateRequestAddonTotalCents(addOns);
+  const hasAnyAddOn =
+    addOns.priorityBoost ||
+    addOns.featuredBadge ||
+    addOns.directMessageCredits > 0;
+  const formatUsd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -384,6 +401,13 @@ export default function NewRequest() {
         preferredState: formData.preferredState || undefined,
         willingToTravel: formData.willingToTravel,
         desiredTimeframe: formData.desiredTimeframe || undefined,
+        addOns: {
+          priorityBoost: addOns.priorityBoost,
+          featuredBadge: addOns.featuredBadge,
+          directMessageCredits: clampDirectMessageCredits(
+            addOns.directMessageCredits,
+          ),
+        },
         // Only send guestEmail if user is not logged in
         guestEmail: !user && guestEmail ? guestEmail : undefined,
       });
@@ -420,6 +444,12 @@ export default function NewRequest() {
           toast.warning(
             `Some images failed to upload: ${failedUploads.join(", ")}`,
           );
+      }
+
+      if (newRequest?.addOnPaymentRequired && newRequest?.addOnCheckoutUrl) {
+        toast.info("Redirecting to secure checkout for your optional add-ons…");
+        window.location.href = newRequest.addOnCheckoutUrl;
+        return;
       }
 
       toast.success("Your idea has been posted!");
@@ -846,7 +876,127 @@ export default function NewRequest() {
             </Card>
           )}
 
-          {/* Card 6: Location & Timing */}
+          {/* Card 6: Optional Add-ons */}
+          <Card className="bg-card border-border/60 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">
+                Optional visibility add-ons
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Posting stays free. These are optional extras to help your request get faster attention.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
+                Base request post: <span className="font-semibold text-foreground">$0.00</span>
+              </div>
+
+              <label className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3 cursor-pointer hover:border-primary/40 transition-colors">
+                <div>
+                  <p className="text-sm font-medium">Priority Boost (48 hours)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Gives your request extra visibility near the top of the board.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.priorityBoostCents)}</span>
+                  <input
+                    type="checkbox"
+                    checked={addOns.priorityBoost}
+                    onChange={(e) =>
+                      setAddOns((prev) => ({
+                        ...prev,
+                        priorityBoost: e.target.checked,
+                      }))
+                    }
+                    className="w-4 h-4 accent-primary rounded"
+                  />
+                </div>
+              </label>
+
+              <label className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3 cursor-pointer hover:border-primary/40 transition-colors">
+                <div>
+                  <p className="text-sm font-medium">Featured Request Badge</p>
+                  <p className="text-xs text-muted-foreground">
+                    Adds a featured label so your request stands out in listings.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.featuredBadgeCents)}</span>
+                  <input
+                    type="checkbox"
+                    checked={addOns.featuredBadge}
+                    onChange={(e) =>
+                      setAddOns((prev) => ({
+                        ...prev,
+                        featuredBadge: e.target.checked,
+                      }))
+                    }
+                    className="w-4 h-4 accent-primary rounded"
+                  />
+                </div>
+              </label>
+
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div>
+                    <p className="text-sm font-medium">Direct Message Credits</p>
+                    <p className="text-xs text-muted-foreground">
+                      Priority intro messages you can send to matching artists.
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold">
+                    {formatUsd(REQUEST_ADDON_PRICING.directMessageCreditCents)} each
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={addOns.directMessageCredits}
+                    onChange={(e) => {
+                      const next = Number(e.target.value || "0");
+                      const safeValue = Number.isFinite(next)
+                        ? Math.max(0, Math.min(20, Math.floor(next)))
+                        : 0;
+                      setAddOns((prev) => ({
+                        ...prev,
+                        directMessageCredits: safeValue,
+                      }));
+                    }}
+                    className="w-28 bg-background/50 border-border/60"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setAddOns((prev) => ({
+                        ...prev,
+                        directMessageCredits:
+                          prev.directMessageCredits +
+                            REQUEST_ADDON_PRICING.directMessageBundleCount <=
+                          20
+                            ? prev.directMessageCredits +
+                              REQUEST_ADDON_PRICING.directMessageBundleCount
+                            : 20,
+                      }))
+                    }
+                  >
+                    +{REQUEST_ADDON_PRICING.directMessageBundleCount} for {formatUsd(REQUEST_ADDON_PRICING.directMessageBundleCents)}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
+                <span className="text-sm text-muted-foreground">Optional add-ons total</span>
+                <span className="text-sm font-semibold">{formatUsd(addOnTotalCents)}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 7: Location & Timing */}
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const appPort = process.env.PORT || "300";
+const appPort = process.env.PORT || "3000";
 const appBaseUrl = process.env.BASE_URL || `http://localhost:${appPort}`;
 const useManagedWebServer = process.env.SKIP_WEB_SERVER !== "1";
 

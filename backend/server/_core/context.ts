@@ -4,6 +4,7 @@ import { supabaseAdmin } from "./supabase";
 import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { COOKIE_NAME } from "@shared/const";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -21,7 +22,7 @@ export async function createContext(
     const authHeader = opts.req.headers.authorization;
     const token =
       authHeader?.replace("Bearer ", "") ||
-      opts.req.cookies?.["sb-access-token"];
+      opts.req.cookies?.[COOKIE_NAME];
 
     if (token) {
       // Verify token with Supabase

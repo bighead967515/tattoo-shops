@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Calendar, CheckCircle, Info } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 
 interface BookingDialogProps {
@@ -43,12 +43,14 @@ export default function BookingDialog({
   };
 
   const [formData, setFormData] = useState(initialFormData);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const createBookingMutation = trpc.bookings.create.useMutation({
     onSuccess: () => {
       toast.success("Booking request sent!");
-      setFormData(initialFormData); // Reset form data
-      onOpenChange(false); // Close dialog on success
+      setFormData(initialFormData);
+      setSubmitError(null);
+      onOpenChange(false);
     },
     onError: (error) => {
       const zodError = (
@@ -59,17 +61,16 @@ export default function BookingDialog({
           | undefined
       )?.zodError;
       if (zodError?.fieldErrors) {
-        const errors = zodError.fieldErrors;
-        for (const field in errors) {
-          const messages = errors[field];
-          if (messages) {
-            toast.error(`${field}: ${messages.join(", ")}`);
-          }
-        }
+        const fieldMessages = Object.entries(zodError.fieldErrors)
+          .flatMap(([field, msgs]) => (msgs ?? []).map((m) => `${field}: ${m}`))
+          .join(" • ");
+        setSubmitError(fieldMessages || "Please check the form and try again.");
       } else {
-        toast.error(
-          error.message ||
-            "Failed to send booking request. Please try again later.",
+        const msg = error.message || "";
+        setSubmitError(
+          msg.includes("network") || msg.includes("fetch")
+            ? "Network error — check your connection and try again."
+            : msg || "Failed to send booking request. Please try again.",
         );
       }
     },
@@ -129,6 +130,7 @@ export default function BookingDialog({
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (submitError) setSubmitError(null);
   };
 
   const isLoading = createBookingMutation.isPending;
@@ -268,6 +270,12 @@ export default function BookingDialog({
           </div>
 
           {/* Submit Button */}
+          {submitError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          )}
           <div className="flex gap-3 pt-4">
             <Button
               type="button"
