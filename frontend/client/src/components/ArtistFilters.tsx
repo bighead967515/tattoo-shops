@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { X } from "lucide-react";
 
 export interface FilterState {
+  shopName: string;
   styles: string[];
   minRating: number;
   minExperience: number;
@@ -60,7 +61,12 @@ export default function ArtistFilters({
     onFiltersChange({ ...filters, [field]: value });
   };
 
+  const handleShopNameChange = (value: string) => {
+    onFiltersChange({ ...filters, shopName: value });
+  };
+
   const hasActiveFilters =
+    filters.shopName ||
     filters.styles.length > 0 ||
     filters.minRating > 0 ||
     filters.minExperience > 0 ||
@@ -85,6 +91,16 @@ export default function ArtistFilters({
       </div>
 
       <div className="space-y-6">
+        {/* Shop */}
+        <div>
+          <h4 className="font-medium mb-3">Shop</h4>
+          <Input
+            placeholder="Shop name"
+            value={filters.shopName}
+            onChange={(e) => handleShopNameChange(e.target.value)}
+          />
+        </div>
+
         {/* Location */}
         <div>
           <h4 className="font-medium mb-3">Location</h4>
@@ -176,6 +192,11 @@ export default function ArtistFilters({
         <div className="mt-6 pt-6 border-t">
           <h4 className="text-sm font-medium mb-2">Active Filters:</h4>
           <div className="flex flex-wrap gap-2">
+            {filters.shopName && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                Shop: {filters.shopName}
+              </span>
+            )}
             {filters.city && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
                 {filters.city}

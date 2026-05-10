@@ -224,6 +224,7 @@ export const appRouter = router({
     search: publicProcedure
       .input(
         z.object({
+          shopName: z.string().optional(),
           styles: z.array(z.string()).optional(),
           minRating: z.number().optional(),
           minExperience: z.number().optional(),

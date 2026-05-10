@@ -31,6 +31,7 @@ export default function ArtistBrowse() {
   );
 
   const [filters, setFilters] = useState<FilterState>({
+    shopName: "",
     styles: [],
     minRating: 0,
     minExperience: 0,
@@ -51,6 +52,7 @@ export default function ArtistBrowse() {
   // Structured filter search (existing)
   const filterSearch = trpc.artists.search.useQuery(
     {
+      shopName: filters.shopName.trim() || undefined,
       styles: filters.styles.length > 0 ? filters.styles : undefined,
       minRating: filters.minRating > 0 ? filters.minRating : undefined,
       minExperience:
@@ -87,6 +89,7 @@ export default function ArtistBrowse() {
 
   const handleClearFilters = () => {
     setFilters({
+      shopName: "",
       styles: [],
       minRating: 0,
       minExperience: 0,
