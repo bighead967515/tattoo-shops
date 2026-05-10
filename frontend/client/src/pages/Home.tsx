@@ -474,10 +474,10 @@ export default function Home() {
               <div>
                 <h4 className="mb-4 font-semibold">Contact</h4>
                 <a
-                  href="mailto:hello@universalinc.pro"
+                  href="mailto:hello@theinkednetwork.website"
                   className="text-sm text-muted-foreground hover:text-primary"
                 >
-                  hello@universalinc.pro
+                  hello@theinkednetwork.website
                 </a>
               </div>
             </div>
