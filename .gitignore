@@ -28,6 +28,10 @@ coverage/
 *.lcov
 .nyc_output
 
+# Playwright test artifacts
+playwright-report/
+test-results/
+
 # Next.js
 /.next/
 /out/

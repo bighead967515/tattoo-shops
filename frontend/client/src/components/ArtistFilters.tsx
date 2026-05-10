@@ -94,7 +94,9 @@ export default function ArtistFilters({
         {/* Shop */}
         <div>
           <h4 className="font-medium mb-3">Shop</h4>
+          <Label htmlFor="shop-name" className="sr-only">Shop name</Label>
           <Input
+            id="shop-name"
             placeholder="Shop name"
             value={filters.shopName}
             onChange={(e) => handleShopNameChange(e.target.value)}

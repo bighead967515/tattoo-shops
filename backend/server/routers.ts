@@ -233,7 +233,12 @@ export const appRouter = router({
         }),
       )
       .query(async ({ input }) => {
-        return await db.searchArtists(input);
+        return await db.searchArtists({
+          ...input,
+          shopName: input.shopName ? sanitizeInput(input.shopName, 255) : undefined,
+          city: input.city ? sanitizeInput(input.city, 100) : undefined,
+          state: input.state ? sanitizeInput(input.state, 50) : undefined,
+        });
       }),
 
     /**

@@ -249,8 +249,8 @@ export default function RequestDetail() {
     (b: BidType) => b.artist.userId === user?.id,
   );
   // Per-tier monthly bid quota logic
-  const isFreeTier = isFreeArtistTier(artistProfile?.subscriptionTier);
-  const canonicalTier = (artistProfile?.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
+  const canonicalTier = (isArtist ? (artistProfile?.subscriptionTier ?? "artist_free") : "artist_free") as ArtistCanonicalTier;
+  const isFreeTier = isFreeArtistTier(canonicalTier);
   const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
   const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
   const bidsPerMonth = tierLimits.bidsPerMonth;
@@ -345,9 +345,9 @@ export default function RequestDetail() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-2xl" style={detailTitleStyle}>
+                  <h1 className="text-2xl font-semibold leading-none tracking-tight" style={detailTitleStyle}>
                     {request.title}
-                  </CardTitle>
+                  </h1>
                   <CardDescription className="flex items-center gap-2 mt-2">
                     <User className="h-4 w-4" />
                     Posted by {requestClientName}
