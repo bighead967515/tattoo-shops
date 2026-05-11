@@ -43,9 +43,10 @@ export default defineConfig({
   webServer: useManagedWebServer
     ? {
         command:
-          "node -r dotenv/config ./node_modules/tsx/dist/cli.mjs watch backend/server/_core/index.ts dotenv_config_path=.env",
+          "cross-env NODE_ENV=test node -r dotenv/config dist/index.js dotenv_config_path=.env",
         url: `${appBaseUrl}/api/health`,
-        reuseExistingServer: !process.env.CI,
+        timeout: 120000,
+        reuseExistingServer: false,
         stdout: "ignore",
         stderr: "pipe",
       }

@@ -8,7 +8,7 @@ const plugins: PluginOption[] = [react(), tailwindcss()];
 
 if (process.env.VITE_ENABLE_JSX_LOC === "true") {
   plugins.push(jsxLocPlugin());
-}
+}ost important ambiguities to finalize:
 
 export default defineConfig({
   plugins,

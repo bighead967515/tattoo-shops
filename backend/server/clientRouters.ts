@@ -880,7 +880,7 @@ export const bidsRouter = router({
     }));
   }),
 
-  // AI Bid Assistant — draft a bid response (Professional/Icon tier only)
+  // AI Bid Assistant — draft a bid response (Pro subscription/Icon tier only)
   draftBid: protectedProcedure
     .input(z.object({ requestId: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -906,7 +906,7 @@ export const bidsRouter = router({
         throw new TRPCError({
           code: "FORBIDDEN",
           message:
-            "AI Bid Assistant is available for Professional and Icon tier artists. Upgrade to access this feature.",
+            "AI Bid Assistant is available for Pro subscription and Icon tier artists. Upgrade to access this feature.",
         });
       }
 

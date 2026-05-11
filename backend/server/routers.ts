@@ -224,6 +224,7 @@ export const appRouter = router({
     search: publicProcedure
       .input(
         z.object({
+          shopName: z.string().optional(),
           styles: z.array(z.string()).optional(),
           minRating: z.number().optional(),
           minExperience: z.number().optional(),
@@ -232,7 +233,19 @@ export const appRouter = router({
         }),
       )
       .query(async ({ input }) => {
-        return await db.searchArtists(input);
+        const normalizeText = (value?: string, maxLen = 100) => {
+          if (!value) return undefined;
+          const trimmed = value.trim();
+          if (!trimmed) return undefined;
+          return trimmed.slice(0, maxLen);
+        };
+
+        return await db.searchArtists({
+          ...input,
+          shopName: normalizeText(input.shopName),
+          city: normalizeText(input.city),
+          state: normalizeText(input.state, 50),
+        });
       }),
 
     /**

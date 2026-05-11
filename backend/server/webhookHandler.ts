@@ -575,7 +575,7 @@ async function handleSubscriptionCancelled(
       await tx
         .update(artists)
         .set({
-          subscriptionTier: "free",
+          subscriptionTier: "artist_free",
           updatedAt: new Date(),
         })
         .where(eq(artists.userId, user.id));

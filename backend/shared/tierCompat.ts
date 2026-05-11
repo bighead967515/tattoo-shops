@@ -13,9 +13,9 @@ export type LegacyArtistTier =
 
 const FREE_ARTIST_TIERS = ["artist_free", "free"] as const;
 const AI_BID_ASSISTANT_TIERS = [
-  "artist_pro",
+  "artist_amateur",
   "artist_icon",
-  "professional",
+  "amateur",
   "frontPage",
 ] as const;
 

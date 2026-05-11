@@ -249,8 +249,10 @@ export default function RequestDetail() {
     (b: BidType) => b.artist.userId === user?.id,
   );
   // Per-tier monthly bid quota logic
-  const isFreeTier = isFreeArtistTier(artistProfile?.subscriptionTier);
-  const canonicalTier = (artistProfile?.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
+  const effectiveArtistTier =
+    user?.subscriptionTier ?? artistProfile?.subscriptionTier ?? "artist_free";
+  const isFreeTier = isFreeArtistTier(effectiveArtistTier);
+  const canonicalTier = effectiveArtistTier as ArtistCanonicalTier;
   const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
   const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
   const bidsPerMonth = tierLimits.bidsPerMonth;
@@ -1000,10 +1002,10 @@ export default function RequestDetail() {
                           </DialogDescription>
                         </DialogHeader>
 
-                        {/* AI Bid Assistant — Professional/Icon tier only */}
+                        {/* AI Bid Assistant — Pro subscription/Icon tier only */}
                         {artistProfile &&
                           canUseAiBidAssistant(
-                            artistProfile.subscriptionTier,
+                            effectiveArtistTier,
                           ) && (
                             <Button
                               type="button"

@@ -204,7 +204,7 @@ export const verificationRouter = router({
     .mutation(async ({ ctx, input }) => {
       return await dbFns.reviewVerificationDocument(input.documentId, {
         status: input.decision,
-        reviewedBy: ctx.user.id,
+        reviewedBy: ctx.user!.id,
         reviewNotes: input.notes,
       });
     }),

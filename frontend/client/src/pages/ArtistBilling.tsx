@@ -26,7 +26,7 @@ interface PlanDef {
   monthlyPrice: number; // cents
   yearlyPrice: number;  // cents
   transactionFee: string | null;
-  stripeTierArg: "artist_amateur" | "artist_pro" | "artist_icon" | null;
+  stripeTierArg: "artist_amateur" | "artist_icon" | null;
   badge: string | null;
   isMostPopular: boolean;
   isFounder: boolean;
@@ -68,7 +68,7 @@ const PLANS: PlanDef[] = [
     monthlyPrice: 0,
     yearlyPrice: 0,
     transactionFee: "10% on accepted bids",
-    stripeTierArg: "artist_pro",
+    stripeTierArg: null,
     badge: "No subscription",
     isMostPopular: false,
     isFounder: false,

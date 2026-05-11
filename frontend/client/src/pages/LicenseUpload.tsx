@@ -9,8 +9,9 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 
-const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+type AllowedMimeType = (typeof ALLOWED_TYPES)[number];
 
 export default function LicenseUpload() {
   const [, setLocation] = useLocation();
@@ -51,10 +52,12 @@ export default function LicenseUpload() {
       return;
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!(ALLOWED_TYPES as readonly string[]).includes(file.type)) {
       toast.error("File must be PDF, PNG, or JPG.");
       return;
     }
+
+    const mimeType = file.type as AllowedMimeType;
 
     setIsUploading(true);
 
@@ -62,7 +65,7 @@ export default function LicenseUpload() {
       // 1. Get signed upload URL from our backend
       const { signedUrl, path } = await getUploadUrlMutation.mutateAsync({
         fileName: file.name,
-        contentType: file.type,
+        contentType: mimeType,
         fileSize: file.size,
       });
 
@@ -96,7 +99,7 @@ export default function LicenseUpload() {
         documentType: "state_license",
         originalFileName: file.name,
         fileSize: file.size,
-        mimeType: file.type,
+        mimeType,
       });
 
       toast.success(

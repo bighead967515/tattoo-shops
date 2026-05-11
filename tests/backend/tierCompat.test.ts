@@ -19,11 +19,13 @@ describe("tier compatibility helpers", () => {
     expect(isFreeArtistTier("artist_pro")).toBe(false);
   });
 
-  it("allows AI bid assistant for pro/icon canonical and legacy tiers", () => {
-    expect(canUseAiBidAssistant("artist_pro")).toBe(true);
+  it("allows AI bid assistant for amateur/icon canonical and legacy tiers", () => {
+    expect(canUseAiBidAssistant("artist_amateur")).toBe(true);
     expect(canUseAiBidAssistant("artist_icon")).toBe(true);
-    expect(canUseAiBidAssistant("professional")).toBe(true);
+    expect(canUseAiBidAssistant("amateur")).toBe(true);
     expect(canUseAiBidAssistant("frontPage")).toBe(true);
+    expect(canUseAiBidAssistant("artist_pro")).toBe(false);
+    expect(canUseAiBidAssistant("professional")).toBe(false);
     expect(canUseAiBidAssistant("artist_free")).toBe(false);
   });
 
