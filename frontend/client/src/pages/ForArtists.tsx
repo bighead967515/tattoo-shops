@@ -41,37 +41,35 @@ export default function ForArtists() {
       <section className="relative bg-gradient-to-br from-background via-background to-primary/10 border-b py-24">
         <div className="container max-w-5xl mx-auto text-center space-y-6 px-4">
           <Badge className="mb-2 px-4 py-1 text-sm bg-primary/20 text-primary border-primary/30">
-            🎨 Founding Artist Program — Limited Spots
+            Cover-up specialists wanted
           </Badge>
-          <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-            Get Discovered.<br />
-            <span className="text-primary">Receive Client Bids.</span><br />
-            Manage Your Bookings.
+          <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+            Find clients who are actively looking for
+            <span className="text-primary"> cover-ups and reworks.</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Ink Connect connects serious tattoo artists with clients who are ready to book.
-            Join 8 artists already on the platform — free to start, no credit card required.
+            Ink Connect helps artists who do complex cover-up work attract better-fit clients and respond to requests with clear project details.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
             <Button
               size="lg"
-              className="text-lg px-10 py-6 shadow-lg shadow-primary/20"
+              className="w-full text-lg px-10 py-6 shadow-lg shadow-primary/20 sm:w-auto"
               onClick={() => setLocation("/artist/register")}
             >
-              Join as a Founding Artist
+              Join as a cover-up artist
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
             <Button
               size="lg"
               variant="outline"
-              className="text-lg px-10 py-6"
+              className="w-full text-lg px-10 py-6 sm:w-auto"
               onClick={() => setLocation("/artists")}
             >
               See Artist Directory
             </Button>
           </div>
           <p className="text-sm text-muted-foreground pt-2">
-            ✓ Free to join &nbsp;·&nbsp; ✓ No setup fees &nbsp;·&nbsp; ✓ Cancel anytime
+            Build trust with better-fit requests and clearer client intent.
           </p>
         </div>
       </section>
@@ -86,7 +84,7 @@ export default function ForArtists() {
               </div>
               <h3 className="text-lg font-bold mb-2">Clients Come to You</h3>
               <p className="text-sm text-muted-foreground">
-                Clients post their tattoo ideas with budgets. You browse requests in your style and send bids — no cold outreach needed.
+                Clients submit structured cover-up requests so you can focus on finding and responding to projects that match your style.
               </p>
             </div>
             <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-muted/30 border border-border/60 hover:border-primary/40 transition-all group">
@@ -95,7 +93,7 @@ export default function ForArtists() {
               </div>
               <h3 className="text-lg font-bold mb-2">Get Paid Securely</h3>
               <p className="text-sm text-muted-foreground">
-                Stripe-powered payments with deposit collection built in. No chasing invoices — funds are held and released automatically.
+                Use built-in booking and payment tools so clients can move from request to confirmed work with less friction.
               </p>
             </div>
             <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-muted/30 border border-border/60 hover:border-primary/40 transition-all group">
@@ -104,7 +102,7 @@ export default function ForArtists() {
               </div>
               <h3 className="text-lg font-bold mb-2">Build Your Reputation</h3>
               <p className="text-sm text-muted-foreground">
-                Verified reviews, a public portfolio page, and a Verified Artist badge that signals trust to every client who finds you.
+                Show portfolio proof, communicate your process clearly, and build trust with clients who care about cover-up results.
               </p>
             </div>
           </div>
@@ -122,7 +120,7 @@ export default function ForArtists() {
               The Founding Artist Offer
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              The first 50 artists who join get locked-in pricing and exclusive perks — forever.
+              Early artists can unlock long-term pricing and extra visibility perks.
             </p>
           </div>
 
@@ -158,7 +156,7 @@ export default function ForArtists() {
                   className="w-full text-lg py-6 shadow-lg shadow-primary/20"
                   onClick={() => setLocation("/artist/register")}
                 >
-                  Claim Your Founding Spot
+                  Join as a cover-up artist
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
                 <p className="text-xs text-muted-foreground">
@@ -261,16 +259,16 @@ export default function ForArtists() {
       <section className="py-24">
         <div className="container max-w-3xl mx-auto px-4 text-center space-y-6">
           <Palette className="w-12 h-12 text-primary mx-auto" />
-          <h2 className="text-4xl font-bold">Ready to grow your clientele?</h2>
+          <h2 className="text-4xl font-bold">Ready to win more cover-up projects?</h2>
           <p className="text-xl text-muted-foreground">
-            Join 8 artists already on Ink Connect. Takes less than 2 minutes to get started.
+            Join Ink Connect and connect with clients who are actively requesting cover-up and rework work.
           </p>
           <Button
             size="lg"
-            className="text-lg px-12 py-6 shadow-lg shadow-primary/20"
+            className="w-full text-lg px-12 py-6 shadow-lg shadow-primary/20 sm:w-auto"
             onClick={() => setLocation("/artist/register")}
           >
-            Create Your Artist Profile
+            Join as a cover-up artist
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <p className="text-sm text-muted-foreground">

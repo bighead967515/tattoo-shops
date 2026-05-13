@@ -282,8 +282,11 @@ app.use(
   const startServer = async () => {
     // Initialize Supabase Storage buckets on startup
     try {
-      await initializeBuckets();
-      logger.info("Supabase storage buckets initialized successfully");
+      const storageInit = await initializeBuckets();
+      logger.info("Supabase storage buckets initialized successfully", {
+        existing: storageInit.existing,
+        created: storageInit.created,
+      });
     } catch (error) {
       logger.error("Failed to initialize storage buckets", { error });
     }

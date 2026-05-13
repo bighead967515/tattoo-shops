@@ -18,143 +18,112 @@ import {
 
 const audienceLanes = [
   {
-    title: "Looking for a tattoo artist?",
+    title: "Specialize in cover-ups?",
     body:
-      "Describe your idea, upload a few references, and let local artists come to you. Compare portfolios, styles, and real quotes, then pick the one that feels right.",
-    cta: "Post a Request",
-    href: "/client/new-request",
-    icon: FileText,
+      "Review clear request details, respond with your approach, and focus on cover-up projects that match your style and process.",
+    cta: "Join as a cover-up artist",
+    href: "/for-artists",
+    icon: Palette,
   },
   {
-    title: "Looking to fill your books?",
+    title: "Need a cover-up or rework?",
     body:
-      "Browse client requests that match your style, send quotes on projects you actually want, and grow your client base without chasing leads or paying for ads.",
-    cta: "Apply as an Artist",
-    href: "/artist/register",
-    icon: Palette,
+      "Share your current tattoo, your goals, and your timeline. Artists with relevant experience can respond with realistic next-step options.",
+    cta: "Start your cover-up request",
+    href: "/client/new-request",
+    icon: FileText,
   },
 ];
 
 const clientSteps = [
   {
-    title: "Describe your idea",
+    title: "Share what you have now",
     body:
-      "Tell us what you're thinking, style, placement, size, vibe. Upload any references you've got. The more detail, the better the quotes.",
+      "Upload photos and include placement, size, and what you want to change. Better details help artists evaluate your options faster.",
     icon: FileText,
   },
   {
-    title: "Get quotes from real artists",
+    title: "Get responses from specialists",
     body:
-      "Artists near you who do your style will review your post and send quotes. You'll see their portfolio, their message, and their price, all in one place.",
+      "Artists review your request and respond with their approach, timeline, and scope. You can compare fit before deciding on next steps.",
     icon: MessageSquare,
   },
   {
-    title: "Book the right one",
+    title: "Choose your next step",
     body:
-      "Pick the artist that feels like the best fit. No commitment until you're ready. No pressure.",
+      "Review portfolios, ask follow-up questions, and move forward when you are ready. There is no pressure to commit immediately.",
     icon: CheckCircle,
   },
 ];
 
 const artistSteps = [
   {
-    title: "Build your profile",
+    title: "Show your cover-up proof",
     body:
-      "Showcase your portfolio, tag your styles, and set your location. We review every artist before they go live, so the clients who find you know you're the real deal.",
+      "Present work that reflects your process and style strengths so clients can assess whether you are the right fit for their request.",
     icon: Palette,
   },
   {
-    title: "Browse client requests",
+    title: "Review detailed requests",
     body:
-      "See what people in your area are looking for. Filter by style, placement, and budget. Send a quote when you see a project worth your time.",
+      "See project details before responding, including placement, style goals, budget range, and timeline preferences.",
     icon: MapPin,
   },
   {
-    title: "Grow your books your way",
+    title: "Respond with clarity",
     body:
-      "You set your price. You choose your projects. Ink Connect just connects the dots.",
+      "Share your recommended approach and expected scope so clients can make informed decisions and you can focus on better-fit work.",
     icon: Calendar,
   },
 ];
 
 const whyInkConnect = [
   {
-    title: "Hand-picked artists",
+    title: "Built for cover-up decisions",
     body:
-      "Every artist on the platform is individually reviewed. No random listings, no unvetted accounts.",
+      "Requests capture details that matter for cover-ups, so artists can respond with useful guidance instead of generic replies.",
     icon: Star,
   },
   {
-    title: "Real quotes, not estimates",
+    title: "Portfolio-first trust",
     body:
-      "Artists send quotes based on your actual idea, not a generic price list. You know what you're getting into before you book.",
+      "Clients can evaluate artist work and approach before choosing who to contact next.",
     icon: Wallet,
   },
   {
-    title: "You're in control",
+    title: "Clear process on both sides",
     body:
-      "Browse at your own pace. Compare as many quotes as you want. Nobody's pushing you to book before you're ready.",
+      "Clients submit structured requests. Artists respond with specifics. Everyone saves time by starting with better information.",
     icon: Award,
   },
   {
-    title: "Safe studios, verified work",
+    title: "Practical expectations",
     body:
-      "All listed studios meet health and safety standards. Verified reviews come from clients with real bookings, not anonymous posts.",
+      "Cover-ups vary by tattoo and goals. Ink Connect is designed to support realistic planning, not one-size-fits-all promises.",
     icon: Shield,
-  },
-];
-
-const clientTestimonials = [
-  {
-    quote:
-      '"I posted my idea on a Tuesday and had three quotes by Thursday. The artist I picked nailed exactly what I had in mind."',
-    byline: "Client Name, City",
-  },
-  {
-    quote:
-      "\"I'd been trying to find someone who does Japanese traditional for months. Posted on Ink Connect and found them in two days.\"",
-    byline: "Client Name, City",
-  },
-  {
-    quote:
-      '"It made the whole process way less stressful. I could compare portfolios and prices without feeling pressured."',
-    byline: "Client Name, City",
-  },
-];
-
-const artistTestimonials = [
-  {
-    quote:
-      '"I get to pick the projects I actually want to do. That alone is worth it."',
-    byline: "Artist Name, Style, City",
-  },
-  {
-    quote:
-      '"My books have been full for three months straight. Most of those bookings came through Ink Connect."',
-    byline: "Artist Name, Style, City",
   },
 ];
 
 const faqs = [
   {
-    question: "Is it really free to post a request?",
+    question: "What if my tattoo is very dark or complex?",
     answer:
-      "Yes. Posting your tattoo idea and receiving quotes is completely free for clients.",
+      "Artists can review your details and explain whether direct cover-up may be possible or whether a staged approach may be more realistic.",
   },
   {
-    question: "How are artists vetted?",
+    question: "I do not know how to describe what I want. Can I still start?",
     answer:
-      "Every artist goes through a manual review before their profile goes live. We check portfolio quality, professionalism, and studio standards, not just follower counts.",
+      "Yes. The request flow prompts you through the key details artists need to give useful responses.",
   },
   {
-    question: "Do I have to book once I get quotes?",
+    question: "Do I have to commit once artists respond?",
     answer:
-      "Not at all. You can receive quotes, compare artists, and take your time. There's no obligation until you decide to move forward.",
+      "No. You can compare options and decide when or whether to move forward.",
   },
   {
-    question: "I'm an artist, is there a commission on bookings?",
+    question: "I am an artist. Are requests detailed enough to evaluate fit?",
     answer:
-      "No commission on quotes. You work out the booking details directly with your client through Ink Connect.",
+      "Requests include core details like placement, style goals, timing, and budget range so you can respond with more clarity.",
   },
 ];
 
@@ -170,34 +139,34 @@ export default function Home() {
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.28em] text-primary/80">
               Ink Connect
             </p>
-            <h1 className="mb-6 text-4xl font-bold leading-tight md:text-6xl">
-              Your next tattoo starts with the right artist.
+            <h1 className="mb-6 text-3xl font-bold leading-tight sm:text-4xl md:text-6xl">
+              Cover-up work needs a clear plan and the right artist.
             </h1>
             <p className="mx-auto mb-8 max-w-3xl text-lg text-muted-foreground md:text-2xl">
-              Post your idea, get quotes from vetted artists near you, and book the one that fits your style and your budget. No guesswork. No cold DMs.
+              Ink Connect helps clients submit better cover-up requests and helps artists find serious clients actively looking for cover-up specialists.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button
                 size="lg"
                 onClick={() => setLocation("/client/new-request")}
-                className="px-8 py-6 text-lg"
+                className="w-full px-8 py-6 text-lg sm:w-auto"
               >
-                Post Your Idea, It's Free
+                Start your cover-up request
               </Button>
               <Button
                 size="lg"
                 variant="link"
-                onClick={() => setLocation("/artists")}
+                onClick={() => setLocation("/for-artists")}
                 className="h-auto px-0 text-base text-foreground"
               >
-                Browse Artist Portfolios
+                I'm a cover-up artist
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
 
             <p className="mt-5 text-sm text-muted-foreground">
-              Clients in Louisiana and beyond are already getting quotes. Join them.
+              Built for both sides: clients who need a better next step and artists who want better-fit cover-up clients.
             </p>
           </div>
         </div>
@@ -233,12 +202,12 @@ export default function Home() {
       <section id="how-it-works" className="container py-20">
         <div className="mx-auto mb-12 max-w-3xl text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Here's how it works for clients
+            How artists find better-fit clients
           </h2>
         </div>
 
         <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
-          {clientSteps.map(({ title, body, icon: Icon }, index) => (
+          {artistSteps.map(({ title, body, icon: Icon }, index) => (
             <Card key={title} className="rounded-3xl border-border/60 p-8">
               <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Icon className="h-7 w-7" />
@@ -253,8 +222,8 @@ export default function Home() {
         </div>
 
         <div className="mt-10 text-center">
-          <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
-            Post Your Idea, It's Free
+          <Button size="lg" className="w-full sm:w-auto" variant="outline" onClick={() => setLocation("/artist/register")}> 
+            Join as a cover-up artist
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -264,12 +233,12 @@ export default function Home() {
         <div className="container py-20">
           <div className="mx-auto mb-12 max-w-3xl text-center">
             <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-              Here's how it works for artists
+              How it works for clients
             </h2>
           </div>
 
           <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
-            {artistSteps.map(({ title, body, icon: Icon }, index) => (
+            {clientSteps.map(({ title, body, icon: Icon }, index) => (
               <Card key={title} className="rounded-3xl border-border/60 bg-background p-8">
                 <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Icon className="h-7 w-7" />
@@ -284,8 +253,8 @@ export default function Home() {
           </div>
 
           <div className="mt-10 text-center">
-            <Button size="lg" variant="outline" onClick={() => setLocation("/artist/register")}> 
-              Apply to Join as an Artist
+            <Button size="lg" className="w-full sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
+              Start your cover-up request
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -295,7 +264,7 @@ export default function Home() {
       <section className="container py-20">
         <div className="mx-auto mb-12 max-w-3xl text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Why people use Ink Connect
+            Why clients and artists use Ink Connect for cover-up work
           </h2>
         </div>
 
@@ -316,30 +285,15 @@ export default function Home() {
         <div className="container py-20">
           <div className="mb-12 text-center">
             <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-              What clients are saying
+              Questions people ask before starting
             </h2>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            {clientTestimonials.map(({ quote, byline }) => (
-              <Card key={quote} className="rounded-3xl border-border/60 bg-background p-8">
-                <p className="mb-5 text-lg leading-8">{quote}</p>
-                <p className="text-sm font-medium text-muted-foreground">{byline}</p>
-              </Card>
-            ))}
-          </div>
-
-          <div className="mt-20 mb-12 text-center">
-            <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-              What artists are saying
-            </h2>
-          </div>
-
-          <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
-            {artistTestimonials.map(({ quote, byline }) => (
-              <Card key={quote} className="rounded-3xl border-border/60 bg-background p-8">
-                <p className="mb-5 text-lg leading-8">{quote}</p>
-                <p className="text-sm font-medium text-muted-foreground">{byline}</p>
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+            {faqs.map(({ question, answer }) => (
+              <Card key={question} className="rounded-3xl border-border/60 bg-background p-8">
+                <h3 className="mb-3 text-lg font-semibold">{question}</h3>
+                <p className="text-muted-foreground">{answer}</p>
               </Card>
             ))}
           </div>
@@ -370,45 +324,28 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="container py-20">
-        <div className="mb-12 text-center">
-          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            A few things people ask before signing up
-          </h2>
-        </div>
-
-        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
-          {faqs.map(({ question, answer }) => (
-            <Card key={question} className="rounded-3xl border-border/60 p-8">
-              <h3 className="mb-3 text-lg font-semibold">{question}</h3>
-              <p className="text-muted-foreground">{answer}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
       <section className="container pb-20">
         <Card className="rounded-[2rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-12 text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Ready to find your match?
+            Ready to move forward on your cover-up?
           </h2>
           <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground">
-            Whether you're looking for your next tattoo or your next client, Ink Connect is where that starts.
+            Submit your request as a client, or join as an artist to connect with people actively looking for cover-up specialists.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
-              Post Your Idea, It's Free
+            <Button size="lg" className="w-full sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
+              Start your cover-up request
             </Button>
             <Button
               size="lg"
               variant="outline"
               onClick={() => setLocation("/artist/register")}
             >
-              Apply as an Artist
+              Join as a cover-up artist
             </Button>
           </div>
           <p className="mt-5 text-sm text-muted-foreground">
-            No pressure. No spam. Just the right connection.
+            Clear request details. Realistic responses. No pressure to commit right away.
           </p>
         </Card>
       </section>
@@ -419,7 +356,7 @@ export default function Home() {
             <div>
               <h3 className="mb-3 text-2xl font-bold">Ink Connect</h3>
               <p className="text-muted-foreground">
-                Ink Connect, Where ideas meet artists.
+                Ink Connect helps clients and artists connect around clear, realistic cover-up planning.
               </p>
             </div>
 
@@ -435,6 +372,16 @@ export default function Home() {
                   <li>
                     <Link href="/client/new-request" className="hover:text-primary">
                       Post a Request
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/cover-ups" className="hover:text-primary">
+                      Cover-Up Help
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/request-flow" className="hover:text-primary">
+                      Request Flow
                     </Link>
                   </li>
                   <li>

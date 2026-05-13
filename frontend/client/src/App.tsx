@@ -35,6 +35,8 @@ import ResetPassword from "./pages/ResetPassword";
 import ArtistBilling from "./pages/ArtistBilling";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import ArtistRegister from "./pages/ArtistRegister";
+import CoverUps from "./pages/CoverUps";
+import RequestFlow from "./pages/RequestFlow";
 
 function Router() {
   return (
@@ -44,6 +46,8 @@ function Router() {
       <Route path="/artists" component={ArtistBrowse} />
       <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/for-artists" component={ForArtists} />
+      <Route path="/cover-ups" component={CoverUps} />
+      <Route path="/request-flow" component={RequestFlow} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/artist-dashboard" component={ArtistDashboard} />
       <Route path="/login" component={Login} />
@@ -88,6 +92,8 @@ function usesPageHeader(path: string) {
     path === "/artists" ||
     path.startsWith("/artist/") ||
     path === "/for-artists" ||
+    path === "/cover-ups" ||
+    path === "/request-flow" ||
     path === "/dashboard" ||
     path === "/artist-dashboard" ||
     path === "/help" ||
