@@ -35,6 +35,21 @@ import {
   TIER_LIMITS as UNIFIED_TIER_LIMITS,
 } from "./const";
 
+function readRuntimeEnv(key: string): string | null {
+  if (typeof process !== "undefined" && process.env?.[key]) {
+    return process.env[key] ?? null;
+  }
+
+  const viteEnv = (import.meta as any)?.env as
+    | Record<string, string | undefined>
+    | undefined;
+  if (viteEnv?.[key]) {
+    return viteEnv[key] ?? null;
+  }
+
+  return null;
+}
+
 // Re-export for consumers that import from this file
 export { SubscriptionTiers, UNIFIED_TIER_LIMITS };
 export type { SubscriptionTier };
@@ -240,11 +255,11 @@ export const CLIENT_TIER_PRICING = {
   },
   client_plus: {
     monthly: 900, // $9.00
-    stripePriceIdMonth: process.env.STRIPE_CLIENT_PLUS_PRICE_ID ?? null,
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID"),
   },
   client_elite: {
     monthly: 1900, // $19.00
-    stripePriceIdMonth: process.env.STRIPE_CLIENT_ELITE_PRICE_ID ?? null,
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID"),
   },
 } as const;
 

@@ -56,6 +56,7 @@ export default function ArtistDashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const {
     data: artist,
@@ -91,7 +92,16 @@ export default function ArtistDashboard() {
     onSuccess: () => {
       refetchPortfolio();
       setIsUploading(false);
+      setUploadProgress(null);
+      setUploadError(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success("Image added to portfolio!");
+    },
+    onError: (err) => {
+      setIsUploading(false);
+      setUploadProgress(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploadError(err.message || "Failed to save image. Tap Retry to try again.");
     },
   });
 
@@ -175,6 +185,7 @@ export default function ArtistDashboard() {
 
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadError(null);
     try {
       // 1. Get signed upload URL
       const { signedUrl, path } = await getUploadUrlMutation.mutateAsync({
@@ -207,9 +218,16 @@ export default function ArtistDashboard() {
       });
     } catch (error) {
       console.error(error);
-      toast.error("Failed to upload image");
       setIsUploading(false);
       setUploadProgress(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      const message =
+        error instanceof Error ? error.message : "Upload failed";
+      setUploadError(
+        message.includes("network") || message.includes("fetch")
+          ? "Network error — check your connection and retry."
+          : "Failed to upload image. Tap Retry to try again.",
+      );
     }
   };
 
@@ -396,8 +414,25 @@ export default function ArtistDashboard() {
             </div>
             {isUploading && uploadProgress !== null && (
               <div className="space-y-2">
-                <Label>Uploading...</Label>
+                <Label>Uploading… {uploadProgress}%</Label>
                 <Progress value={uploadProgress} className="w-full" />
+              </div>
+            )}
+            {uploadError && (
+              <div className="flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <span className="flex-1">{uploadError}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    setUploadError(null);
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  Retry
+                </Button>
               </div>
             )}
 
@@ -405,10 +440,20 @@ export default function ArtistDashboard() {
               {portfolioLoading ? (
                 <p>Loading portfolio...</p>
               ) : portfolio?.length === 0 ? (
-                <div className="col-span-full py-12 text-center bg-muted/30 border border-dashed rounded-lg">
+                <div className="col-span-full py-12 text-center bg-muted/30 border border-dashed rounded-lg space-y-3">
                   <p className="text-muted-foreground">
-                    Your portfolio is empty. Add your best work!
+                    Your portfolio is empty. Add your best work to attract clients!
                   </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Upload Your First Image
+                  </Button>
                 </div>
               ) : (
                 portfolio?.map((image) => {

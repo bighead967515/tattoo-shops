@@ -32,6 +32,12 @@ const BUCKET_CONFIGS = [
   },
 ];
 
+type BucketInitSummary = {
+  existing: string[];
+  created: string[];
+  failed: Array<{ name: string; message: string }>;
+};
+
 /**
  * Supabase Storage helpers
  */
@@ -192,7 +198,7 @@ export async function listFiles(bucketName: string, path: string) {
  * Initialize all storage buckets defined in BUCKET_CONFIGS
  * Creates each bucket if it doesn't exist with its specified settings.
  */
-export async function initializeBuckets() {
+export async function initializeBuckets(): Promise<BucketInitSummary> {
   const { data: existingBuckets, error: listError } =
     await supabaseAdmin.storage.listBuckets();
 
@@ -200,6 +206,12 @@ export async function initializeBuckets() {
     console.error("[Storage] Failed to list buckets:", listError);
     throw new Error(`Failed to list storage buckets: ${listError.message}`);
   }
+
+  const summary: BucketInitSummary = {
+    existing: [],
+    created: [],
+    failed: [],
+  };
 
   for (const config of BUCKET_CONFIGS) {
     const bucketExists = existingBuckets.some((b) => b.name === config.name);
@@ -219,10 +231,29 @@ export async function initializeBuckets() {
           `[Storage] Failed to create bucket "${config.name}":`,
           createError,
         );
-        // Don't throw, just log the error and continue, so one failure doesn't stop others
+        const statusCode = (createError as { statusCode?: string }).statusCode;
+        const permissionHint =
+          statusCode === "403"
+            ? " Check SUPABASE_SERVICE_KEY on this environment; bucket creation requires a service_role key."
+            : "";
+
+        summary.failed.push({
+          name: config.name,
+          message: `${createError.message}.${permissionHint}`.trim(),
+        });
       } else {
         console.log(`[Storage] Bucket "${config.name}" created successfully.`);
+        summary.created.push(config.name);
       }
+    } else {
+      summary.existing.push(config.name);
     }
   }
+
+  if (summary.failed.length > 0) {
+    const failedBuckets = summary.failed.map((f) => f.name).join(", ");
+    throw new Error(`Storage bucket initialization failed for: ${failedBuckets}`);
+  }
+
+  return summary;
 }

@@ -48,7 +48,7 @@ export const verificationRouter = router({
     .input(
       z.object({
         fileName: z.string(),
-        contentType: z.string(),
+        contentType: z.enum(["image/jpeg", "image/png", "application/pdf"]),
         fileSize: z.number(),
       }),
     )
@@ -79,7 +79,7 @@ export const verificationRouter = router({
         documentType: z.string(),
         originalFileName: z.string(),
         fileSize: z.number(),
-        mimeType: z.string(),
+        mimeType: z.enum(["image/jpeg", "image/png", "application/pdf"]),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -202,16 +202,9 @@ export const verificationRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Authentication required",
-        });
-      }
-
       return await dbFns.reviewVerificationDocument(input.documentId, {
         status: input.decision,
-        reviewedBy: ctx.user.id,
+        reviewedBy: ctx.user!.id,
         reviewNotes: input.notes,
       });
     }),

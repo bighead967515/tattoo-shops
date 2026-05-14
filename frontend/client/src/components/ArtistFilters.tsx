@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { X } from "lucide-react";
 
 export interface FilterState {
+  shopName: string;
   styles: string[];
   minRating: number;
   minExperience: number;
@@ -18,6 +19,21 @@ interface ArtistFiltersProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   onClearFilters: () => void;
+}
+
+export function normalizeFilterText(value: string): string {
+  return value.trim();
+}
+
+export function hasActiveFilterValues(filters: FilterState): boolean {
+  return (
+    normalizeFilterText(filters.shopName).length > 0 ||
+    filters.styles.length > 0 ||
+    filters.minRating > 0 ||
+    filters.minExperience > 0 ||
+    normalizeFilterText(filters.city).length > 0 ||
+    normalizeFilterText(filters.state).length > 0
+  );
 }
 
 const TATTOO_STYLES = [
@@ -60,12 +76,14 @@ export default function ArtistFilters({
     onFiltersChange({ ...filters, [field]: value });
   };
 
-  const hasActiveFilters =
-    filters.styles.length > 0 ||
-    filters.minRating > 0 ||
-    filters.minExperience > 0 ||
-    filters.city ||
-    filters.state;
+  const handleShopNameChange = (value: string) => {
+    onFiltersChange({ ...filters, shopName: value });
+  };
+
+  const trimmedShopName = normalizeFilterText(filters.shopName);
+  const trimmedCity = normalizeFilterText(filters.city);
+  const trimmedState = normalizeFilterText(filters.state);
+  const hasActiveFilters = hasActiveFilterValues(filters);
 
   return (
     <Card className="p-6 sticky top-20">
@@ -85,6 +103,16 @@ export default function ArtistFilters({
       </div>
 
       <div className="space-y-6">
+        {/* Shop */}
+        <div>
+          <h4 className="font-medium mb-3">Shop</h4>
+          <Input
+            placeholder="Shop name"
+            value={filters.shopName}
+            onChange={(e) => handleShopNameChange(e.target.value)}
+          />
+        </div>
+
         {/* Location */}
         <div>
           <h4 className="font-medium mb-3">Location</h4>
@@ -176,14 +204,19 @@ export default function ArtistFilters({
         <div className="mt-6 pt-6 border-t">
           <h4 className="text-sm font-medium mb-2">Active Filters:</h4>
           <div className="flex flex-wrap gap-2">
-            {filters.city && (
+            {trimmedShopName && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-                {filters.city}
+                Shop: {trimmedShopName}
               </span>
             )}
-            {filters.state && (
+            {trimmedCity && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-                {filters.state}
+                {trimmedCity}
+              </span>
+            )}
+            {trimmedState && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                {trimmedState}
               </span>
             )}
             {filters.styles.map((style) => (

@@ -23,6 +23,12 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, loading } = useAuth();
 
+  useEffect(() => {
+    if (!loading && (!isAuthenticated || !user)) {
+      setLocation("/login");
+    }
+  }, [loading, isAuthenticated, user, setLocation]);
+
   const { data: artist } = trpc.artists.getByUserId.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -58,9 +64,6 @@ export default function Dashboard() {
 
   // Redirect if not authenticated after loading completes
   if (!isAuthenticated || !user) {
-    useEffect(() => {
-      setLocation("/");
-    }, [setLocation]);
     return null;
   }
 

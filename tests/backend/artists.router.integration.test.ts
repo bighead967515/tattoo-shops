@@ -124,6 +124,7 @@ describe("artists router integration", () => {
     const caller = createCaller(null);
 
     const filters = {
+      shopName: "Delta",
       styles: ["Realism", "Traditional"],
       minRating: 4,
       minExperience: 3,
@@ -139,5 +140,49 @@ describe("artists router integration", () => {
     expect(mockSearchArtists).toHaveBeenCalledTimes(1);
     expect(mockSearchArtists).toHaveBeenCalledWith(filters);
     expect(result).toEqual(artists);
+  });
+
+  it("normalizes whitespace-only text filters before artists.search", async () => {
+    const caller = createCaller(null);
+
+    mockSearchArtists.mockResolvedValue([]);
+
+    await caller.artists.search({
+      shopName: "   ",
+      city: "  ",
+      state: "   ",
+      minRating: 0,
+      minExperience: 0,
+      styles: [],
+    });
+
+    expect(mockSearchArtists).toHaveBeenCalledTimes(1);
+    expect(mockSearchArtists).toHaveBeenCalledWith({
+      shopName: undefined,
+      city: undefined,
+      state: undefined,
+      minRating: 0,
+      minExperience: 0,
+      styles: [],
+    });
+  });
+
+  it("trims text filters before artists.search", async () => {
+    const caller = createCaller(null);
+
+    mockSearchArtists.mockResolvedValue([]);
+
+    await caller.artists.search({
+      shopName: "  Delta Ink  ",
+      city: "  Baton Rouge ",
+      state: "  LA  ",
+    });
+
+    expect(mockSearchArtists).toHaveBeenCalledTimes(1);
+    expect(mockSearchArtists).toHaveBeenCalledWith({
+      shopName: "Delta Ink",
+      city: "Baton Rouge",
+      state: "LA",
+    });
   });
 });

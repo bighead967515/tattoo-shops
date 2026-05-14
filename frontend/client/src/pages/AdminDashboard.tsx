@@ -278,7 +278,7 @@ function VerificationPanel() {
               <div className="flex-1 space-y-3">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-semibold">
-                    {item.userName || "Unknown User"}
+                    {item.user?.name || "Unknown User"}
                   </span>
                   <Badge variant="outline">{doc.documentType}</Badge>
                   {ocrVerdict && (

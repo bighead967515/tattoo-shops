@@ -48,11 +48,19 @@ export default function ArtistFinder() {
   const loading = artistsLoading || shopsLoading;
   const isError = artistsError || shopsError;
 
+  const artistEntries = useMemo(
+    () => mapArtistsToTattooShops(artists ?? []),
+    [artists],
+  );
+
+  const shopEntries = useMemo(
+    () => mapShopsToTattooShops(shopRecords ?? []),
+    [shopRecords],
+  );
+
   const allEntries = useMemo(() => {
-    const artistEntries = mapArtistsToTattooShops(artists ?? []);
-    const shopEntries = mapShopsToTattooShops(shopRecords ?? []);
-    // Merge: artists first, then shops — deduplicate by name+city to avoid showing
-    // the same business twice if it appears in both tables.
+    // Merge for "All" tab only — deduplicate by name+city so the same business
+    // doesn't appear twice. Artists take precedence (linked profile).
     const seen = new Set<string>();
     const merged: TattooShop[] = [];
     for (const entry of [...artistEntries, ...shopEntries]) {
@@ -63,13 +71,14 @@ export default function ArtistFinder() {
       }
     }
     return merged;
-  }, [artists, shopRecords]);
+  }, [artistEntries, shopEntries]);
 
   const tabFiltered = useMemo(() => {
-    if (activeTab === "artists") return allEntries.filter((e) => e.source === "artist");
-    if (activeTab === "shops") return allEntries.filter((e) => e.source === "shop");
+    // Each tab uses its own clean data source so artists never appear in Shops
+    if (activeTab === "artists") return artistEntries;
+    if (activeTab === "shops") return shopEntries;
     return allEntries;
-  }, [allEntries, activeTab]);
+  }, [activeTab, artistEntries, shopEntries, allEntries]);
 
   const filteredShops = useMemo(
     () => filterTattooShops(tabFiltered, activeSearch),
@@ -80,8 +89,8 @@ export default function ArtistFinder() {
     setActiveSearch(searchCity);
   };
 
-  const artistCount = allEntries.filter((e) => e.source === "artist").length;
-  const shopCount = allEntries.filter((e) => e.source === "shop").length;
+  const artistCount = artistEntries.length;
+  const shopCount = shopEntries.length;
 
   usePageSeo({
     title: "Find Tattoo Artists & Shops Near You | Ink Connect",

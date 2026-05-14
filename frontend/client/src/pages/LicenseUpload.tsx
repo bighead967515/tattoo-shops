@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { UploadCloud, ArrowLeft, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
-const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+type AllowedMimeType = (typeof ALLOWED_TYPES)[number];
 
 export default function LicenseUpload() {
   const [, setLocation] = useLocation();
+  const { user, isAuthenticated, loading } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -49,10 +52,12 @@ export default function LicenseUpload() {
       return;
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!(ALLOWED_TYPES as readonly string[]).includes(file.type)) {
       toast.error("File must be PDF, PNG, or JPG.");
       return;
     }
+
+    const mimeType = file.type as AllowedMimeType;
 
     setIsUploading(true);
 
@@ -60,7 +65,7 @@ export default function LicenseUpload() {
       // 1. Get signed upload URL from our backend
       const { signedUrl, path } = await getUploadUrlMutation.mutateAsync({
         fileName: file.name,
-        contentType: file.type,
+        contentType: mimeType,
         fileSize: file.size,
       });
 
@@ -94,7 +99,7 @@ export default function LicenseUpload() {
         documentType: "state_license",
         originalFileName: file.name,
         fileSize: file.size,
-        mimeType: file.type,
+        mimeType,
       });
 
       toast.success(
@@ -115,6 +120,29 @@ export default function LicenseUpload() {
     getUploadUrlMutation.isPending ||
     addDocumentMutation.isPending ||
     isUploading;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="container mx-auto py-8 px-4 text-center">
+        <h1 className="text-2xl font-bold mb-4">Please Sign In</h1>
+        <p className="text-muted-foreground mb-4">
+          You need to be signed in to upload your license.
+        </p>
+        <Link href="/login">
+          <Button>Sign In</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-primary/5 flex items-center justify-center p-4">

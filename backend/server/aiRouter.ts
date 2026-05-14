@@ -65,8 +65,8 @@ export const aiRouter = router({
         });
       }
 
-      // 2. Check subscription tier and AI credits
-      const tier = (clientProfile.subscriptionTier ||
+      // 2. Check subscription tier and AI credits (always read from canonical users.subscriptionTier)
+      const tier = (ctx.user.subscriptionTier ||
         "client_free") as ClientSubscriptionTier;
       const tierLimits = getClientTierLimits(tier);
 
@@ -129,6 +129,15 @@ export const aiRouter = router({
         };
       } catch (error) {
         logger.error("AI tattoo generation failed:", error);
+
+        // Refund the credit if one was consumed — generation did not succeed
+        if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
+          await db
+            .update(clients)
+            .set({ aiCredits: sql`${clients.aiCredits} + 1`, updatedAt: new Date() })
+            .where(eq(clients.id, clientProfile.id));
+        }
+
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to generate tattoo design. Please try again.",
@@ -158,7 +167,7 @@ export const aiRouter = router({
       };
     }
 
-    const tier = (clientProfile.subscriptionTier ||
+    const tier = (ctx.user.subscriptionTier ||
       "client_free") as ClientSubscriptionTier;
     const tierLimits = getClientTierLimits(tier);
 

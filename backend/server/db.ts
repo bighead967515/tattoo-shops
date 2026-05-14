@@ -274,6 +274,7 @@ export async function getAllArtistsAdmin() {
 }
 
 export async function searchArtists(filters: {
+  shopName?: string;
   styles?: string[];
   minRating?: number;
   minExperience?: number;
@@ -283,9 +284,18 @@ export async function searchArtists(filters: {
   const db = await getDb();
   if (!db) return [];
 
+  const normalizedShopName = filters.shopName?.trim();
+  const normalizedCity = filters.city?.trim();
+  const normalizedState = filters.state?.trim();
+
   const conditions: any[] = [eq(artists.isApproved, true)];
 
-   // Filter by styles — PostgreSQL ILIKE on comma-separated styles column
+  // Filter by shop name (case-insensitive partial match)
+  if (normalizedShopName) {
+    conditions.push(sql`${artists.shopName} ILIKE ${`%${normalizedShopName}%`}`);
+  }
+
+  // Filter by styles — PostgreSQL ILIKE on comma-separated styles column
   if (filters.styles && filters.styles.length > 0) {
     const styleConditions = filters.styles.map(
       (style) => sql`${artists.styles} ILIKE ${'%' + style + '%'}`,
@@ -304,14 +314,14 @@ export async function searchArtists(filters: {
     conditions.push(gte(artists.experience, filters.minExperience));
   }
 
-  // Filter by city
-  if (filters.city) {
-    conditions.push(eq(artists.city, filters.city));
+  // Filter by city (case-insensitive partial match)
+  if (normalizedCity) {
+    conditions.push(sql`${artists.city} ILIKE ${`%${normalizedCity}%`}`);
   }
 
-  // Filter by state
-  if (filters.state) {
-    conditions.push(eq(artists.state, filters.state));
+  // Filter by state (case-insensitive partial match)
+  if (normalizedState) {
+    conditions.push(sql`${artists.state} ILIKE ${`%${normalizedState}%`}`);
   }
 
   return await db

@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { constructWebhookEvent, stripePriceToClientTier, stripePriceToArtistTier } from "./stripe";
 import * as db from "./db";
 import { getDb } from "./db";
-import { clients, users } from "../drizzle/schema";
+import { clients, users, tattooRequests } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "./_core/logger";
 import {
@@ -13,6 +13,7 @@ import {
 } from "./webhookQueue";
 import { CLIENT_TIER_LIMITS } from "../shared/tierLimits";
 import { artists } from "../drizzle/schema";
+import { REQUEST_ADDON_PAYMENT_STATUSES } from "@shared/requestAddons";
 
 // Flag to track if processor is started
 let processorStarted = false;
@@ -43,6 +44,11 @@ async function processWebhookEvent(
   switch (eventType) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
+
+      if (session.metadata?.paymentType === "request_addons") {
+        await handleRequestAddonCheckoutCompleted(session);
+        break;
+      }
 
       // Client subscription checkout completion path
       if (session.mode === "subscription") {
@@ -146,6 +152,46 @@ async function processWebhookEvent(
     default:
       logger.debug("Received unhandled webhook event type", { eventType });
   }
+}
+
+async function handleRequestAddonCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const rawRequestId = session.metadata?.requestId;
+  const requestId = rawRequestId ? parseInt(rawRequestId, 10) : 0;
+
+  if (!requestId || isNaN(requestId) || requestId <= 0) {
+    logger.warn("Request add-on checkout missing valid requestId", {
+      sessionId: session.id,
+    });
+    return;
+  }
+
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id;
+
+  const database = await getDb();
+  if (!database) {
+    throw new Error("Database not available for request add-on webhook");
+  }
+
+  await database
+    .update(tattooRequests)
+    .set({
+      addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.PAID,
+      addOnStripePaymentIntentId: paymentIntentId ?? null,
+      addOnPaidAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(tattooRequests.id, requestId));
+
+  logger.info("Request add-on payment marked paid", {
+    requestId,
+    sessionId: session.id,
+    paymentIntentId,
+  });
 }
 
 function parseUserIdFromMetadata(
@@ -504,31 +550,65 @@ async function handleSubscriptionCancelled(
     return;
   }
 
+  // Determine whether this user is an artist or a client so we downgrade
+  // to the correct free tier — artist_free for artists, client_free for clients.
+  const [artistRow] = await database
+    .select({ id: artists.id })
+    .from(artists)
+    .where(eq(artists.userId, user.id))
+    .limit(1);
+
+  const isArtist = !!artistRow;
+
   await database.transaction(async (tx) => {
-    await tx
-      .update(users)
-      .set({
-        subscriptionTier: "client_free",
-        stripeSubscriptionId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
+    if (isArtist) {
+      await tx
+        .update(users)
+        .set({
+          subscriptionTier: "artist_free",
+          stripeSubscriptionId: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
 
-    await tx
-      .update(clients)
-      .set({
-        subscriptionTier: "client_free",
-        aiCredits: 0,
-        stripeSubscriptionId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(clients.userId, user.id));
+      // Keep deprecated column in sync for backward compat
+      await tx
+        .update(artists)
+        .set({
+          subscriptionTier: "artist_free",
+          updatedAt: new Date(),
+        })
+        .where(eq(artists.userId, user.id));
+    } else {
+      await tx
+        .update(users)
+        .set({
+          subscriptionTier: "client_free",
+          stripeSubscriptionId: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+
+      await tx
+        .update(clients)
+        .set({
+          subscriptionTier: "client_free",
+          aiCredits: 0,
+          stripeSubscriptionId: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(clients.userId, user.id));
+    }
   });
 
-  logger.info("Client subscription cancelled — downgraded to free", {
-    userId: user.id,
-    subscriptionId: subscription.id,
-  });
+  logger.info(
+    `${isArtist ? "Artist" : "Client"} subscription cancelled — downgraded to free`,
+    {
+      userId: user.id,
+      subscriptionId: subscription.id,
+      isArtist,
+    },
+  );
 }
 
 export async function handleStripeWebhook(req: Request, res: Response) {

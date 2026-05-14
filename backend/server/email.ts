@@ -65,7 +65,7 @@ export async function sendEmail(options: EmailOptions) {
     to,
     subject,
     html,
-    from = "Ink Connect <noreply@universalinc.pro>",
+    from = "Ink Connect <noreply@theinkednetwork.website>",
   } = options;
 
   return emailCircuit.execute(async () => {
@@ -183,7 +183,7 @@ export async function sendArtistInvitation(to: string, shopName: string) {
       </div>
       
       <p style="text-align: center;">
-        <a href="https://universalinc.pro/for-artists" class="cta-button">
+        <a href="https://theinkednetwork.website/for-artists" class="cta-button">
           Create Your FREE Profile Now →
         </a>
       </p>

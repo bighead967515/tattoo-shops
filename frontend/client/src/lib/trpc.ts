@@ -8,7 +8,7 @@ export const trpc = createTRPCReact<AppRouter>();
 export const trpcClient = trpc.createClient({
   links: [
     loggerLink({
-      enabled: () => process.env.NODE_ENV === "development",
+      enabled: () => import.meta.env.DEV,
     }),
     httpBatchLink({
       url: "/api/trpc",

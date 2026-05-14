@@ -28,6 +28,8 @@ var init_env = __esm({
       STRIPE_ARTIST_PRO_PRICE_ID_YEAR: z.string().default("price_1TOraYQRJTQEheTOHNQL82m3"),
       STRIPE_ARTIST_ICON_PRICE_ID_MONTH: z.string().default("price_1TOraZQRJTQEheTOofBdpJwM"),
       STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().default("price_1TOraaQRJTQEheTOwDiBtF35"),
+      // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
+      STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
       // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
       STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
       STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
@@ -68,6 +70,7 @@ var init_env = __esm({
       stripeArtistProPriceIdYear: parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_YEAR,
       stripeArtistIconPriceIdMonth: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
       stripeArtistIconPriceIdYear: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
+      stripeFoundingArtistPriceId: parsed.data.STRIPE_FOUNDING_ARTIST_PRICE_ID,
       // Client tier price IDs
       stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
       stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,
@@ -199,6 +202,10 @@ var init_schema = __esm({
       bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
       /** Tracks which month the bidsThisMonth counter belongs to, format: YYYY-MM */
       bidsMonthYear: varchar("bidsMonthYear", { length: 7 }).default("2000-01").notNull(),
+      /** True if this artist signed up during the Founding Artist offer period */
+      isFoundingArtist: boolean("isFoundingArtist").default(false).notNull(),
+      /** When the 6-month free trial ends; null for non-founding artists */
+      foundingTrialEndsAt: timestamp("foundingTrialEndsAt"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
     });
@@ -456,6 +463,18 @@ var init_schema = __esm({
         willingToTravel: boolean("willingToTravel").default(false),
         desiredTimeframe: varchar("desiredTimeframe", { length: 100 }),
         // e.g., "ASAP", "Within 1 month", "Flexible"
+        addOnPriorityBoost: boolean("addOnPriorityBoost").default(false).notNull(),
+        addOnFeaturedBadge: boolean("addOnFeaturedBadge").default(false).notNull(),
+        addOnDirectMessageCredits: integer("addOnDirectMessageCredits").default(0).notNull(),
+        addOnTotalCents: integer("addOnTotalCents").default(0).notNull(),
+        addOnPaymentStatus: varchar("addOnPaymentStatus", { length: 30 }).$type().default("not_requested").notNull(),
+        addOnStripeCheckoutSessionId: varchar("addOnStripeCheckoutSessionId", {
+          length: 255
+        }),
+        addOnStripePaymentIntentId: varchar("addOnStripePaymentIntentId", {
+          length: 255
+        }),
+        addOnPaidAt: timestamp("addOnPaidAt"),
         status: requestStatusEnum("status").default("open").notNull(),
         selectedBidId: integer("selectedBidId"),
         // Will be set when client accepts a bid
@@ -626,6 +645,7 @@ __export(db_exports, {
   deletePortfolioImage: () => deletePortfolioImage,
   discoverArtists: () => discoverArtists,
   getAllArtists: () => getAllArtists,
+  getAllArtistsAdmin: () => getAllArtistsAdmin,
   getAllShops: () => getAllShops,
   getArtistById: () => getArtistById,
   getArtistByUserId: () => getArtistByUserId,
@@ -677,16 +697,18 @@ function logPoolStats() {
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const dbUrl = process.env.DATABASE_URL;
+      const dbUrl = process.env.DATABASE_URL.replace(/^DATABASE_URL=/, "");
       _sqlClient = postgres(dbUrl, {
-        max: 20,
-        // Max connections in pool
+        max: 10,
+        // Supabase free tier has a 60 connection limit; keep pool small
         idle_timeout: 30,
         // Close idle connections after 30 seconds
-        connect_timeout: 5,
-        // 5 second connection timeout
+        connect_timeout: 10,
+        // 10 second connection timeout (Render cold starts are slow)
         prepare: false,
         // MUST be false for Supabase (Supavisor/PgBouncer incompatible)
+        ssl: dbUrl.includes("supabase") ? "require" : void 0,
+        // Supabase pooler requires SSL
         onnotice: (notice) => {
           logger.debug("Database notice", { message: notice.message });
         },
@@ -783,7 +805,7 @@ async function createArtist(artist) {
   if (!db) throw new Error("Database not available");
   return await db.transaction(async (tx) => {
     await tx.update(users).set(buildArtistOnboardingUserUpdate()).where(eq(users.id, artist.userId));
-    const [created] = await tx.insert(artists).values(artist).returning();
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
     return created;
   });
 }
@@ -802,12 +824,38 @@ async function getArtistById(id) {
 async function getAllArtists() {
   const db = await getDb();
   if (!db) return [];
-  return await db.select().from(artists).where(eq(artists.isApproved, true));
+  return await db.select().from(artists).where(eq(artists.isApproved, true)).orderBy(
+    // Founding artists appear first
+    sql`${artists.isFoundingArtist} DESC`,
+    desc(artists.createdAt)
+  );
+}
+async function getAllArtistsAdmin() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select({
+    id: artists.id,
+    shopName: artists.shopName,
+    city: artists.city,
+    state: artists.state,
+    isApproved: artists.isApproved,
+    createdAt: artists.createdAt,
+    userId: artists.userId,
+    userName: users.name,
+    userEmail: users.email,
+    verificationStatus: users.verificationStatus
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).orderBy(desc(artists.createdAt));
 }
 async function searchArtists(filters) {
   const db = await getDb();
   if (!db) return [];
+  const normalizedShopName = filters.shopName?.trim();
+  const normalizedCity = filters.city?.trim();
+  const normalizedState = filters.state?.trim();
   const conditions = [eq(artists.isApproved, true)];
+  if (normalizedShopName) {
+    conditions.push(sql`${artists.shopName} ILIKE ${`%${normalizedShopName}%`}`);
+  }
   if (filters.styles && filters.styles.length > 0) {
     const styleConditions = filters.styles.map(
       (style) => sql`${artists.styles} ILIKE ${"%" + style + "%"}`
@@ -822,13 +870,16 @@ async function searchArtists(filters) {
   if (filters.minExperience && filters.minExperience > 0) {
     conditions.push(gte(artists.experience, filters.minExperience));
   }
-  if (filters.city) {
-    conditions.push(eq(artists.city, filters.city));
+  if (normalizedCity) {
+    conditions.push(sql`${artists.city} ILIKE ${`%${normalizedCity}%`}`);
   }
-  if (filters.state) {
-    conditions.push(eq(artists.state, filters.state));
+  if (normalizedState) {
+    conditions.push(sql`${artists.state} ILIKE ${`%${normalizedState}%`}`);
   }
-  return await db.select().from(artists).where(and(...conditions));
+  return await db.select().from(artists).where(and(...conditions)).orderBy(
+    sql`${artists.isFoundingArtist} DESC`,
+    desc(artists.averageRating)
+  );
 }
 async function getAllShops() {
   const db = await getDb();
@@ -1199,10 +1250,20 @@ var SubscriptionTiers = z2.enum([
   "client_elite"
 ]);
 var TIER_LIMITS = {
-  artist_free: { portfolioMax: 3, aiCredits: 0, canBook: false },
-  artist_amateur: { portfolioMax: 15, aiCredits: 0, canBook: true },
-  artist_pro: { portfolioMax: 999, aiCredits: 0, canBook: true },
-  artist_icon: { portfolioMax: 999, aiCredits: 0, canBook: true },
+  // Artist tiers: canonical model
+  artist_free: { portfolioMax: 10, aiCredits: 0, canBook: false },
+  artist_amateur: {
+    portfolioMax: Number.MAX_SAFE_INTEGER,
+    aiCredits: 0,
+    canBook: true
+  },
+  // Pay-as-you-go: no subscription, bidding enabled, bookings remain off
+  artist_pro: { portfolioMax: 10, aiCredits: 0, canBook: false },
+  artist_icon: {
+    portfolioMax: Number.MAX_SAFE_INTEGER,
+    aiCredits: 0,
+    canBook: true
+  },
   client_free: { portfolioMax: 0, aiCredits: 0, canBook: true },
   client_plus: { portfolioMax: 0, aiCredits: 10, canBook: true },
   client_elite: { portfolioMax: 0, aiCredits: 999, canBook: true }
@@ -1938,6 +1999,41 @@ var stripe = new Stripe(ENV.stripeSecretKey, {
   maxNetworkRetries: 2
   // Stripe's built-in retry
 });
+async function createCheckoutSession({
+  priceInCents,
+  productName,
+  productDescription,
+  customerEmail,
+  metadata,
+  successUrl,
+  cancelUrl
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: productName,
+              description: productDescription
+            },
+            unit_amount: priceInCents
+          },
+          quantity: 1
+        }
+      ],
+      mode: "payment",
+      customer_email: customerEmail,
+      metadata,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true
+    });
+    return session;
+  });
+}
 async function createSubscriptionCheckout({
   priceId,
   customerEmail,
@@ -2013,6 +2109,33 @@ async function createArtistSubscriptionCheckout({
     return session;
   });
 }
+async function createFoundingArtistCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
+      metadata: { ...metadata, isFoundingArtist: "true" },
+      subscription_data: {
+        trial_period_days: 180,
+        metadata: { ...metadata, isFoundingArtist: "true" }
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: false
+      // Founding offer IS the promo — no stacking
+    });
+    return session;
+  });
+}
 async function constructWebhookEvent(payload, signature) {
   if (!ENV.stripeWebhookSecret) {
     throw new Error("STRIPE_WEBHOOK_SECRET is required");
@@ -2028,6 +2151,16 @@ async function constructWebhookEvent(payload, signature) {
 init_env();
 
 // backend/shared/tierLimits.ts
+function readRuntimeEnv(key) {
+  if (typeof process !== "undefined" && process.env?.[key]) {
+    return process.env[key] ?? null;
+  }
+  const viteEnv = import.meta?.env;
+  if (viteEnv?.[key]) {
+    return viteEnv[key] ?? null;
+  }
+  return null;
+}
 var TRANSACTION_FEE_RATES = {
   /** Free tier — no bidding, no fee */
   free: 0,
@@ -2160,12 +2293,12 @@ var CLIENT_TIER_PRICING = {
   client_plus: {
     monthly: 900,
     // $9.00
-    stripePriceIdMonth: process.env.STRIPE_CLIENT_PLUS_PRICE_ID ?? null
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID")
   },
   client_elite: {
     monthly: 1900,
     // $19.00
-    stripePriceIdMonth: process.env.STRIPE_CLIENT_ELITE_PRICE_ID ?? null
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID")
   }
 };
 function getClientTierLimits(tier) {
@@ -2175,9 +2308,9 @@ function getClientTierLimits(tier) {
 // backend/shared/tierCompat.ts
 var FREE_ARTIST_TIERS = ["artist_free", "free"];
 var AI_BID_ASSISTANT_TIERS = [
-  "artist_pro",
+  "artist_amateur",
   "artist_icon",
-  "professional",
+  "amateur",
   "frontPage"
 ];
 function hasTierValue(tier, allowed) {
@@ -2201,6 +2334,31 @@ function toLegacyArtistTier(tier) {
 
 // backend/server/clientRouters.ts
 init_onboarding();
+
+// backend/shared/requestAddons.ts
+var REQUEST_ADDON_PRICING = {
+  priorityBoostCents: 199,
+  featuredBadgeCents: 99,
+  directMessageCreditCents: 49,
+  directMessageBundleCount: 5,
+  directMessageBundleCents: 199
+};
+var REQUEST_ADDON_PAYMENT_STATUSES = {
+  NOT_REQUESTED: "not_requested",
+  CHECKOUT_PENDING: "checkout_pending",
+  PAID: "paid",
+  FAILED: "failed"
+};
+function clampDirectMessageCredits(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(20, Math.floor(value)));
+}
+function calculateRequestAddonTotalCents(selection) {
+  const credits = clampDirectMessageCredits(selection.directMessageCredits);
+  return (selection.priorityBoost ? REQUEST_ADDON_PRICING.priorityBoostCents : 0) + (selection.featuredBadge ? REQUEST_ADDON_PRICING.featuredBadgeCents : 0) + credits * REQUEST_ADDON_PRICING.directMessageCreditCents;
+}
+
+// backend/server/clientRouters.ts
 function sanitizeFileName(fileName, maxLength = 100) {
   let sanitized = path.basename(fileName);
   sanitized = sanitized.replace(/[\\\0]/g, "");
@@ -2254,6 +2412,9 @@ var clientsRouter = router({
       const [created] = await tx.insert(clients).values({
         userId: ctx.user.id,
         ...input,
+        displayName: sanitizeInput(input.displayName, 255),
+        bio: input.bio ? sanitizeInput(input.bio, 1e3) : void 0,
+        preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : void 0,
         onboardingCompleted: true
       }).returning();
       return created;
@@ -2272,7 +2433,13 @@ var clientsRouter = router({
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
-    const [updated] = await db.update(clients).set({ ...input, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(clients.userId, ctx.user.id)).returning();
+    const [updated] = await db.update(clients).set({
+      ...input,
+      displayName: input.displayName ? sanitizeInput(input.displayName, 255) : void 0,
+      bio: input.bio ? sanitizeInput(input.bio, 1e3) : void 0,
+      preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : void 0,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq2(clients.userId, ctx.user.id)).returning();
     if (!updated) {
       throw new TRPCError2({
         code: "NOT_FOUND",
@@ -2347,7 +2514,12 @@ var requestsRouter = router({
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
           )`.as("bidCount")
-    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(desc2(tattooRequests.createdAt)).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
+    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
+      desc2(
+        sql2`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+      ),
+      desc2(tattooRequests.createdAt)
+    ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
     return results.map((r) => ({
       ...r.request,
       client: r.client,
@@ -2366,8 +2538,9 @@ var requestsRouter = router({
     }).optional()
   ).query(async ({ ctx, input }) => {
     const db = await requireDb();
-    const [artist] = await db.select({ subscriptionTier: artists.subscriptionTier }).from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
-    if (!artist || isFreeArtistTier(artist.subscriptionTier)) {
+    const [artist] = await db.select({ id: artists.id }).from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
+    const canonicalTierForDashboard = ctx.user.subscriptionTier ?? "artist_free";
+    if (!artist || isFreeArtistTier(canonicalTierForDashboard)) {
       throw new TRPCError2({
         code: "FORBIDDEN",
         message: "This feature is only available for paid artist plans."
@@ -2385,7 +2558,12 @@ var requestsRouter = router({
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
           )`.as("bidCount")
-    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(desc2(tattooRequests.createdAt)).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
+    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
+      desc2(
+        sql2`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+      ),
+      desc2(tattooRequests.createdAt)
+    ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
     return results.map((r) => ({
       ...r.request,
       client: r.client,
@@ -2407,7 +2585,12 @@ var requestsRouter = router({
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
           )`.as("bidCount")
-    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(desc2(tattooRequests.createdAt)).limit(8);
+    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
+      desc2(
+        sql2`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+      ),
+      desc2(tattooRequests.createdAt)
+    ).limit(8);
     return results.map((r) => ({
       ...r.request,
       client: r.client,
@@ -2477,23 +2660,94 @@ var requestsRouter = router({
       preferredState: z3.string().max(50).optional(),
       willingToTravel: z3.boolean().default(false),
       desiredTimeframe: z3.string().max(100).optional(),
+      addOns: z3.object({
+        priorityBoost: z3.boolean().default(false),
+        featuredBadge: z3.boolean().default(false),
+        directMessageCredits: z3.number().int().min(0).max(20).default(0)
+      }).optional(),
       guestEmail: z3.string().email().max(255).optional()
       // guests can optionally leave contact info
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
-    const { guestEmail, ...requestInput } = input;
+    const { guestEmail, addOns, ...requestInput } = input;
+    const normalizedAddOns = {
+      priorityBoost: addOns?.priorityBoost ?? false,
+      featuredBadge: addOns?.featuredBadge ?? false,
+      directMessageCredits: clampDirectMessageCredits(
+        addOns?.directMessageCredits ?? 0
+      )
+    };
+    const addOnTotalCents = calculateRequestAddonTotalCents(normalizedAddOns);
     let clientId = null;
+    let userEmail = "";
     if (ctx.user) {
       const [client] = await db.select({ id: clients.id }).from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
       if (client) clientId = client.id;
+      const [userRow] = await db.select({ email: users.email }).from(users).where(eq2(users.id, ctx.user.id)).limit(1);
+      userEmail = userRow?.email ?? "";
     }
     const [newRequest] = await db.insert(tattooRequests).values({
       clientId,
       guestEmail: clientId ? null : guestEmail ?? null,
-      ...requestInput
+      addOnPriorityBoost: normalizedAddOns.priorityBoost,
+      addOnFeaturedBadge: normalizedAddOns.featuredBadge,
+      addOnDirectMessageCredits: normalizedAddOns.directMessageCredits,
+      addOnTotalCents,
+      addOnPaymentStatus: addOnTotalCents > 0 ? REQUEST_ADDON_PAYMENT_STATUSES.CHECKOUT_PENDING : REQUEST_ADDON_PAYMENT_STATUSES.NOT_REQUESTED,
+      ...requestInput,
+      title: sanitizeInput(requestInput.title, 255),
+      description: sanitizeInput(requestInput.description, 5e3)
     }).returning();
-    return newRequest;
+    if (addOnTotalCents <= 0) {
+      return {
+        ...newRequest,
+        addOnPaymentRequired: false,
+        addOnCheckoutUrl: null
+      };
+    }
+    const checkoutEmail = userEmail || guestEmail || "";
+    if (!checkoutEmail) {
+      throw new TRPCError2({
+        code: "BAD_REQUEST",
+        message: "An email is required to purchase add-ons."
+      });
+    }
+    const baseUrl = ENV.publicBaseUrl || "http://localhost:3000";
+    try {
+      const session = await createCheckoutSession({
+        priceInCents: addOnTotalCents,
+        productName: "Ink Connect Request Add-ons",
+        productDescription: "Optional visibility and messaging add-ons for your tattoo request.",
+        customerEmail: checkoutEmail,
+        metadata: {
+          paymentType: "request_addons",
+          requestId: String(newRequest.id),
+          userId: ctx.user ? String(ctx.user.id) : "guest"
+        },
+        successUrl: `${baseUrl}/requests/${newRequest.id}?addons=success`,
+        cancelUrl: `${baseUrl}/requests/${newRequest.id}?addons=cancel`
+      });
+      await db.update(tattooRequests).set({
+        addOnStripeCheckoutSessionId: session.id,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq2(tattooRequests.id, newRequest.id));
+      return {
+        ...newRequest,
+        addOnPaymentRequired: true,
+        addOnCheckoutUrl: session.url
+      };
+    } catch (error) {
+      await db.update(tattooRequests).set({
+        addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.FAILED,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq2(tattooRequests.id, newRequest.id));
+      throw new TRPCError2({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Unable to initialize add-on payment. Please try again.",
+        cause: error
+      });
+    }
   }),
   // AI Prompt Refiner — open to everyone including guests
   refineDescription: publicProcedure.input(
@@ -2650,7 +2904,7 @@ var bidsRouter = router({
       client: b.client
     }));
   }),
-  // AI Bid Assistant — draft a bid response (Professional/Icon tier only)
+  // AI Bid Assistant — draft a bid response (Pro subscription/Icon tier only)
   draftBid: protectedProcedure.input(z3.object({ requestId: z3.number() })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const [artist] = await db.select().from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
@@ -2660,10 +2914,11 @@ var bidsRouter = router({
         message: "Only artists can use the bid assistant"
       });
     }
-    if (!canUseAiBidAssistant(artist.subscriptionTier)) {
+    const canonicalTierForDraft = ctx.user.subscriptionTier ?? "artist_free";
+    if (!canUseAiBidAssistant(canonicalTierForDraft)) {
       throw new TRPCError2({
         code: "FORBIDDEN",
-        message: "AI Bid Assistant is available for Professional and Icon tier artists. Upgrade to access this feature."
+        message: "AI Bid Assistant is available for Pro subscription and Icon tier artists. Upgrade to access this feature."
       });
     }
     const [request] = await db.select().from(tattooRequests).where(eq2(tattooRequests.id, input.requestId)).limit(1);
@@ -2723,14 +2978,14 @@ var bidsRouter = router({
         message: "Only artists can submit bids"
       });
     }
-    const canonicalTier = artist.subscriptionTier ?? "artist_free";
+    const canonicalTier = ctx.user.subscriptionTier ?? "artist_free";
     const legacyTier = toLegacyArtistTier(canonicalTier);
     const tierLimits = TIER_LIMITS2[legacyTier] ?? TIER_LIMITS2.free;
     const bidsPerMonth = tierLimits.bidsPerMonth;
     if (bidsPerMonth === 0) {
       throw new TRPCError2({
         code: "FORBIDDEN",
-        message: "Bidding on client posts requires a paid plan. Upgrade to the Artist plan ($9/mo) to start submitting proposals."
+        message: "Bidding on client posts requires a paid plan. Upgrade to Pro or switch to pay-as-you-go to start submitting proposals."
       });
     }
     if (bidsPerMonth !== Number.MAX_SAFE_INTEGER) {
@@ -2780,7 +3035,7 @@ var bidsRouter = router({
       artistId: artist.id,
       priceEstimate: input.priceEstimate,
       estimatedHours: input.estimatedHours,
-      message: input.message,
+      message: sanitizeInput(input.message, 2e3),
       availableDate: input.availableDate ? new Date(input.availableDate) : null,
       portfolioLinks: input.portfolioLinks,
       platformFeeRateBps
@@ -3193,7 +3448,7 @@ var verificationRouter = router({
   getUploadUrl: protectedProcedure.input(
     z4.object({
       fileName: z4.string(),
-      contentType: z4.string(),
+      contentType: z4.enum(["image/jpeg", "image/png", "application/pdf"]),
       fileSize: z4.number()
     })
   ).mutation(async ({ ctx, input }) => {
@@ -3217,7 +3472,7 @@ var verificationRouter = router({
       documentType: z4.string(),
       originalFileName: z4.string(),
       fileSize: z4.number(),
-      mimeType: z4.string()
+      mimeType: z4.enum(["image/jpeg", "image/png", "application/pdf"])
     })
   ).mutation(async ({ ctx, input }) => {
     const expectedPrefix = `private/${ctx.user.id}/`;
@@ -3308,12 +3563,6 @@ var verificationRouter = router({
       notes: z4.string().optional()
     })
   ).mutation(async ({ ctx, input }) => {
-    if (!ctx.user) {
-      throw new TRPCError3({
-        code: "UNAUTHORIZED",
-        message: "Authentication required"
-      });
-    }
     return await reviewVerificationDocument(input.documentId, {
       status: input.decision,
       reviewedBy: ctx.user.id,
@@ -3642,7 +3891,7 @@ var aiRouter = router({
         message: "You need a client profile to use AI Generation. Complete client onboarding first."
       });
     }
-    const tier = clientProfile.subscriptionTier || "client_free";
+    const tier = ctx.user.subscriptionTier || "client_free";
     const tierLimits = getClientTierLimits(tier);
     if (tierLimits.aiGenerationsPerMonth === 0) {
       throw new TRPCError4({
@@ -3681,6 +3930,9 @@ var aiRouter = router({
       };
     } catch (error) {
       logger.error("AI tattoo generation failed:", error);
+      if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
+        await db.update(clients).set({ aiCredits: sql3`${clients.aiCredits} + 1`, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(clients.id, clientProfile.id));
+      }
       throw new TRPCError4({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to generate tattoo design. Please try again."
@@ -3702,7 +3954,7 @@ var aiRouter = router({
         isUnlimited: false
       };
     }
-    const tier = clientProfile.subscriptionTier || "client_free";
+    const tier = ctx.user.subscriptionTier || "client_free";
     const tierLimits = getClientTierLimits(tier);
     return {
       tier,
@@ -3795,13 +4047,22 @@ var appRouter = router({
     getAll: publicProcedure.query(async () => {
       return await getAllArtists();
     }),
+    /** Admin: list all artists (approved + unapproved) with user info */
+    adminGetAll: adminProcedure.query(async () => {
+      return await getAllArtistsAdmin();
+    }),
+    /** Admin: approve or reject an artist */
+    adminSetApproval: adminProcedure.input(z7.object({ artistId: z7.number(), approved: z7.boolean() })).mutation(async ({ input }) => {
+      await updateArtist(input.artistId, { isApproved: input.approved });
+      return { success: true };
+    }),
     /**
      * Create a Stripe Checkout Session for an artist subscription upgrade.
      * Returns the Checkout URL to redirect the artist to Stripe.
      */
     createSubscriptionCheckout: protectedProcedure.input(
       z7.object({
-        tier: z7.enum(["artist_amateur", "artist_pro", "artist_icon"]),
+        tier: z7.enum(["artist_amateur", "artist_icon"]),
         interval: z7.enum(["month", "year"]).default("month"),
         successUrl: z7.string().url(),
         cancelUrl: z7.string().url()
@@ -3819,8 +4080,6 @@ var appRouter = router({
       const priceIdMap = {
         artist_amateur_month: ENV.stripeArtistAmateurPriceIdMonth,
         artist_amateur_year: ENV.stripeArtistAmateurPriceIdYear,
-        artist_pro_month: ENV.stripeArtistProPriceIdMonth,
-        artist_pro_year: ENV.stripeArtistProPriceIdYear,
         artist_icon_month: ENV.stripeArtistIconPriceIdMonth,
         artist_icon_year: ENV.stripeArtistIconPriceIdYear
       };
@@ -3847,8 +4106,53 @@ var appRouter = router({
       });
       return { checkoutUrl: session.url };
     }),
+    /**
+     * Start the Founding Artist checkout:
+     * - 180-day free trial then $19/mo locked rate
+     * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
+     */
+    startFoundingCheckout: protectedProcedure.input(
+      z7.object({
+        successUrl: z7.string().url(),
+        cancelUrl: z7.string().url()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (!artist) {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "You must have an artist profile before joining the Founding Artist offer."
+        });
+      }
+      const [user] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
+      const priceId = ENV.stripeFoundingArtistPriceId;
+      if (!priceId) {
+        throw new TRPCError6({
+          code: "PRECONDITION_FAILED",
+          message: "Founding Artist price is not configured."
+        });
+      }
+      const session = await createFoundingArtistCheckout({
+        priceId,
+        customerEmail: user?.email ?? "",
+        stripeCustomerId: user?.stripeCustomerId ?? void 0,
+        metadata: {
+          userId: String(ctx.user.id),
+          artistId: String(artist.id),
+          tier: "artist_amateur",
+          interval: "month",
+          isFoundingArtist: "true"
+        },
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl
+      });
+      return { checkoutUrl: session.url };
+    }),
     search: publicProcedure.input(
       z7.object({
+        shopName: z7.string().optional(),
         styles: z7.array(z7.string()).optional(),
         minRating: z7.number().optional(),
         minExperience: z7.number().optional(),
@@ -3856,7 +4160,18 @@ var appRouter = router({
         state: z7.string().optional()
       })
     ).query(async ({ input }) => {
-      return await searchArtists(input);
+      const normalizeText = (value, maxLen = 100) => {
+        if (!value) return void 0;
+        const trimmed = value.trim();
+        if (!trimmed) return void 0;
+        return trimmed.slice(0, maxLen);
+      };
+      return await searchArtists({
+        ...input,
+        shopName: normalizeText(input.shopName),
+        city: normalizeText(input.city),
+        state: normalizeText(input.state, 50)
+      });
     }),
     /**
      * Tattoo Discovery — natural language semantic search.
@@ -3906,7 +4221,10 @@ var appRouter = router({
     ).mutation(async ({ ctx, input }) => {
       return await createArtist({
         userId: ctx.user.id,
-        ...input
+        ...input,
+        shopName: sanitizeInput(input.shopName, 255),
+        bio: input.bio ? sanitizeInput(input.bio, 2e3) : void 0,
+        specialties: input.specialties ? sanitizeInput(input.specialties, 500) : void 0
       });
     }),
     update: artistOwnerProcedure.input(
@@ -3929,7 +4247,48 @@ var appRouter = router({
       })
     ).mutation(async ({ input }) => {
       const { id, ...data } = input;
-      return await updateArtist(id, data);
+      return await updateArtist(id, {
+        ...data,
+        shopName: data.shopName ? sanitizeInput(data.shopName, 255) : void 0,
+        bio: data.bio ? sanitizeInput(data.bio, 2e3) : void 0,
+        specialties: data.specialties ? sanitizeInput(data.specialties, 500) : void 0
+      });
+    }),
+    /**
+     * Enable the no-subscription transaction plan.
+     * Sets canonical tier to artist_pro (mapped to pay-as-you-go fee logic).
+     */
+    enablePayAsYouGo: protectedProcedure.mutation(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable"
+        });
+      }
+      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (!artist) {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "You must have an artist profile first."
+        });
+      }
+      const [userRow] = await database.select({
+        stripeSubscriptionId: users.stripeSubscriptionId,
+        subscriptionTier: users.subscriptionTier
+      }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
+      if (!userRow) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "User not found" });
+      }
+      if (userRow.stripeSubscriptionId) {
+        throw new TRPCError6({
+          code: "PRECONDITION_FAILED",
+          message: "You already have an active subscription. Cancel it first before switching to pay-as-you-go."
+        });
+      }
+      await database.update(users).set({ subscriptionTier: "artist_pro" }).where(eq5(users.id, ctx.user.id));
+      await database.update(artists).set({ subscriptionTier: "artist_pro" }).where(eq5(artists.id, artist.id));
+      return { success: true, tier: "artist_pro" };
     })
   }),
   portfolio: router({
@@ -4014,11 +4373,11 @@ var appRouter = router({
     // Re-analyze an existing portfolio image with Gemini Vision
     reanalyze: artistOwnerProcedure.input(z7.object({ id: z7.number(), artistId: z7.number() })).mutation(async ({ input }) => {
       const image = await getPortfolioImageById(input.id);
-      if (!image) throw new Error("Portfolio image not found");
-      if (image.artistId !== input.artistId) throw new Error("Forbidden");
+      if (!image) throw new TRPCError6({ code: "NOT_FOUND", message: "Portfolio image not found" });
+      if (image.artistId !== input.artistId) throw new TRPCError6({ code: "FORBIDDEN", message: "Forbidden" });
       const analysis = await analyzePortfolioImage(image.imageUrl);
       if (analysis.qualityScore === 0) {
-        throw new Error("AI analysis failed \u2014 please try again later");
+        throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "AI analysis failed \u2014 please try again later" });
       }
       await updatePortfolioImageAI(input.id, {
         aiStyles: JSON.stringify(analysis.styles),
@@ -4034,13 +4393,11 @@ var appRouter = router({
     delete: protectedProcedure.input(z7.object({ id: z7.number() })).mutation(async ({ ctx, input }) => {
       const image = await getPortfolioImageById(input.id);
       if (!image) {
-        throw new Error("Portfolio image not found");
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Portfolio image not found" });
       }
       const artist = await getArtistById(image.artistId);
       if (!artist || artist.userId !== ctx.user.id) {
-        throw new Error(
-          "Forbidden: You can only delete your own portfolio images"
-        );
+        throw new TRPCError6({ code: "FORBIDDEN", message: "You can only delete your own portfolio images" });
       }
       try {
         await deleteFile(BUCKETS.PORTFOLIO_IMAGES, image.imageKey);
@@ -4113,7 +4470,7 @@ var appRouter = router({
     ).mutation(async ({ ctx, input }) => {
       const sanitizedEmail = sanitizeEmail(input.customerEmail);
       if (!sanitizedEmail) {
-        throw new Error("Invalid email address");
+        throw new TRPCError6({ code: "BAD_REQUEST", message: "Invalid email address" });
       }
       return await createBooking({
         ...input,
@@ -4142,7 +4499,7 @@ var appRouter = router({
     ).mutation(async ({ ctx, input }) => {
       const booking = await getBookingById(input.id);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Booking not found" });
       }
       const isCustomer = booking.userId === ctx.user.id;
       let isArtist = false;
@@ -4151,9 +4508,10 @@ var appRouter = router({
         isArtist = !!(artist && artist.userId === ctx.user.id);
       }
       if (!isCustomer && !isArtist) {
-        throw new Error(
-          "Forbidden: You can only update your own bookings or bookings for your artist profile"
-        );
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "You can only update your own bookings or bookings for your artist profile"
+        });
       }
       return await updateBooking(input.id, { status: input.status });
     })
@@ -4209,7 +4567,7 @@ var appRouter = router({
      */
     reanalyzeReview: adminProcedure.input(z7.object({ reviewId: z7.number() })).mutation(async ({ input }) => {
       const review = await getReviewById(input.reviewId);
-      if (!review) throw new Error("Review not found");
+      if (!review) throw new TRPCError6({ code: "NOT_FOUND", message: "Review not found" });
       const analysis = await analyzeReviewSentiment({
         rating: review.rating,
         comment: review.comment,
@@ -4247,7 +4605,7 @@ async function createContext(opts) {
   let user = null;
   try {
     const authHeader = opts.req.headers.authorization;
-    const token = authHeader?.replace("Bearer ", "") || opts.req.cookies?.["sb-access-token"];
+    const token = authHeader?.replace("Bearer ", "") || opts.req.cookies?.[COOKIE_NAME];
     if (token) {
       const {
         data: { user: supabaseUser },
@@ -4608,6 +4966,10 @@ async function processWebhookEvent(eventType, event) {
   switch (eventType) {
     case "checkout.session.completed": {
       const session = event.data.object;
+      if (session.metadata?.paymentType === "request_addons") {
+        await handleRequestAddonCheckoutCompleted(session);
+        break;
+      }
       if (session.mode === "subscription") {
         await handleSubscriptionCheckoutCompleted(session);
         break;
@@ -4683,6 +5045,32 @@ async function processWebhookEvent(eventType, event) {
     default:
       logger.debug("Received unhandled webhook event type", { eventType });
   }
+}
+async function handleRequestAddonCheckoutCompleted(session) {
+  const rawRequestId = session.metadata?.requestId;
+  const requestId = rawRequestId ? parseInt(rawRequestId, 10) : 0;
+  if (!requestId || isNaN(requestId) || requestId <= 0) {
+    logger.warn("Request add-on checkout missing valid requestId", {
+      sessionId: session.id
+    });
+    return;
+  }
+  const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+  const database = await getDb();
+  if (!database) {
+    throw new Error("Database not available for request add-on webhook");
+  }
+  await database.update(tattooRequests).set({
+    addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.PAID,
+    addOnStripePaymentIntentId: paymentIntentId ?? null,
+    addOnPaidAt: /* @__PURE__ */ new Date(),
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq8(tattooRequests.id, requestId));
+  logger.info("Request add-on payment marked paid", {
+    requestId,
+    sessionId: session.id,
+    paymentIntentId
+  });
 }
 function parseUserIdFromMetadata(metadata) {
   const raw = metadata?.userId;
@@ -4858,7 +5246,14 @@ async function handleArtistSubscriptionChange(subscription, tier, eventType) {
   }
   await database.transaction(async (tx) => {
     await tx.update(users).set({ stripeCustomerId, subscriptionTier: tier, stripeSubscriptionId: subscription.id, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(users.id, user.id));
-    await tx.update(artists).set({ subscriptionTier: tier, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(artists.userId, user.id));
+    const isFoundingArtist = subscription.metadata?.isFoundingArtist === "true";
+    const artistUpdate = { subscriptionTier: tier, updatedAt: /* @__PURE__ */ new Date() };
+    if (isFoundingArtist) {
+      artistUpdate.isFoundingArtist = true;
+      const trialEnd = subscription.trial_end;
+      artistUpdate.foundingTrialEndsAt = trialEnd ? new Date(trialEnd * 1e3) : null;
+    }
+    await tx.update(artists).set(artistUpdate).where(eq8(artists.userId, user.id));
   });
   logger.info("Artist subscription changed", {
     userId: user.id,
@@ -4890,23 +5285,41 @@ async function handleSubscriptionCancelled(subscription) {
     );
     return;
   }
+  const [artistRow] = await database.select({ id: artists.id }).from(artists).where(eq8(artists.userId, user.id)).limit(1);
+  const isArtist = !!artistRow;
   await database.transaction(async (tx) => {
-    await tx.update(users).set({
-      subscriptionTier: "client_free",
-      stripeSubscriptionId: null,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(users.id, user.id));
-    await tx.update(clients).set({
-      subscriptionTier: "client_free",
-      aiCredits: 0,
-      stripeSubscriptionId: null,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(clients.userId, user.id));
+    if (isArtist) {
+      await tx.update(users).set({
+        subscriptionTier: "artist_free",
+        stripeSubscriptionId: null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq8(users.id, user.id));
+      await tx.update(artists).set({
+        subscriptionTier: "artist_free",
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq8(artists.userId, user.id));
+    } else {
+      await tx.update(users).set({
+        subscriptionTier: "client_free",
+        stripeSubscriptionId: null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq8(users.id, user.id));
+      await tx.update(clients).set({
+        subscriptionTier: "client_free",
+        aiCredits: 0,
+        stripeSubscriptionId: null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq8(clients.userId, user.id));
+    }
   });
-  logger.info("Client subscription cancelled \u2014 downgraded to free", {
-    userId: user.id,
-    subscriptionId: subscription.id
-  });
+  logger.info(
+    `${isArtist ? "Artist" : "Client"} subscription cancelled \u2014 downgraded to free`,
+    {
+      userId: user.id,
+      subscriptionId: subscription.id,
+      isArtist
+    }
+  );
 }
 async function handleStripeWebhook(req, res) {
   const signature = req.headers["stripe-signature"];
@@ -5049,8 +5462,8 @@ function parseAllowedOrigins() {
     return fromEnv;
   }
   return ENV.isProduction ? [
-    "https://universalinc.pro",
-    "https://www.universalinc.pro",
+    "https://theinkednetwork.website",
+    "https://www.theinkednetwork.website",
     "http://localhost:3000",
     "http://127.0.0.1:3000"
   ] : ["http://localhost:3000", "http://localhost:5173"];

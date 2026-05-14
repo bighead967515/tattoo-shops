@@ -56,8 +56,8 @@ function parseAllowedOrigins(): string[] {
 
   return ENV.isProduction
     ? [
-        "https://universalinc.pro",
-        "https://www.universalinc.pro",
+        "https://theinkednetwork.website",
+        "https://www.theinkednetwork.website",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
       ]
@@ -282,8 +282,11 @@ app.use(
   const startServer = async () => {
     // Initialize Supabase Storage buckets on startup
     try {
-      await initializeBuckets();
-      logger.info("Supabase storage buckets initialized successfully");
+      const storageInit = await initializeBuckets();
+      logger.info("Supabase storage buckets initialized successfully", {
+        existing: storageInit.existing,
+        created: storageInit.created,
+      });
     } catch (error) {
       logger.error("Failed to initialize storage buckets", { error });
     }
