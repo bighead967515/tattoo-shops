@@ -29,6 +29,7 @@ const STYLE_OPTIONS = [
   "Traditional",
   "Fineline",
   "Japanese",
+  "Cover-up",
   "Blackwork",
   "Realism",
   "Geometric",
@@ -334,6 +335,9 @@ export default function ArtistRegister() {
                 <Palette className="w-4 h-4 inline mr-1" />
                 Primary Style(s) * <span className="text-muted-foreground font-normal">(select all that apply)</span>
               </Label>
+              <p className="text-xs text-muted-foreground">
+                All tattoo artists are welcome. Cover-up experience is a plus, not required.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {STYLE_OPTIONS.map(style => (
                   <button

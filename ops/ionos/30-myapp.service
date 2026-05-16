@@ -1,0 +1,24 @@
+# Place at /etc/systemd/system/myapp.service
+
+[Unit]
+Description=Tattoo Shops Node Application
+After=network.target
+
+[Service]
+Type=simple
+User=nodeapp
+Group=nodeapp
+WorkingDirectory=/opt/tattoo-shops
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/tattoo-shops/.env.production
+ExecStart=/usr/bin/node dist/server/_core/index.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/myapp.log
+StandardError=append:/var/log/myapp.log
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
