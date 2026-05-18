@@ -1,6 +1,7 @@
 import { COOKIE_NAME, TIER_LIMITS, type SubscriptionTier } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { logger } from "./_core/logger";
 import {
   publicProcedure,
   protectedProcedure,
@@ -86,6 +87,39 @@ export const appRouter = router({
       .input(z.object({ artistId: z.number(), approved: z.boolean() }))
       .mutation(async ({ input }) => {
         await db.updateArtist(input.artistId, { isApproved: input.approved });
+        
+        // P1-3: Trigger n8n workflow for approval notification email
+        if (ENV.n8nWebhookUrl && ENV.n8nWebhookSecret) {
+          try {
+            const webhookUrl = `${ENV.n8nWebhookUrl}/webhook/artist-approval`;
+            const response = await fetch(webhookUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${ENV.n8nWebhookSecret}`,
+              },
+              body: JSON.stringify({
+                artistId: input.artistId,
+                approved: input.approved,
+              }),
+            });
+            
+            if (!response.ok) {
+              logger.warn("n8n webhook returned non-2xx status", {
+                artistId: input.artistId,
+                status: response.status,
+                statusText: response.statusText,
+              });
+            }
+          } catch (err) {
+            // Log but don't fail user request if webhook fails
+            logger.error("Failed to trigger n8n approval notification workflow", {
+              artistId: input.artistId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        
         return { success: true };
       }),
 
@@ -291,29 +325,30 @@ export const appRouter = router({
       .input(
         z.object({
           shopName: z.string(),
-          bio: z.string().optional(),
-          specialties: z.string().optional(),
-          experience: z.number().optional(),
-          address: z.string().optional(),
-          city: z.string().optional(),
-          state: z.string().optional(),
-          zipCode: z.string().optional(),
-          phone: z.string().optional(),
-          website: z.string().optional(),
-          instagram: z.string().optional(),
-          facebook: z.string().optional(),
-          lat: z.string().optional(),
-          lng: z.string().optional(),
+          ...otherFields
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        return await db.createArtist({
-          userId: ctx.user.id,
-          ...input,
-          shopName: sanitizeInput(input.shopName, 255),
-          bio: input.bio ? sanitizeInput(input.bio, 2000) : undefined,
-          specialties: input.specialties ? sanitizeInput(input.specialties, 500) : undefined,
-        });
+        const newArtist = await db.createArtist(input);
+
+        if (ENV.n8nOnboardingWebhookUrl) {
+          fetch(ENV.n8nOnboardingWebhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${ENV.n8nWebhookSecret}`,
+            },
+            body: JSON.stringify({
+              artistId: newArtist.id,
+              userId: ctx.user.id,
+              email: ctx.user.email,
+              firstName: ctx.user.name?.split(" ")[0] ?? "there",
+              shopName: input.shopName,
+            }),
+          }).catch(() => {});
+        }
+
+        return newArtist;
       }),
 
     update: artistOwnerProcedure

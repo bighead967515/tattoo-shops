@@ -16,7 +16,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | **AI**         | Groq + Hugging Face (design generation, vision tagging, NLP discovery, review moderation, license OCR, bid drafting) |
 | **Email**      | Resend (booking confirmations, artist invitations)                                                                       |
 | **Monitoring** | Sentry, Winston logging, health check endpoint                                                                           |
-| **Deployment** | Hostinger (active), with legacy provider configs still present in-repo                                                   |
+| **Deployment** | Render (active), with legacy provider configs still present in-repo                                                   |
 | **Testing**    | Vitest (unit), Playwright (e2e), Artillery (load)                                                                        |
 
 ## Project Structure
@@ -201,11 +201,57 @@ VITE_SUPABASE_URL=https://...          # Frontend Supabase URL (same as SUPABASE
 VITE_SUPABASE_ANON_KEY=...             # Frontend anon/public key (same as SUPABASE_ANON_KEY)
 STRIPE_SECRET_KEY=sk_...               # Stripe secret key
 STRIPE_WEBHOOK_SECRET=whsec_...        # Stripe webhook signing secret
-RESEND_API_KEY=re_...                  # Resend API key
-GROQ_API_KEY=gsk_...                    # Groq API key for discovery, prompt refinement, bid drafting, moderation
-HUGGINGFACE_API_KEY=hf_...              # Hugging Face API key for image generation, captioning, OCR
-OWNER_OPEN_ID=...                      # Admin user identifier
+
+# ⚠️ IMPORTANT: Stripe Price IDs are REQUIRED and must be set explicitly per environment.
+# Hardcoded defaults risk accidental charges in staging/dev or features failing in production.
+# 1. Create Products and Prices in your Stripe Dashboard
+# 2. Copy the Price IDs below
+# 3. Set as environment variables for each deployment target (dev, staging, production)
+
+# Artist subscription prices (create in Stripe Dashboard, then set here)
+STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH=price_...   # $29/mo artist subscription
+STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR=price_...    # $232/yr artist subscription
+STRIPE_ARTIST_PRO_PRICE_ID_MONTH=price_...       # Pay-as-you-go (monthly billing)
+STRIPE_ARTIST_PRO_PRICE_ID_YEAR=price_...        # Pay-as-you-go (yearly billing)
+STRIPE_ARTIST_ICON_PRICE_ID_MONTH=price_...      # Founding Artist $19/mo locked
+STRIPE_ARTIST_ICON_PRICE_ID_YEAR=price_...       # Founding Artist yearly equivalent
+STRIPE_FOUNDING_ARTIST_PRICE_ID=price_...        # Base price for Founding Artist trial (same as amateur month)
+
+# Client subscription prices (create in Stripe Dashboard, then set here)
+STRIPE_CLIENT_PLUS_PRICE_ID=price_...            # $9/mo Enthusiast plan
+STRIPE_CLIENT_ELITE_PRICE_ID=price_...           # $19/mo Elite Ink plan
+
+RESEND_API_KEY=re_...                  # Resend API key for transactional email
+GROQ_API_KEY=gsk_...                   # Groq API key for discovery, prompt refinement, bid drafting, moderation
+HUGGINGFACE_API_KEY=hf_...             # Hugging Face API key for image generation, captioning, OCR
+OWNER_OPEN_ID=...                      # Admin user identifier (Supabase Auth UUID for admin)
+
+# P1-3: n8n Workflow Automation (optional, used for artist approval notifications)
+N8N_WEBHOOK_URL=https://n8n.example.com  # n8n instance URL for webhook triggers
+N8N_WEBHOOK_SECRET=your-secret-token     # Bearer token for n8n webhook authentication
 ```
+
+**⚠️ Security Notes:**
+
+- **Never commit `.env` files** — use environment-specific secret management (GitHub Secrets, AWS Secrets Manager, etc.)
+- **Stripe Price IDs are environment-specific** — use different sets for dev/staging/production to prevent accidental charges
+- **Service role key** is sensitive — restrict to backend-only; never expose to frontend
+- **n8n webhook secret** — use a strong random token (e.g., `openssl rand -hex 32`), store securely in GitHub Secrets
+
+### n8n Workflows
+
+P1-3 integrates with n8n for automated email notifications:
+
+- **Artist Approval Notification** — triggered when admin approves/rejects artist profile
+  - Sends customized email to artist
+  - Logs notification status to Supabase
+  - See: `backend/n8n/workflows/email/artist-approval-notification.md`
+
+To enable:
+1. Deploy n8n instance (e.g., on Render, Railway, or self-hosted)
+2. Create webhook-triggered workflow (see documentation above)
+3. Set `N8N_WEBHOOK_URL` and `N8N_WEBHOOK_SECRET` in production `.env`
+4. Workflow triggers automatically on `POST /admin/artists/:id/approve`
 
 ### Database Setup
 
@@ -279,9 +325,9 @@ The API uses [tRPC](https://trpc.io) for type-safe client-server communication.
 
 ## Deployment
 
-The active deployment target is **Hostinger**.
+The active deployment target is **Render**.
 
-Recommended Hostinger deployment flow:
+Recommended Render deployment flow:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -289,15 +335,13 @@ pnpm build
 pnpm start
 ```
 
-Hostinger should run the bundled Node server from `dist/index.js`, with the frontend served from `dist/public` by the Express app.
+Render should run the bundled Node server from `dist/index.js`, with the frontend served from `dist/public` by the Express app.
 
 Required deployment notes:
 
-- Configure all environment variables in the Hostinger dashboard or server environment.
-- Ensure the public app URL, CORS settings, and Stripe webhook endpoint match the Hostinger domain.
+- Configure all environment variables in the Render dashboard or server environment.
+- Ensure the public app URL, CORS settings, and Stripe webhook endpoint match the Render domain.
 - Keep uploads and document storage in Supabase Storage; the app should not rely on local filesystem persistence.
-
-Legacy deployment configs for Vercel, Railway, and Render still exist in the repo, but they are not the active deployment target.
 
 ## Additional Documentation
 

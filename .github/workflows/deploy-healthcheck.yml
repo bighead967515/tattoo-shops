@@ -1,0 +1,25 @@
+name: Post-Deploy Health Check
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Render deploy
+        run: sleep 180
+
+      - name: Health check
+        env:
+          APP_URL: ${{ secrets.APP_URL || 'https://inkconnect.app' }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Post-deploy health check failed — HTTP $STATUS on ${APP_URL}/api/health"
+            exit 1
+          fi
+          echo "Post-deploy health check passed — HTTP $STATUS"

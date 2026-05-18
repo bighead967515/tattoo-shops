@@ -207,7 +207,8 @@ export async function createArtist(artist: InsertArtist) {
       .set(buildArtistOnboardingUserUpdate())
       .where(eq(users.id, artist.userId));
 
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
+    // NEW ARTISTS MUST BE APPROVED BY ADMIN BEFORE APPEARING IN PUBLIC LISTINGS
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: false }).returning();
     return created;
   });
 }

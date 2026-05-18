@@ -5,6 +5,38 @@ import superjson from "superjson";
 
 export const trpc = createTRPCReact<AppRouter>();
 
+const CSRF_HEADER_NAME = "x-csrf-token";
+const CSRF_STORAGE_KEY = "csrf_token";
+
+function readStoredCsrfToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(CSRF_STORAGE_KEY);
+}
+
+function storeCsrfToken(token: string) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(CSRF_STORAGE_KEY, token);
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+  const existing = readStoredCsrfToken();
+  if (existing) return existing;
+
+  if (typeof window === "undefined") return null;
+
+  // Bootstrap token from a safe GET endpoint. The backend emits X-CSRF-Token on all responses.
+  const response = await window.fetch("/api/health", {
+    method: "GET",
+    credentials: "include",
+  });
+  const token = response.headers.get("X-CSRF-Token");
+  if (token) {
+    storeCsrfToken(token);
+    return token;
+  }
+  return null;
+}
+
 export const trpcClient = trpc.createClient({
   links: [
     loggerLink({
@@ -13,10 +45,26 @@ export const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
+      fetch: async (url, options) => {
+        const response = await window.fetch(url, {
+          ...options,
+          credentials: "include",
+        });
+
+        const freshToken = response.headers.get("X-CSRF-Token");
+        if (freshToken) {
+          storeCsrfToken(freshToken);
+        }
+
+        return response;
+      },
       async headers() {
-        return {
-          // authorization: getAuthCookie(),
-        };
+        const token = await ensureCsrfToken();
+        return token
+          ? {
+              [CSRF_HEADER_NAME]: token,
+            }
+          : {};
       },
     }),
   ],

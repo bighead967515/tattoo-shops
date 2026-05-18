@@ -36,7 +36,9 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: secure ? "none" : "lax",
+    // P1-1 CSRF Fix: Use strict instead of none to prevent SameSite=none CSRF vulnerability
+    // strict blocks cross-site cookies entirely, preventing CSRF attacks via <form> + <img>
+    sameSite: "strict" as const,
     secure,
   };
 }

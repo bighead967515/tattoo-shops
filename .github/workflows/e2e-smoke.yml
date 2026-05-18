@@ -2,6 +2,8 @@ name: E2E Smoke
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'  # 4:00 AM UTC nightly on main
 
 jobs:
   smoke:

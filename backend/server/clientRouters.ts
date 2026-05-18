@@ -263,6 +263,28 @@ export const requestsRouter = router({
       const db = await requireDb();
       const filters = input || { limit: 20, offset: 0 };
 
+      // P1-2 Fix: Build WHERE clause dynamically based on filters
+      const whereConditions = [eq(tattooRequests.status, "open")];
+      
+      if (filters?.style) {
+        // Match against comma-separated styles in request
+        whereConditions.push(
+          sql`${tattooRequests.style} ILIKE ${'%' + filters.style + '%'}`
+        );
+      }
+      
+      if (filters?.city) {
+        whereConditions.push(
+          eq(clients.city, filters.city)
+        );
+      }
+      
+      if (filters?.state) {
+        whereConditions.push(
+          eq(clients.state, filters.state)
+        );
+      }
+
       const results = await db
         .select({
           request: tattooRequests,
@@ -278,7 +300,7 @@ export const requestsRouter = router({
         })
         .from(tattooRequests)
         .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
-        .where(eq(tattooRequests.status, "open"))
+        .where(and(...whereConditions))
         .orderBy(
           desc(
             sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
@@ -328,8 +350,30 @@ export const requestsRouter = router({
         });
       }
 
-      // 2. Fetch open requests (same logic as getOpen)
+      // 2. Fetch open requests with filters (P1-2 Fix: apply filters)
       const filters = input || { limit: 20, offset: 0 };
+      
+      // P1-2 Fix: Build WHERE clause dynamically based on filters
+      const whereConditions = [eq(tattooRequests.status, "open")];
+      
+      if (filters?.style) {
+        whereConditions.push(
+          sql`${tattooRequests.style} ILIKE ${'%' + filters.style + '%'}`
+        );
+      }
+      
+      if (filters?.city) {
+        whereConditions.push(
+          eq(clients.city, filters.city)
+        );
+      }
+      
+      if (filters?.state) {
+        whereConditions.push(
+          eq(clients.state, filters.state)
+        );
+      }
+      
       const results = await db
         .select({
           request: tattooRequests,
@@ -345,7 +389,7 @@ export const requestsRouter = router({
         })
         .from(tattooRequests)
         .leftJoin(clients, eq(tattooRequests.clientId, clients.id))
-        .where(eq(tattooRequests.status, "open"))
+        .where(and(...whereConditions))
         .orderBy(
           desc(
             sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,

@@ -11,6 +11,7 @@ import {
   foreignKey,
   index,
   unique,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SubscriptionTier } from "@shared/const";
@@ -125,6 +126,12 @@ export const artists = pgTable("artists", {
   bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
   /** Tracks which month the bidsThisMonth counter belongs to, format: YYYY-MM */
   bidsMonthYear: varchar("bidsMonthYear", { length: 7 }).default("2000-01").notNull(),
+  /** The artist's balance of purchased/granted bid tokens */
+  bidTokens: integer("bidTokens").default(0).notNull(),
+  /** The artist's balance of purchased/granted chat tokens */
+  chatTokens: integer("chatTokens").default(0).notNull(),
+  /** The artist's balance of AI generation credits */
+  aiCredits: integer("aiCredits").default(0).notNull(),
   /** True if this artist signed up during the Founding Artist offer period */
   isFoundingArtist: boolean("isFoundingArtist").default(false).notNull(),
   /** When the 6-month free trial ends; null for non-founding artists */
@@ -419,11 +426,7 @@ export const tattooRequests = pgTable(
     preferredState: varchar("preferredState", { length: 50 }),
     willingToTravel: boolean("willingToTravel").default(false),
     desiredTimeframe: varchar("desiredTimeframe", { length: 100 }), // e.g., "ASAP", "Within 1 month", "Flexible"
-    addOnPriorityBoost: boolean("addOnPriorityBoost").default(false).notNull(),
-    addOnFeaturedBadge: boolean("addOnFeaturedBadge").default(false).notNull(),
-    addOnDirectMessageCredits: integer("addOnDirectMessageCredits")
-      .default(0)
-      .notNull(),
+    selectedAddons: jsonb("selectedAddons").$type<string[]>().default([]).notNull(),
     addOnTotalCents: integer("addOnTotalCents").default(0).notNull(),
     addOnPaymentStatus: varchar("addOnPaymentStatus", { length: 30 })
       .$type<RequestAddonPaymentStatus>()

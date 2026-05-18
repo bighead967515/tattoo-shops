@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { constructWebhookEvent, stripePriceToClientTier, stripePriceToArtistTier } from "./stripe";
+import { constructWebhookEvent, stripePriceToArtistTier } from "./stripe";
 import * as db from "./db";
 import { getDb } from "./db";
 import { clients, users, tattooRequests } from "../drizzle/schema";
@@ -11,7 +11,7 @@ import {
   startQueueProcessor,
   getQueueStats,
 } from "./webhookQueue";
-import { CLIENT_TIER_LIMITS } from "../shared/tierLimits";
+
 import { artists } from "../drizzle/schema";
 import { REQUEST_ADDON_PAYMENT_STATUSES } from "@shared/requestAddons";
 
@@ -252,11 +252,6 @@ async function handleSubscriptionCheckoutCompleted(
       ? session.subscription
       : session.subscription?.id;
 
-  const metadataTier = session.metadata?.tier;
-  const tier =
-    metadataTier === "client_plus" || metadataTier === "client_elite"
-      ? metadataTier
-      : null;
 
   const database = await getDb();
   if (!database) {
@@ -291,33 +286,13 @@ async function handleSubscriptionCheckoutCompleted(
 
     if (customerId) userUpdate.stripeCustomerId = customerId;
     if (subscriptionId) userUpdate.stripeSubscriptionId = subscriptionId;
-    if (tier) userUpdate.subscriptionTier = tier;
 
     await tx.update(users).set(userUpdate).where(eq(users.id, user.id));
-
-    if (tier) {
-      const tierLimits = CLIENT_TIER_LIMITS[tier];
-      const aiCredits =
-        tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
-          ? 999
-          : tierLimits.aiGenerationsPerMonth;
-
-      await tx
-        .update(clients)
-        .set({
-          subscriptionTier: tier,
-          aiCredits,
-          stripeSubscriptionId: subscriptionId ?? null,
-          updatedAt: new Date(),
-        })
-        .where(eq(clients.userId, user.id));
-    }
   });
 
   logger.info("Subscription checkout completed and customer reconciled", {
     userId: user.id,
     sessionId: session.id,
-    tier,
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscriptionId,
   });
@@ -355,92 +330,13 @@ async function handleSubscriptionChange(
     return;
   }
 
-  const tier = stripePriceToClientTier(priceId);
-  if (!tier) {
-    logger.debug(
-      "Subscription price does not match any known tier",
-      {
-        priceId,
-        subscriptionId: subscription.id,
-      },
-    );
-    return;
-  }
-
-  // Only active/trialing subscriptions should grant paid client tiers.
-  const grantableStatuses = new Set<Stripe.Subscription.Status>([
-    "active",
-    "trialing",
-  ]);
-  if (!grantableStatuses.has(subscription.status)) {
-    logger.info("Skipping tier grant for non-grantable subscription status", {
+  logger.debug(
+    "Subscription price does not match any known artist tier",
+    {
+      priceId,
       subscriptionId: subscription.id,
-      status: subscription.status,
-      eventType,
-    });
-    return;
-  }
-
-  const database = await getDb();
-  if (!database) {
-    throw new Error("Database not available for subscription webhook");
-  }
-
-  const user = await resolveUserForSubscription(
-    database,
-    stripeCustomerId,
-    subscription.metadata,
+    },
   );
-
-  if (!user) {
-    logger.warn(
-      "No user found for stripeCustomerId during subscription change",
-      {
-        stripeCustomerId,
-        subscriptionId: subscription.id,
-      },
-    );
-    return;
-  }
-
-  const tierLimits = CLIENT_TIER_LIMITS[tier];
-  const aiCredits =
-    tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
-      ? 999
-      : tierLimits.aiGenerationsPerMonth;
-
-  // Atomically update users (source of truth) and clients (legacy copy)
-  await database.transaction(async (tx) => {
-    // Update canonical tier on users table
-    await tx
-      .update(users)
-      .set({
-        stripeCustomerId,
-        subscriptionTier: tier,
-        stripeSubscriptionId: subscription.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
-
-    // Propagate to clients table (legacy sync)
-    await tx
-      .update(clients)
-      .set({
-        subscriptionTier: tier,
-        aiCredits,
-        stripeSubscriptionId: subscription.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(clients.userId, user.id));
-  });
-
-  logger.info("Client subscription changed", {
-    userId: user.id,
-    tier,
-    aiCredits,
-    subscriptionId: subscription.id,
-    eventType,
-  });
 }
 
 /**
