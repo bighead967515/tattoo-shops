@@ -2614,7 +2614,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(and2(...whereConditions)).orderBy(
       desc2(
-        sql2`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
@@ -2674,7 +2674,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(and2(...whereConditions)).orderBy(
       desc2(
-        sql2`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
@@ -2701,7 +2701,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
       desc2(
-        sql2`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(8);

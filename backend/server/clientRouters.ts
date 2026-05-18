@@ -299,7 +299,7 @@ export const requestsRouter = router({
         .where(and(...whereConditions))
         .orderBy(
           desc(
-            sql<number>`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+            sql<number>`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`,
           ),
           desc(tattooRequests.createdAt),
         )
@@ -388,7 +388,7 @@ export const requestsRouter = router({
         .where(and(...whereConditions))
         .orderBy(
           desc(
-            sql<number>`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+            sql<number>`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`,
           ),
           desc(tattooRequests.createdAt),
         )
@@ -425,7 +425,7 @@ export const requestsRouter = router({
       .where(eq(tattooRequests.status, "open"))
       .orderBy(
         desc(
-          sql<number>`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+          sql<number>`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`,
         ),
         desc(tattooRequests.createdAt),
       )
