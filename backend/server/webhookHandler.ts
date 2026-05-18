@@ -345,7 +345,7 @@ async function handleSubscriptionChange(
  */
 async function handleArtistSubscriptionChange(
   subscription: Stripe.Subscription,
-  tier: "artist_amateur" | "artist_pro" | "artist_icon",
+  tier: "artist_paygo" | "artist_pro" | "artist_elite",
   eventType: string,
 ): Promise<void> {
   const stripeCustomerId =

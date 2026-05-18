@@ -99,3 +99,59 @@ export function canArtistAddMorePhotos(tier: ArtistSubscriptionTier, currentCoun
   const limits = getArtistTierLimits(tier);
   return currentCount < limits.portfolioPhotos;
 }
+
+// ============================================
+// CLIENT SUBSCRIPTION TIERS
+// ============================================
+
+export const CLIENT_TIER_LIMITS = {
+  client_free: {
+    name: "Collector",
+    requestsPerMonth: 1,
+    aiGenerationsPerMonth: 0,
+    directChatWithArtists: false,
+    priorityRequestBoard: false,
+    depositFeeWaived: false,
+  },
+  client_plus: {
+    name: "Enthusiast",
+    requestsPerMonth: 10,
+    aiGenerationsPerMonth: 10,
+    directChatWithArtists: false,
+    priorityRequestBoard: true,
+    depositFeeWaived: false,
+  },
+  client_elite: {
+    name: "Elite Ink",
+    requestsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
+    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited
+    directChatWithArtists: true,
+    priorityRequestBoard: true,
+    depositFeeWaived: true,
+  },
+} as const;
+
+export const CLIENT_TIER_PRICING = {
+  client_free: {
+    monthly: 0,
+    stripePriceIdMonth: null,
+  },
+  client_plus: {
+    monthly: 900, // $9.00
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID"),
+  },
+  client_elite: {
+    monthly: 1900, // $19.00
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID"),
+  },
+} as const;
+
+export type ClientSubscriptionTier = keyof typeof CLIENT_TIER_LIMITS;
+
+export function getClientTierLimits(tier: ClientSubscriptionTier) {
+  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
+}
+
+export function getClientTierPricing(tier: ClientSubscriptionTier) {
+  return CLIENT_TIER_PRICING[tier] || CLIENT_TIER_PRICING.client_free;
+}

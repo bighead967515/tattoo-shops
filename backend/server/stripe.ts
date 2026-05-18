@@ -66,19 +66,19 @@ export async function createCheckoutSession({
  */
 export function stripePriceToArtistTier(
   priceId: string,
-): "artist_amateur" | "artist_pro" | "artist_icon" | null {
+): "artist_paygo" | "artist_pro" | "artist_elite" | null {
   const { 
     stripeArtistAmateurPriceIdMonth, stripeArtistAmateurPriceIdYear,
     stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
     stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
   } = ENV;
 
-  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
-    return "artist_amateur";
   if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
-    return "artist_icon";
+    return "artist_elite";
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
+    return "artist_paygo";
 
   return null;
 }

@@ -20,27 +20,23 @@ import { logger } from "./_core/logger";
 import path from "path";
 import { sanitizeInput } from "./_core/sanitize";
 import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
-import { createCheckoutSession, createSubscriptionCheckout } from "./stripe";
+import { createCheckoutSession, createArtistSubscriptionCheckout as createSubscriptionCheckout } from "./stripe";
 import { ENV } from "./_core/env";
 import {
   CLIENT_TIER_PRICING,
-  TIER_LIMITS,
-  getTransactionFeeRate,
-  type ArtistTierKey,
+  getArtistTierLimits,
+  type ArtistSubscriptionTier,
   type ClientSubscriptionTier,
 } from "../shared/tierLimits";
 import {
   canUseAiBidAssistant,
-  isFreeArtistTier,
-  toLegacyArtistTier,
-  type ArtistCanonicalTier,
 } from "../shared/tierCompat";
 import { buildClientOnboardingUserUpdate } from "./_core/onboarding";
 import {
   REQUEST_ADDON_PAYMENT_STATUSES,
   calculateRequestAddonTotalCents,
-  clampDirectMessageCredits,
-} from "@shared/requestAddons";
+  type RequestAddonSelection,
+} from "../shared/requestAddons";
 
 /**
  * Sanitize a filename to prevent path traversal attacks.
@@ -303,7 +299,7 @@ export const requestsRouter = router({
         .where(and(...whereConditions))
         .orderBy(
           desc(
-            sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+            sql<number>`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
           ),
           desc(tattooRequests.createdAt),
         )
@@ -343,7 +339,7 @@ export const requestsRouter = router({
 
       const canonicalTierForDashboard = ctx.user.subscriptionTier ?? "artist_free";
 
-      if (!artist || isFreeArtistTier(canonicalTierForDashboard)) {
+      if (!artist || canonicalTierForDashboard === "artist_free") {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "This feature is only available for paid artist plans.",
@@ -392,7 +388,7 @@ export const requestsRouter = router({
         .where(and(...whereConditions))
         .orderBy(
           desc(
-            sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+            sql<number>`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
           ),
           desc(tattooRequests.createdAt),
         )
@@ -429,7 +425,7 @@ export const requestsRouter = router({
       .where(eq(tattooRequests.status, "open"))
       .orderBy(
         desc(
-          sql<number>`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
+          sql<number>`CASE WHEN ${tattooRequests.selectedAddons} @> '"priorityPlacement"'::jsonb AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`,
         ),
         desc(tattooRequests.createdAt),
       )
@@ -550,9 +546,14 @@ export const requestsRouter = router({
         desiredTimeframe: z.string().max(100).optional(),
         addOns: z
           .object({
-            priorityBoost: z.boolean().default(false),
-            featuredBadge: z.boolean().default(false),
-            directMessageCredits: z.number().int().min(0).max(20).default(0),
+            priorityPlacement: z.boolean().default(false),
+            preBookingChat: z.boolean().default(false),
+            aiPriceEstimate: z.boolean().default(false),
+            incognitoMode: z.boolean().default(false),
+            conceptArtist: z.boolean().default(false),
+            perfectMatchRouter: z.boolean().default(false),
+            painAnalysis: z.boolean().default(false),
+            vipBundle: z.boolean().default(false),
           })
           .optional(),
         guestEmail: z.string().email().max(255).optional(), // guests can optionally leave contact info
@@ -562,12 +563,15 @@ export const requestsRouter = router({
       const db = await requireDb();
       const { guestEmail, addOns, ...requestInput } = input;
 
-      const normalizedAddOns = {
-        priorityBoost: addOns?.priorityBoost ?? false,
-        featuredBadge: addOns?.featuredBadge ?? false,
-        directMessageCredits: clampDirectMessageCredits(
-          addOns?.directMessageCredits ?? 0,
-        ),
+      const normalizedAddOns: RequestAddonSelection = {
+        priorityPlacement: addOns?.priorityPlacement ?? false,
+        preBookingChat: addOns?.preBookingChat ?? false,
+        aiPriceEstimate: addOns?.aiPriceEstimate ?? false,
+        incognitoMode: addOns?.incognitoMode ?? false,
+        conceptArtist: addOns?.conceptArtist ?? false,
+        perfectMatchRouter: addOns?.perfectMatchRouter ?? false,
+        painAnalysis: addOns?.painAnalysis ?? false,
+        vipBundle: addOns?.vipBundle ?? false,
       };
       const addOnTotalCents = calculateRequestAddonTotalCents(normalizedAddOns);
 
@@ -590,14 +594,16 @@ export const requestsRouter = router({
         userEmail = userRow?.email ?? "";
       }
 
+      const addOnArray = Object.entries(normalizedAddOns)
+        .filter(([_, value]) => value)
+        .map(([key]) => key);
+
       const [newRequest] = await db
         .insert(tattooRequests)
         .values({
           clientId,
           guestEmail: clientId ? null : (guestEmail ?? null),
-          addOnPriorityBoost: normalizedAddOns.priorityBoost,
-          addOnFeaturedBadge: normalizedAddOns.featuredBadge,
-          addOnDirectMessageCredits: normalizedAddOns.directMessageCredits,
+          selectedAddons: addOnArray,
           addOnTotalCents,
           addOnPaymentStatus:
             addOnTotalCents > 0
@@ -1034,10 +1040,9 @@ export const bidsRouter = router({
       // ── Per-tier monthly bid quota enforcement ──────────────────────────
       // Use canonical users.subscriptionTier (updated by Stripe webhook) rather
       // than the deprecated artists.subscriptionTier column.
-      const canonicalTier = (ctx.user.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
-      const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
-      const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
-      const bidsPerMonth = tierLimits.bidsPerMonth;
+      const canonicalTier = (ctx.user.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+      const tierLimits = getArtistTierLimits(canonicalTier);
+      const bidsPerMonth = tierLimits.freeBidsPerMonth;
 
       // Free tier: bidding is completely blocked
       if (bidsPerMonth === 0) {
@@ -1111,7 +1116,7 @@ export const bidsRouter = router({
       }
 
       // Store the platform fee rate (in basis points) at bid creation time
-      const feeRate = getTransactionFeeRate(legacyTier);
+      const feeRate = tierLimits.transactionFeePercent / 100;
       const platformFeeRateBps = Math.round(feeRate * 10000); // e.g. 0.05 → 500 bps
 
       const [newBid] = await db

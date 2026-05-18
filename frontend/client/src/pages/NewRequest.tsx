@@ -37,7 +37,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import {
   REQUEST_ADDON_PRICING,
   calculateRequestAddonTotalCents,
-  clampDirectMessageCredits,
+  type RequestAddonSelection,
 } from "@shared/requestAddons";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -308,10 +308,15 @@ export default function NewRequest() {
     willingToTravel: false,
     desiredTimeframe: "",
   });
-  const [addOns, setAddOns] = useState({
-    priorityBoost: false,
-    featuredBadge: false,
-    directMessageCredits: 0,
+  const [addOns, setAddOns] = useState<RequestAddonSelection>({
+    priorityPlacement: false,
+    preBookingChat: false,
+    aiPriceEstimate: false,
+    incognitoMode: false,
+    conceptArtist: false,
+    perfectMatchRouter: false,
+    painAnalysis: false,
+    vipBundle: false,
   });
 
   const [uploadedImages, setUploadedImages] = useState<
@@ -332,10 +337,7 @@ export default function NewRequest() {
   const addImageToRequest = trpc.requests.addImage.useMutation();
 
   const addOnTotalCents = calculateRequestAddonTotalCents(addOns);
-  const hasAnyAddOn =
-    addOns.priorityBoost ||
-    addOns.featuredBadge ||
-    addOns.directMessageCredits > 0;
+  const hasAnyAddOn = addOnTotalCents > 0;
   const formatUsd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -401,13 +403,7 @@ export default function NewRequest() {
         preferredState: formData.preferredState || undefined,
         willingToTravel: formData.willingToTravel,
         desiredTimeframe: formData.desiredTimeframe || undefined,
-        addOns: {
-          priorityBoost: addOns.priorityBoost,
-          featuredBadge: addOns.featuredBadge,
-          directMessageCredits: clampDirectMessageCredits(
-            addOns.directMessageCredits,
-          ),
-        },
+        addOns,
         // Only send guestEmail if user is not logged in
         guestEmail: !user && guestEmail ? guestEmail : undefined,
       });
@@ -876,122 +872,126 @@ export default function NewRequest() {
             </Card>
           )}
 
-          {/* Card 6: Optional Add-ons */}
-          <Card className="bg-card border-border/60 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">
-                Optional visibility add-ons
+          {/* Card 6: Boost Your Request */}
+          <Card className="bg-card border-border/60 shadow-lg relative overflow-hidden">
+            {/* Glossy gradient effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+            <CardHeader className="pb-3 relative z-10">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Boost Your Request
               </CardTitle>
-              <CardDescription className="text-xs">
-                Posting stays free. These are optional extras to help your request get faster attention.
+              <CardDescription className="text-sm">
+                Posting is always free. These optional upgrades help you get faster, better quotes from top artists.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
-                Base request post: <span className="font-semibold text-foreground">$0.00</span>
-              </div>
-
-              <label className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3 cursor-pointer hover:border-primary/40 transition-colors">
-                <div>
-                  <p className="text-sm font-medium">Priority Boost (48 hours)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Gives your request extra visibility near the top of the board.
+            <CardContent className="space-y-4 relative z-10">
+              {/* VIP Bundle Highlight */}
+              <label className={`flex items-start justify-between gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${addOns.vipBundle ? 'border-primary bg-primary/10 shadow-md shadow-primary/20' : 'border-border/60 hover:border-primary/50 hover:bg-primary/5'}`}>
+                <div className="flex-1">
+                  <p className="text-base font-bold text-primary flex items-center gap-2">
+                    VIP Ink Bundle <Badge variant="default" className="text-[10px] h-4 py-0">BEST VALUE</Badge>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Get Priority Placement, AI Price Estimate, Pre-Booking Chat, and Perfect Match Router. Usually $21.96.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.priorityBoostCents)}</span>
+                  <span className="text-base font-bold">{formatUsd(REQUEST_ADDON_PRICING.vipBundleCents)}</span>
                   <input
                     type="checkbox"
-                    checked={addOns.priorityBoost}
-                    onChange={(e) =>
-                      setAddOns((prev) => ({
-                        ...prev,
-                        priorityBoost: e.target.checked,
-                      }))
-                    }
-                    className="w-4 h-4 accent-primary rounded"
-                  />
-                </div>
-              </label>
-
-              <label className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3 cursor-pointer hover:border-primary/40 transition-colors">
-                <div>
-                  <p className="text-sm font-medium">Featured Request Badge</p>
-                  <p className="text-xs text-muted-foreground">
-                    Adds a featured label so your request stands out in listings.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.featuredBadgeCents)}</span>
-                  <input
-                    type="checkbox"
-                    checked={addOns.featuredBadge}
-                    onChange={(e) =>
-                      setAddOns((prev) => ({
-                        ...prev,
-                        featuredBadge: e.target.checked,
-                      }))
-                    }
-                    className="w-4 h-4 accent-primary rounded"
-                  />
-                </div>
-              </label>
-
-              <div className="rounded-lg border border-border/60 p-3">
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <div>
-                    <p className="text-sm font-medium">Direct Message Credits</p>
-                    <p className="text-xs text-muted-foreground">
-                      Priority intro messages you can send to matching artists.
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold">
-                    {formatUsd(REQUEST_ADDON_PRICING.directMessageCreditCents)} each
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={addOns.directMessageCredits}
+                    checked={addOns.vipBundle}
                     onChange={(e) => {
-                      const next = Number(e.target.value || "0");
-                      const safeValue = Number.isFinite(next)
-                        ? Math.max(0, Math.min(20, Math.floor(next)))
-                        : 0;
+                      const checked = e.target.checked;
                       setAddOns((prev) => ({
                         ...prev,
-                        directMessageCredits: safeValue,
+                        vipBundle: checked,
+                        // Clear others if VIP selected, or just leave them but VIP overrides price
+                        ...(checked ? { priorityPlacement: false, aiPriceEstimate: false, preBookingChat: false, perfectMatchRouter: false } : {})
                       }));
                     }}
-                    className="w-28 bg-background/50 border-border/60"
+                    className="w-5 h-5 accent-primary rounded"
                   />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      setAddOns((prev) => ({
-                        ...prev,
-                        directMessageCredits:
-                          prev.directMessageCredits +
-                            REQUEST_ADDON_PRICING.directMessageBundleCount <=
-                          20
-                            ? prev.directMessageCredits +
-                              REQUEST_ADDON_PRICING.directMessageBundleCount
-                            : 20,
-                      }))
-                    }
-                  >
-                    +{REQUEST_ADDON_PRICING.directMessageBundleCount} for {formatUsd(REQUEST_ADDON_PRICING.directMessageBundleCents)}
-                  </Button>
                 </div>
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* Priority Placement */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.priorityPlacement && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
+                  <div>
+                    <p className="text-sm font-medium">Priority Placement</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Top of the artist feed for 48 hrs.</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.priorityPlacementCents)}</span>
+                    <input
+                      type="checkbox"
+                      checked={addOns.priorityPlacement || addOns.vipBundle}
+                      disabled={addOns.vipBundle}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, priorityPlacement: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                    />
+                  </div>
+                </label>
+
+                {/* AI Price Estimate */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.aiPriceEstimate && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
+                  <div>
+                    <p className="text-sm font-medium">AI Price Estimate</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Instant accurate cost analysis.</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.aiPriceEstimateCents)}</span>
+                    <input
+                      type="checkbox"
+                      checked={addOns.aiPriceEstimate || addOns.vipBundle}
+                      disabled={addOns.vipBundle}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, aiPriceEstimate: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                    />
+                  </div>
+                </label>
+
+                {/* Pre-Booking Chat */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.preBookingChat && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
+                  <div>
+                    <p className="text-sm font-medium">Pre-Booking Chat</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Message artists before you book.</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.preBookingChatCents)}</span>
+                    <input
+                      type="checkbox"
+                      checked={addOns.preBookingChat || addOns.vipBundle}
+                      disabled={addOns.vipBundle}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, preBookingChat: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                    />
+                  </div>
+                </label>
+
+                {/* Perfect Match Router */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.perfectMatchRouter && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
+                  <div>
+                    <p className="text-sm font-medium">Perfect Match</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Direct push to 3 ideal artists.</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.perfectMatchRouterCents)}</span>
+                    <input
+                      type="checkbox"
+                      checked={addOns.perfectMatchRouter || addOns.vipBundle}
+                      disabled={addOns.vipBundle}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, perfectMatchRouter: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                    />
+                  </div>
+                </label>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
-                <span className="text-sm text-muted-foreground">Optional add-ons total</span>
-                <span className="text-sm font-semibold">{formatUsd(addOnTotalCents)}</span>
+              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 mt-4">
+                <span className="text-sm font-medium text-primary">Upgrade Total</span>
+                <span className="text-lg font-bold text-primary">{formatUsd(addOnTotalCents)}</span>
               </div>
             </CardContent>
           </Card>

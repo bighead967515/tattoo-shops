@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: universalinc
+    name: inkconnect
     runtime: node
     region: oregon
     plan: free

@@ -10,11 +10,13 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { eq, sql, and, gt } from "drizzle-orm";
 import { getDb } from "./db";
-import { clients } from "../drizzle/schema";
+import { clients, artists } from "../drizzle/schema";
 import { generateTattooDesign } from "./geminiGeneration";
 import {
   getClientTierLimits,
   type ClientSubscriptionTier,
+  getArtistTierLimits,
+  type ArtistSubscriptionTier,
 } from "../shared/tierLimits";
 import { logger } from "./_core/logger";
 
@@ -50,57 +52,65 @@ export const aiRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
 
-      // 1. Verify user has a client profile
-      const [clientProfile] = await db
-        .select()
-        .from(clients)
-        .where(eq(clients.userId, ctx.user.id))
-        .limit(1);
+      const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
 
-      if (!clientProfile) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message:
-            "You need a client profile to use AI Generation. Complete client onboarding first.",
-        });
-      }
+      let profileId: number;
+      let availableCredits: number;
+      let limitMax: number;
+      let tableName: any;
 
-      // 2. Check subscription tier and AI credits (always read from canonical users.subscriptionTier)
-      const tier = (ctx.user.subscriptionTier ||
-        "client_free") as ClientSubscriptionTier;
-      const tierLimits = getClientTierLimits(tier);
+      if (isArtist) {
+        const [artistProfile] = await db.select().from(artists).where(eq(artists.userId, ctx.user.id)).limit(1);
+        if (!artistProfile) throw new TRPCError({ code: "FORBIDDEN", message: "Artist profile not found" });
+        
+        const tier = (ctx.user.subscriptionTier || "artist_free") as ArtistSubscriptionTier;
+        const tierLimits = getArtistTierLimits(tier);
+        if (tierLimits.aiGenerationsPerMonth === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "AI Studio is a Pro feature. Upgrade to Pro ($49/mo) to unlock." });
+        }
+        
+        profileId = artistProfile.id;
+        availableCredits = artistProfile.aiCredits;
+        limitMax = tierLimits.aiGenerationsPerMonth;
+        tableName = artists;
+      } else {
+        const [clientProfile] = await db.select().from(clients).where(eq(clients.userId, ctx.user.id)).limit(1);
+        if (!clientProfile) throw new TRPCError({ code: "FORBIDDEN", message: "Profile not found." });
 
-      if (tierLimits.aiGenerationsPerMonth === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message:
-            "AI Generation is a premium feature. Upgrade to Enthusiast ($9/mo) or Elite Ink ($19/mo) to unlock tattoo design generation.",
-        });
+        const tier = (ctx.user.subscriptionTier || "client_free") as ClientSubscriptionTier;
+        const tierLimits = getClientTierLimits(tier);
+        if (tierLimits.aiGenerationsPerMonth === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "AI Generation requires AI credits. Buy an add-on to generate." });
+        }
+
+        profileId = clientProfile.id;
+        availableCredits = clientProfile.aiCredits;
+        limitMax = tierLimits.aiGenerationsPerMonth;
+        tableName = clients;
       }
 
       // 3. Check remaining credits (unless unlimited) — atomic deduction
-      if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
+      if (limitMax !== Number.MAX_SAFE_INTEGER) {
         // Atomic decrement: only succeeds if aiCredits > 0
         const [updated] = await db
-          .update(clients)
+          .update(tableName)
           .set({
-            aiCredits: sql`${clients.aiCredits} - 1`,
+            aiCredits: sql`${tableName.aiCredits} - 1`,
             updatedAt: new Date(),
           })
           .where(
-            and(eq(clients.id, clientProfile.id), gt(clients.aiCredits, 0)),
+            and(eq(tableName.id, profileId), gt(tableName.aiCredits, 0)),
           )
-          .returning({ aiCredits: clients.aiCredits });
+          .returning({ aiCredits: tableName.aiCredits });
 
         if (!updated) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: `You've used all ${tierLimits.aiGenerationsPerMonth} AI generation credits for this billing period. Upgrade to Elite Ink for unlimited generations.`,
+            message: `You've used all your AI generation credits. Please upgrade or purchase more.`,
           });
         }
 
-        // Use the DB-returned value for the rest of the request
-        clientProfile.aiCredits = updated.aiCredits;
+        availableCredits = updated.aiCredits;
       }
 
       // 4. Generate the tattoo design
@@ -112,10 +122,10 @@ export const aiRouter = router({
         );
 
         logger.info(
-          `AI tattoo generated for client #${clientProfile.id} (user #${ctx.user.id}), credits remaining: ${
-            tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+          `AI tattoo generated for user #${ctx.user.id}, credits remaining: ${
+            limitMax === Number.MAX_SAFE_INTEGER
               ? "unlimited"
-              : clientProfile.aiCredits
+              : availableCredits
           }`,
         );
 
@@ -123,19 +133,19 @@ export const aiRouter = router({
           imageUrl: result.imageUrl,
           imageKey: result.imageKey,
           creditsRemaining:
-            tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+            limitMax === Number.MAX_SAFE_INTEGER
               ? null
-              : clientProfile.aiCredits,
+              : availableCredits,
         };
       } catch (error) {
         logger.error("AI tattoo generation failed:", error);
 
         // Refund the credit if one was consumed — generation did not succeed
-        if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
+        if (limitMax !== Number.MAX_SAFE_INTEGER) {
           await db
-            .update(clients)
-            .set({ aiCredits: sql`${clients.aiCredits} + 1`, updatedAt: new Date() })
-            .where(eq(clients.id, clientProfile.id));
+            .update(tableName)
+            .set({ aiCredits: sql`${tableName.aiCredits} + 1`, updatedAt: new Date() })
+            .where(eq(tableName.id, profileId));
         }
 
         throw new TRPCError({
@@ -151,32 +161,36 @@ export const aiRouter = router({
   getCredits: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
 
-    const [clientProfile] = await db
-      .select()
-      .from(clients)
-      .where(eq(clients.userId, ctx.user.id))
-      .limit(1);
+    const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
 
-    if (!clientProfile) {
+    if (isArtist) {
+      const [artistProfile] = await db.select().from(artists).where(eq(artists.userId, ctx.user.id)).limit(1);
+      if (!artistProfile) return { tier: "artist_free", tierName: "Directory Profile", aiCredits: 0, maxCredits: 0, isUnlimited: false };
+
+      const tier = (ctx.user.subscriptionTier || "artist_free") as ArtistSubscriptionTier;
+      const tierLimits = getArtistTierLimits(tier);
+
       return {
-        tier: "client_free" as const,
-        tierName: "Collector",
-        aiCredits: 0,
-        maxCredits: 0,
-        isUnlimited: false,
+        tier,
+        tierName: tierLimits.name,
+        aiCredits: artistProfile.aiCredits,
+        maxCredits: tierLimits.aiGenerationsPerMonth,
+        isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER,
+      };
+    } else {
+      const [clientProfile] = await db.select().from(clients).where(eq(clients.userId, ctx.user.id)).limit(1);
+      if (!clientProfile) return { tier: "client_free", tierName: "Collector", aiCredits: 0, maxCredits: 0, isUnlimited: false };
+
+      const tier = (ctx.user.subscriptionTier || "client_free") as ClientSubscriptionTier;
+      const tierLimits = getClientTierLimits(tier);
+
+      return {
+        tier,
+        tierName: tierLimits.name,
+        aiCredits: clientProfile.aiCredits,
+        maxCredits: tierLimits.aiGenerationsPerMonth,
+        isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER,
       };
     }
-
-    const tier = (ctx.user.subscriptionTier ||
-      "client_free") as ClientSubscriptionTier;
-    const tierLimits = getClientTierLimits(tier);
-
-    return {
-      tier,
-      tierName: tierLimits.name,
-      aiCredits: clientProfile.aiCredits,
-      maxCredits: tierLimits.aiGenerationsPerMonth,
-      isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER,
-    };
   }),
 });

@@ -2,7 +2,7 @@ import type { SubscriptionTier } from "./const";
 
 export type ArtistCanonicalTier = Extract<
   SubscriptionTier,
-  "artist_free" | "artist_amateur" | "artist_pro" | "artist_icon"
+  "artist_free" | "artist_paygo" | "artist_pro" | "artist_elite"
 >;
 
 export type LegacyArtistTier =
@@ -13,10 +13,12 @@ export type LegacyArtistTier =
 
 const FREE_ARTIST_TIERS = ["artist_free", "free"] as const;
 const AI_BID_ASSISTANT_TIERS = [
-  "artist_amateur",
-  "artist_icon",
+  "artist_paygo",
+  "artist_pro",
+  "artist_elite",
   "amateur",
   "frontPage",
+  "professional",
 ] as const;
 
 function hasTierValue(
@@ -43,9 +45,9 @@ const LEGACY_ARTIST_TIER_BY_CANONICAL: Record<
   LegacyArtistTier
 > = {
   artist_free: "free",
-  artist_amateur: "amateur",
+  artist_paygo: "amateur",
   artist_pro: "professional",
-  artist_icon: "frontPage",
+  artist_elite: "frontPage",
 };
 
 export function toLegacyArtistTier(

@@ -18,6 +18,8 @@ export const SubscriptionTiers = z.enum([
   "artist_pro",
   "artist_elite",
   "client_free",
+  "client_plus",
+  "client_elite",
 ]);
 
 export type SubscriptionTier = z.infer<typeof SubscriptionTiers>;
@@ -47,4 +49,6 @@ export const TIER_LIMITS: Record<
   },
 
   client_free: { portfolioMax: 0, aiCredits: 0, canBook: true },
+  client_plus: { portfolioMax: 0, aiCredits: 10, canBook: true },
+  client_elite: { portfolioMax: 0, aiCredits: Number.MAX_SAFE_INTEGER, canBook: true },
 };

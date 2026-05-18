@@ -4,27 +4,23 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Check, X, Crown, Zap, Palette } from "lucide-react";
 import { Link } from "wouter";
-import { TIER_LIMITS, TIER_PRICING, CLIENT_TIER_LIMITS, CLIENT_TIER_PRICING } from "@shared/tierLimits";
-import {
-  toLegacyArtistTier,
-  type ArtistCanonicalTier,
-} from "@shared/tierCompat";
+import { ARTIST_TIER_LIMITS, ARTIST_TIER_PRICING, CLIENT_TIER_LIMITS, CLIENT_TIER_PRICING, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { cn } from "@/lib/utils";
 
-const artistTierOrder: ArtistCanonicalTier[] = [
+const artistTierOrder: ArtistSubscriptionTier[] = [
   "artist_free",
-  "artist_amateur",
+  "artist_paygo",
   "artist_pro",
-  "artist_icon",
+  "artist_elite",
 ];
 
 const clientTierOrder = ["client_free", "client_plus", "client_elite"] as const;
 
-const ARTIST_TIER_DESCRIPTIONS: Record<ArtistCanonicalTier, string> = {
+const ARTIST_TIER_DESCRIPTIONS: Record<ArtistSubscriptionTier, string> = {
   artist_free: "A free profile to get discovered.",
-  artist_amateur: "Subscription plan with lower transaction fees.",
-  artist_pro: "No subscription. Bid and pay only when you win.",
-  artist_icon: "Founding member perks. Pro features. Rate locked for life.",
+  artist_paygo: "Pay-as-you-go bidding. Pay only when booked.",
+  artist_pro: "Pro Studio features to supercharge your business.",
+  artist_elite: "Elite status, sponsored placement, ultimate growth.",
 };
 
 export default function Pricing() {
@@ -55,11 +51,10 @@ export default function Pricing() {
 
           <div className="grid xl:grid-cols-4 lg:grid-cols-2 md:grid-cols-2 gap-6 max-w-7xl mx-auto">
             {artistTierOrder.map((tier) => {
-              const legacyTier = toLegacyArtistTier(tier);
-              const limits = TIER_LIMITS[legacyTier];
-              const pricing = TIER_PRICING[legacyTier];
-              const isMostPopular = tier === "artist_amateur";
-              const isFoundingArtist = tier === "artist_icon";
+              const limits = ARTIST_TIER_LIMITS[tier];
+              const pricing = ARTIST_TIER_PRICING[tier];
+              const isMostPopular = tier === "artist_pro";
+              const isElite = tier === "artist_elite";
 
               return (
                 <Card
@@ -67,8 +62,8 @@ export default function Pricing() {
                   className={cn(
                     "p-7 flex flex-col relative",
                     isMostPopular && "border-2 border-primary bg-gradient-to-br from-primary/10 to-background",
-                    isFoundingArtist && "border-2 border-amber-400 bg-gradient-to-br from-amber-50/60 to-background dark:from-amber-950/20",
-                    !isMostPopular && !isFoundingArtist && "border-border",
+                    isElite && "border-2 border-amber-400 bg-gradient-to-br from-amber-50/60 to-background dark:from-amber-950/20",
+                    !isMostPopular && !isElite && "border-border",
                   )}
                 >
                   {isMostPopular && (
@@ -79,11 +74,11 @@ export default function Pricing() {
                       </div>
                     </div>
                   )}
-                  {isFoundingArtist && (
+                  {isElite && (
                     <div className="absolute top-0 -translate-y-1/2 w-full flex justify-center">
                       <div className="bg-amber-500 text-white px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
                         <Crown className="h-3 w-3" />
-                        FOUNDING ARTIST
+                        ELITE STATUS
                       </div>
                     </div>
                   )}
@@ -91,7 +86,7 @@ export default function Pricing() {
                   <div className="text-center mb-6">
                     <h2 className={cn(
                       "text-2xl font-bold mb-2",
-                      isFoundingArtist && "text-amber-700 dark:text-amber-400",
+                      isElite && "text-amber-700 dark:text-amber-400",
                     )}>
                       {limits.name}
                     </h2>
@@ -99,13 +94,11 @@ export default function Pricing() {
                       ${pricing.monthly / 100}
                       <span className="text-xl text-muted-foreground">/mo</span>
                     </div>
-                    {isFoundingArtist && (
-                      <div className="text-xs text-amber-600 font-semibold mb-1">
-                        6 months FREE · then $19/mo locked for life
-                      </div>
+                    {tier === "artist_pro" && (
+                      <div className="text-xs text-muted-foreground mb-1">or $490/yr (2 months free)</div>
                     )}
-                    {tier === "artist_amateur" && (
-                      <div className="text-xs text-muted-foreground mb-1">or $232/yr (2 months free)</div>
+                    {tier === "artist_elite" && (
+                      <div className="text-xs text-muted-foreground mb-1">or $990/yr (2 months free)</div>
                     )}
                     <p className="text-muted-foreground text-xs mt-2">
                       {ARTIST_TIER_DESCRIPTIONS[tier]}
@@ -113,13 +106,13 @@ export default function Pricing() {
                   </div>
 
                   <Button
-                    className={cn("w-full mb-6 group", isFoundingArtist && "bg-amber-500 hover:bg-amber-600 text-white border-0")}
+                    className={cn("w-full mb-6 group", isElite && "bg-amber-500 hover:bg-amber-600 text-white border-0")}
                     variant={isMostPopular ? "default" : "outline"}
                     asChild
                   >
                     <Link href="/artist/billing">
                       <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                      {tier === "artist_free" ? "Start Free" : isFoundingArtist ? "Claim Spot" : "Choose Plan"}
+                      {tier === "artist_free" ? "Start Free" : isElite ? "Go Elite" : "Choose Plan"}
                     </Link>
                   </Button>
 
@@ -129,15 +122,16 @@ export default function Pricing() {
                       label={`${limits.portfolioPhotos === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.portfolioPhotos} portfolio photos`}
                       highlight={limits.portfolioPhotos === Number.MAX_SAFE_INTEGER}
                     />
-                    <FeatureRow enabled={limits.canAcceptBookings} label="Accept bookings" />
-                    <FeatureRow enabled={limits.canShowDirectContact} label="Direct contact info" />
-                    <FeatureRow enabled={limits.canRespondToReviews} label="Respond to reviews" />
-                    <FeatureRow enabled={limits.hasAnalytics} label="Profile analytics" />
-                    <FeatureRow enabled={isFoundingArtist} label="Featured badge + homepage placement" />
+                    <FeatureRow enabled={limits.canBid} label="Bid on client requests" />
+                    <FeatureRow enabled={limits.freeBidsPerMonth > 0} label={`${limits.freeBidsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.freeBidsPerMonth} free bids/month`} />
+                    <FeatureRow enabled={limits.aiGenerationsPerMonth > 0} label={`${limits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.aiGenerationsPerMonth} AI design generations`} />
+                    <FeatureRow enabled={limits.chatTokensPerMonth > 0} label="Free client messaging credits" />
+                    <FeatureRow enabled={limits.sponsoredListing} label="Sponsored placement" />
+                    <FeatureRow enabled={limits.verifiedBadge} label="Verified Badge" />
                     <FeatureRow
                       enabled
-                      label={`${Math.round((limits.transactionFeeRate ?? 0) * 100)}% transaction fee`}
-                      neutral={limits.transactionFeeRate === 0}
+                      label={`${limits.transactionFeePercent}% booking fee`}
+                      neutral={limits.transactionFeePercent === 0}
                     />
                   </div>
                 </Card>

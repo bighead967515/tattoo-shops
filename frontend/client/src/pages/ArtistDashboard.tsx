@@ -46,8 +46,7 @@ import ArtistDashboardFeed from "@/components/ArtistDashboardFeed";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { Progress } from "@/components/ui/progress";
 import axios from "axios";
-import { isFreeArtistTier, toLegacyArtistTier, type ArtistCanonicalTier } from "@shared/tierCompat";
-import { TIER_LIMITS, TIER_PRICING, type ArtistTierKey } from "@shared/tierLimits";
+import { getArtistTierLimits, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { Link } from "wouter";
 
 export default function ArtistDashboard() {
@@ -246,13 +245,21 @@ export default function ArtistDashboard() {
               </span>
             </p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setLocation(`/artist/${artist.id}`)}
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            View Public Profile
-          </Button>
+          <div className="flex items-center gap-3">
+            <Link href="/artist/design-lab">
+              <Button variant="default" className="bg-gradient-to-r from-primary to-accent text-primary-foreground font-semibold shadow-lg shadow-primary/20">
+                <Sparkles className="w-4 h-4 mr-2 fill-current" />
+                Open AI Studio
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              onClick={() => setLocation(`/artist/${artist.id}`)}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              View Public Profile
+            </Button>
+          </div>
         </div>
 
         {/* Onboarding Checklist — shown until all steps complete */}
@@ -266,7 +273,7 @@ export default function ArtistDashboard() {
             { id: "portfolio", label: "Upload 3+ portfolio photos", done: hasPortfolio, cta: "Add Photos", tab: "portfolio" },
             { id: "bio", label: "Write a bio (20+ characters)", done: hasBio, cta: "Edit Profile", tab: "settings" },
             { id: "instagram", label: "Add your Instagram handle", done: hasInstagram, cta: "Add Instagram", tab: "settings" },
-            { id: "subscription", label: "Upgrade to Pro for bidding access", done: hasSubscription, cta: "Upgrade", tab: "billing" },
+            { id: "subscription", label: "Upgrade for booking access", done: hasSubscription, cta: "Upgrade", tab: "billing" },
           ];
           const completedCount = steps.filter(s => s.done).length;
           const allDone = completedCount === steps.length;
@@ -315,6 +322,43 @@ export default function ArtistDashboard() {
                     )}
                   </div>
                 ))}
+              </div>
+            </Card>
+          );
+        })()}
+
+        {/* Lost Revenue Widget for Pay-as-you-go Artists */}
+        {(() => {
+          const tier = (artist.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+          if (tier !== "artist_paygo") return null;
+
+          const acceptedBidsRevenue = myBids?.filter((b) => b.status === "accepted").reduce((acc, bid) => acc + (bid.priceEstimate ?? 0), 0) ?? 0;
+          const lostRevenueCents = acceptedBidsRevenue * 0.10; // 10% difference between paygo (15%) and pro (5%)
+          
+          if (lostRevenueCents <= 0) return null;
+          
+          const lostRevenueStr = (lostRevenueCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+          return (
+            <Card className="mb-8 p-6 border-red-500/50 bg-red-500/10">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-full bg-red-500/20">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">
+                    You lost {lostRevenueStr} to platform fees this month!
+                  </h3>
+                  <p className="text-red-900/80 dark:text-red-200/80 mb-4 font-medium">
+                    You are on the Pay-as-you-go tier (15% fee). If you were on the $49/mo Pro Tier (5% fee), you would have kept {lostRevenueStr} of that money.
+                  </p>
+                  <Link href="/artist/billing">
+                    <Button className="bg-red-600 hover:bg-red-700 text-white gap-2 font-bold shadow-lg shadow-red-500/20">
+                      <Zap className="h-4 w-4 fill-current" />
+                      Upgrade to Pro to Stop Losing Money
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </Card>
           );
@@ -562,7 +606,7 @@ export default function ArtistDashboard() {
           {/* Requests Tab */}
           <TabsContent value="requests" className="space-y-4">
             <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
-            {isFreeArtistTier(artist.subscriptionTier) ? (
+            {artist.subscriptionTier === "artist_free" ? (
               <UpgradePrompt
                 feature="View & Bid on Requests"
                 description="Upgrade to a paid plan to view and bid on new tattoo requests from clients."
@@ -754,17 +798,16 @@ export default function ArtistDashboard() {
           <TabsContent value="billing" className="space-y-6">
             <h2 className="text-2xl font-semibold">Subscription & Billing</h2>
             {(() => {
-              const tier = (artist.subscriptionTier ?? "artist_free") as ArtistCanonicalTier;
-              const legacy = toLegacyArtistTier(tier);
-              const limits = TIER_LIMITS[legacy as ArtistTierKey];
-              const isFree = isFreeArtistTier(tier);
-              const isPayg = tier === "artist_pro";
-              const isPro = tier === "artist_amateur";
-              const isFounder = tier === "artist_icon";
+              const tier = (artist.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+              const limits = getArtistTierLimits(tier);
+              const isFree = tier === "artist_free";
+              const isPayg = tier === "artist_paygo";
+              const isPro = tier === "artist_pro";
+              const isElite = tier === "artist_elite";
 
-              const planName = isFree ? "Free" : isPayg ? "Pay-as-you-go" : isPro ? "Pro" : "Founding Artist";
-              const planPrice = isFree || isPayg ? "$0/mo" : isPro ? "$29/mo or $232/yr" : "$19/mo locked for life";
-              const transactionFee = isFree ? "No bidding access" : isPayg ? "10% platform fee on accepted bids" : "5% platform fee on accepted bids";
+              const planName = isFree ? "Directory Profile" : isPayg ? "Pay-as-you-go" : isPro ? "Pro Studio" : "Elite Icon";
+              const planPrice = isFree ? "$0/mo" : isPayg ? "$0/mo" : isPro ? "$49/mo" : "$99/mo";
+              const transactionFee = isFree ? "No bidding access" : isPayg ? "15% platform fee on accepted bids" : isPro ? "5% platform fee on accepted bids" : "3% platform fee on accepted bids";
 
               return (
                 <>
@@ -772,8 +815,8 @@ export default function ArtistDashboard() {
                   <Card className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full ${isFounder ? "bg-amber-100" : "bg-primary/10"}`}>
-                          <Crown className={`h-6 w-6 ${isFounder ? "text-amber-500" : "text-primary"}`} />
+                        <div className={`p-3 rounded-full ${isElite ? "bg-amber-100" : "bg-primary/10"}`}>
+                          <Crown className={`h-6 w-6 ${isElite ? "text-amber-500" : "text-primary"}`} />
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Current Plan</p>
@@ -796,9 +839,9 @@ export default function ArtistDashboard() {
                     <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {[
                         { label: "Portfolio Photos", value: limits.portfolioPhotos === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.portfolioPhotos) },
-                        { label: "Bidding", value: isFree ? "Blocked" : "Unlimited" },
-                        { label: "Analytics", value: limits.hasAnalytics ? "Yes" : "No" },
-                        { label: "Verified Badge", value: limits.isVerifiedBadge ? "Yes" : "No" },
+                        { label: "Bids / Month", value: isFree ? "0" : limits.freeBidsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.freeBidsPerMonth) },
+                        { label: "AI Generations", value: limits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.aiGenerationsPerMonth) },
+                        { label: "Sponsored Listing", value: limits.sponsoredListing ? "Yes" : "No" },
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 rounded-lg bg-muted/40 border">
                           <p className="text-xs text-muted-foreground">{label}</p>
@@ -807,33 +850,6 @@ export default function ArtistDashboard() {
                       ))}
                     </div>
                   </Card>
-
-                  {/* Founding Artist banner for non-founders */}
-                  {!isFounder && (
-                    <Card className="p-5 border-amber-300 bg-amber-50/60 dark:bg-amber-950/10">
-                      <div className="flex items-start gap-4">
-                        <div className="p-2 rounded-full bg-amber-100">
-                          <Crown className="h-5 w-5 text-amber-500" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-amber-900 dark:text-amber-300 mb-1">
-                            🚀 Founding Artist Offer — First 100 Only
-                          </h3>
-                          <p className="text-sm text-amber-800 dark:text-amber-400 mb-3">
-                            Lock in <strong>$19/mo for life</strong> and get <strong>6 months free</strong>. Use code{" "}
-                            <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded font-mono text-xs">FOUNDING_ARTIST_6MO</code>{" "}
-                            at checkout.
-                          </p>
-                          <Link href="/artist/billing">
-                            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white border-0 gap-2">
-                              <Crown className="h-4 w-4" />
-                              Claim Founding Rate
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
 
                   {/* Upgrade CTA for free/payg users */}
                   {(isFree || isPayg) && (
@@ -844,11 +860,11 @@ export default function ArtistDashboard() {
                         </div>
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold mb-2">
-                            {isPayg ? "Save on fees — upgrade to Pro" : "Unlock Your Full Potential"}
+                            {isPayg ? "Save on fees & get AI Tools — Upgrade to Pro" : "Unlock Your Full Potential"}
                           </h3>
                           <p className="text-muted-foreground mb-4">
                             {isPayg
-                              ? "Pro members pay only 5% on accepted bids (vs. 10% pay-as-you-go). Win 3+ bids/month and Pro pays for itself."
+                              ? "Pro members pay only 5% on accepted bids (vs. 15% pay-as-you-go). Win 1 mid-size bid and Pro pays for itself! Plus, unlock 50 AI Studio generations per month for walk-ins."
                               : "Upgrade to start bidding on client posts, accept bookings, get a verified badge, and grow your clientele."}
                           </p>
                           <Link href="/artist/billing">

@@ -30,6 +30,7 @@ import RequestDetail from "./pages/RequestDetail";
 import AdminModeration from "./pages/AdminModeration";
 import AdminDashboard from "./pages/AdminDashboard";
 import DesignLab from "./pages/DesignLab";
+import ArtistDesignLab from "./pages/ArtistDesignLab";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ArtistBilling from "./pages/ArtistBilling";
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/client/design-lab" component={DesignLab} />
       {/* Artist registration flow */}
       <Route path="/artist/register" component={ArtistRegister} />
+      <Route path="/artist/design-lab" component={ArtistDesignLab} />
       {/* Artist billing routes */}
       <Route path="/artist/billing" component={ArtistBilling} />
       <Route path="/artist/billing/success" component={SubscriptionSuccess} />
@@ -104,6 +106,7 @@ function usesPageHeader(path: string) {
     path === "/privacy" ||
     path === "/pricing" ||
     path === "/client/design-lab" ||
+    path === "/artist/design-lab" ||
     path === "/artist/billing" ||
     path === "/artist/billing/success" ||
     path === "/404"
