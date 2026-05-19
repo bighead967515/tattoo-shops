@@ -1,6 +1,8 @@
-import { COOKIE_NAME, TIER_LIMITS, type SubscriptionTier } from "@shared/const";
+import { COOKIE_NAME, type SubscriptionTier } from "@shared/const";
+import { getArtistTierLimits, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { logger } from "./_core/logger";
 import {
   publicProcedure,
   protectedProcedure,
@@ -86,6 +88,39 @@ export const appRouter = router({
       .input(z.object({ artistId: z.number(), approved: z.boolean() }))
       .mutation(async ({ input }) => {
         await db.updateArtist(input.artistId, { isApproved: input.approved });
+        
+        // P1-3: Trigger n8n workflow for approval notification email
+        if (ENV.n8nWebhookUrl && ENV.n8nWebhookSecret) {
+          try {
+            const webhookUrl = `${ENV.n8nWebhookUrl}/webhook/artist-approval`;
+            const response = await fetch(webhookUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${ENV.n8nWebhookSecret}`,
+              },
+              body: JSON.stringify({
+                artistId: input.artistId,
+                approved: input.approved,
+              }),
+            });
+            
+            if (!response.ok) {
+              logger.warn("n8n webhook returned non-2xx status", {
+                artistId: input.artistId,
+                status: response.status,
+                statusText: response.statusText,
+              });
+            }
+          } catch (err) {
+            // Log but don't fail user request if webhook fails
+            logger.error("Failed to trigger n8n approval notification workflow", {
+              artistId: input.artistId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        
         return { success: true };
       }),
 
@@ -96,7 +131,7 @@ export const appRouter = router({
     createSubscriptionCheckout: protectedProcedure
       .input(
         z.object({
-          tier: z.enum(["artist_amateur", "artist_icon"]),
+          tier: z.enum(["artist_pro", "artist_elite"]),
           interval: z.enum(["month", "year"]).default("month"),
           successUrl: z.string().url(),
           cancelUrl: z.string().url(),
@@ -122,10 +157,10 @@ export const appRouter = router({
 
         // Resolve the correct Stripe Price ID
         const priceIdMap: Record<string, string | undefined> = {
-          artist_amateur_month: ENV.stripeArtistAmateurPriceIdMonth,
-          artist_amateur_year:  ENV.stripeArtistAmateurPriceIdYear,
-          artist_icon_month:    ENV.stripeArtistIconPriceIdMonth,
-          artist_icon_year:     ENV.stripeArtistIconPriceIdYear,
+          artist_pro_month: ENV.stripeArtistProPriceIdMonth,
+          artist_pro_year:  ENV.stripeArtistProPriceIdYear,
+          artist_elite_month:    ENV.stripeArtistIconPriceIdMonth,
+          artist_elite_year:     ENV.stripeArtistIconPriceIdYear,
         };
         const priceId = priceIdMap[`${input.tier}_${input.interval}`];
 
@@ -210,7 +245,7 @@ export const appRouter = router({
           metadata: {
             userId: String(ctx.user.id),
             artistId: String(artist.id),
-            tier: "artist_amateur",
+            tier: "artist_pro",
             interval: "month",
             isFoundingArtist: "true",
           },
@@ -292,28 +327,43 @@ export const appRouter = router({
         z.object({
           shopName: z.string(),
           bio: z.string().optional(),
+          experience: z.number().int().positive().optional(),
+          city: z.string().default(""),
+          state: z.string().default(""),
+          styles: z.string().optional(),
           specialties: z.string().optional(),
-          experience: z.number().optional(),
-          address: z.string().optional(),
-          city: z.string().optional(),
-          state: z.string().optional(),
-          zipCode: z.string().optional(),
-          phone: z.string().optional(),
-          website: z.string().optional(),
           instagram: z.string().optional(),
-          facebook: z.string().optional(),
-          lat: z.string().optional(),
-          lng: z.string().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        return await db.createArtist({
-          userId: ctx.user.id,
+        const newArtist = await db.createArtist({
           ...input,
           shopName: sanitizeInput(input.shopName, 255),
           bio: input.bio ? sanitizeInput(input.bio, 2000) : undefined,
-          specialties: input.specialties ? sanitizeInput(input.specialties, 500) : undefined,
+          specialties: input.specialties
+            ? sanitizeInput(input.specialties, 500)
+            : undefined,
+          userId: ctx.user.id,
         });
+
+        if (ENV.n8nOnboardingWebhookUrl) {
+          fetch(ENV.n8nOnboardingWebhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${ENV.n8nWebhookSecret}`,
+            },
+            body: JSON.stringify({
+              artistId: newArtist.id,
+              userId: ctx.user.id,
+              email: ctx.user.email,
+              firstName: ctx.user.name?.split(" ")[0] ?? "there",
+              shopName: input.shopName,
+            }),
+          }).catch(() => {});
+        }
+
+        return newArtist;
       }),
 
     update: artistOwnerProcedure
@@ -426,8 +476,8 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // ── Tier Gatekeeper ──────────────────────────────────────
         const tier = (ctx.user?.subscriptionTier ??
-          "artist_free") as SubscriptionTier;
-        const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
+          "artist_free") as ArtistSubscriptionTier;
+        const limit = getArtistTierLimits(tier).portfolioPhotos;
         const currentCount = await db.getPortfolioCountByArtistId(
           input.artistId,
         );
@@ -459,8 +509,8 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // ── Tier Gatekeeper ──────────────────────────────────────
         const tier = (ctx.user?.subscriptionTier ??
-          "artist_free") as SubscriptionTier;
-        const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
+          "artist_free") as ArtistSubscriptionTier;
+        const limit = getArtistTierLimits(tier).portfolioPhotos;
         const currentCount = await db.getPortfolioCountByArtistId(
           input.artistId,
         );

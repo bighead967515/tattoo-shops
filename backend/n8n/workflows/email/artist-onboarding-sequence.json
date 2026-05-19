@@ -1,0 +1,185 @@
+{
+  "name": "Artist Onboarding 6-Email Sequence",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "name": "trigger_webhook_onboarding",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "artist-onboarding",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "name": "api_supabase_fetch_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [420, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/users?id=eq.' + $node['trigger_webhook_onboarding'].json.body.userId + '&select=email,emailOptOut,name' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "check_not_unsubscribed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !($json[0] && $json[0].emailOptOut) }}",
+              "operation": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "send_email_artist_welcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'The Ink Connect Team <hello@inkconnect.app>', to: $node['trigger_webhook_onboarding'].json.body.email, subject: \"You're in. Here's what to do first.\", html: `<p>Hey ${$node['trigger_webhook_onboarding'].json.body.firstName || 'there'},</p><p>Welcome to Ink Connect.</p><p><a href='https://inkconnect.app/artist-dashboard'>Complete Your Profile</a></p><p style='font-size:12px;color:#666;'>If you no longer wish to receive these emails, unsubscribe here: <a href='${$env.PUBLIC_BASE_URL || 'https://inkconnect.app'}/unsubscribe?email=${encodeURIComponent($node['trigger_webhook_onboarding'].json.body.email || '')}'>Unsubscribe</a></p>` } }}"
+      }
+    },
+    { "name": "wait_day_2", "type": "n8n-nodes-base.wait", "typeVersion": 1, "position": [1140, 220], "parameters": { "unit": "days", "amount": 2 } },
+    {
+      "name": "send_email_artist_profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1380, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'The Ink Connect Team <hello@inkconnect.app>', to: $node['trigger_webhook_onboarding'].json.body.email, subject: 'Clients are looking at your profile right now', html: `<p>Complete your profile to increase visibility.</p><p style='font-size:12px;color:#666;'>If you no longer wish to receive these emails, unsubscribe here: <a href='${$env.PUBLIC_BASE_URL || 'https://inkconnect.app'}/unsubscribe?email=${encodeURIComponent($node['trigger_webhook_onboarding'].json.body.email || '')}'>Unsubscribe</a></p>` } }}"
+      }
+    },
+    { "name": "wait_day_4", "type": "n8n-nodes-base.wait", "typeVersion": 1, "position": [1620, 220], "parameters": { "unit": "days", "amount": 2 } },
+    {
+      "name": "send_email_artist_requests",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1860, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'The Ink Connect Team <hello@inkconnect.app>', to: $node['trigger_webhook_onboarding'].json.body.email, subject: '8 open requests match your style', html: `<p>Open requests are waiting.</p><p style='font-size:12px;color:#666;'>If you no longer wish to receive these emails, unsubscribe here: <a href='${$env.PUBLIC_BASE_URL || 'https://inkconnect.app'}/unsubscribe?email=${encodeURIComponent($node['trigger_webhook_onboarding'].json.body.email || '')}'>Unsubscribe</a></p>` } }}"
+      }
+    },
+    { "name": "wait_day_7", "type": "n8n-nodes-base.wait", "typeVersion": 1, "position": [2100, 220], "parameters": { "unit": "days", "amount": 3 } },
+    {
+      "name": "send_email_artist_bidding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2340, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'The Ink Connect Team <hello@inkconnect.app>', to: $node['trigger_webhook_onboarding'].json.body.email, subject: 'What happens after you send a bid', html: `<p>Here is how bidding works.</p><p style='font-size:12px;color:#666;'>If you no longer wish to receive these emails, unsubscribe here: <a href='${$env.PUBLIC_BASE_URL || 'https://inkconnect.app'}/unsubscribe?email=${encodeURIComponent($node['trigger_webhook_onboarding'].json.body.email || '')}'>Unsubscribe</a></p>` } }}"
+      }
+    },
+    { "name": "wait_day_10", "type": "n8n-nodes-base.wait", "typeVersion": 1, "position": [2580, 220], "parameters": { "unit": "days", "amount": 3 } },
+    {
+      "name": "send_email_artist_founding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2820, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'The Ink Connect Team <hello@inkconnect.app>', to: $node['trigger_webhook_onboarding'].json.body.email, subject: 'Your Founding Artist perks expire in 4 days', html: `<p>Founding perks reminder.</p><p style='font-size:12px;color:#666;'>If you no longer wish to receive these emails, unsubscribe here: <a href='${$env.PUBLIC_BASE_URL || 'https://inkconnect.app'}/unsubscribe?email=${encodeURIComponent($node['trigger_webhook_onboarding'].json.body.email || '')}'>Unsubscribe</a></p>` } }}"
+      }
+    },
+    { "name": "wait_day_14", "type": "n8n-nodes-base.wait", "typeVersion": 1, "position": [3060, 220], "parameters": { "unit": "days", "amount": 4 } },
+    {
+      "name": "send_email_artist_final",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3300, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'Maya, Ink Connect <maya@inkconnect.app>', to: $node['trigger_webhook_onboarding'].json.body.email, subject: 'One step away from going live', html: `<p>Your profile is ready.</p><p style='font-size:12px;color:#666;'>If you no longer wish to receive these emails, unsubscribe here: <a href='${$env.PUBLIC_BASE_URL || 'https://inkconnect.app'}/unsubscribe?email=${encodeURIComponent($node['trigger_webhook_onboarding'].json.body.email || '')}'>Unsubscribe</a></p>` } }}"
+      }
+    },
+    {
+      "name": "respond_webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 420],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, started: true, artistId: $node['trigger_webhook_onboarding'].json.body.artistId } }}"
+      }
+    }
+  ],
+  "connections": {
+    "trigger_webhook_onboarding": {
+      "main": [
+        [
+          { "node": "api_supabase_fetch_user", "type": "main", "index": 0 },
+          { "node": "respond_webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "api_supabase_fetch_user": { "main": [[{ "node": "check_not_unsubscribed", "type": "main", "index": 0 }]] },
+    "check_not_unsubscribed": { "main": [[{ "node": "send_email_artist_welcome", "type": "main", "index": 0 }], []] },
+    "send_email_artist_welcome": { "main": [[{ "node": "wait_day_2", "type": "main", "index": 0 }]] },
+    "wait_day_2": { "main": [[{ "node": "send_email_artist_profile", "type": "main", "index": 0 }]] },
+    "send_email_artist_profile": { "main": [[{ "node": "wait_day_4", "type": "main", "index": 0 }]] },
+    "wait_day_4": { "main": [[{ "node": "send_email_artist_requests", "type": "main", "index": 0 }]] },
+    "send_email_artist_requests": { "main": [[{ "node": "wait_day_7", "type": "main", "index": 0 }]] },
+    "wait_day_7": { "main": [[{ "node": "send_email_artist_bidding", "type": "main", "index": 0 }]] },
+    "send_email_artist_bidding": { "main": [[{ "node": "wait_day_10", "type": "main", "index": 0 }]] },
+    "wait_day_10": { "main": [[{ "node": "send_email_artist_founding", "type": "main", "index": 0 }]] },
+    "send_email_artist_founding": { "main": [[{ "node": "wait_day_14", "type": "main", "index": 0 }]] },
+    "wait_day_14": { "main": [[{ "node": "send_email_artist_final", "type": "main", "index": 0 }]] }
+  }
+}

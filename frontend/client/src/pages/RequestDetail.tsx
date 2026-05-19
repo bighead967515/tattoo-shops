@@ -49,16 +49,15 @@ import {
   Loader2,
   Calendar,
   Sparkles,
+  Zap,
+  Crown,
 } from "lucide-react";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import {
   canUseAiBidAssistant,
-  isFreeArtistTier,
   isFreeClientTier,
-  toLegacyArtistTier,
-  type ArtistCanonicalTier,
 } from "@shared/tierCompat";
-import { TIER_LIMITS, type ArtistTierKey } from "@shared/tierLimits";
+import { getArtistTierLimits, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { REQUEST_ADDON_PRICING } from "@shared/requestAddons";
 
 const FONT_FAMILY_OPTIONS = [
@@ -250,12 +249,10 @@ export default function RequestDetail() {
   );
   // Per-tier monthly bid quota logic
   const effectiveArtistTier =
-    user?.subscriptionTier ?? artistProfile?.subscriptionTier ?? "artist_free";
-  const isFreeTier = isFreeArtistTier(effectiveArtistTier);
-  const canonicalTier = effectiveArtistTier as ArtistCanonicalTier;
-  const legacyTier = toLegacyArtistTier(canonicalTier) as ArtistTierKey;
-  const tierLimits = TIER_LIMITS[legacyTier] ?? TIER_LIMITS.free;
-  const bidsPerMonth = tierLimits.bidsPerMonth;
+    (user?.subscriptionTier ?? artistProfile?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+  const isFreeTier = effectiveArtistTier === "artist_free";
+  const tierLimits = getArtistTierLimits(effectiveArtistTier);
+  const bidsPerMonth = tierLimits.freeBidsPerMonth;
   const isUnlimitedBids = bidsPerMonth === Number.MAX_SAFE_INTEGER;
   // Auto-reset: if the stored month doesn't match current month, treat counter as 0
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -511,43 +508,55 @@ export default function RequestDetail() {
           </Card>
 
           {request.addOnPaymentStatus === "paid" &&
-            (request.addOnPriorityBoost ||
-              request.addOnFeaturedBadge ||
-              request.addOnDirectMessageCredits > 0) && (
+            (request.selectedAddons?.length > 0) && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Request Add-ons</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" />
+                    Request Add-ons
+                  </CardTitle>
                   <CardDescription>
                     These optional upgrades were purchased for this request.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  {request.addOnPriorityBoost && (
+                  {request.selectedAddons?.includes("vipBundle") && (
                     <div className="flex items-center justify-between">
-                      <span>Priority Boost (48h)</span>
+                      <span>VIP Ink Bundle</span>
                       <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.priorityBoostCents)}
+                        {formatUsd(REQUEST_ADDON_PRICING.vipBundleCents)}
                       </span>
                     </div>
                   )}
-                  {request.addOnFeaturedBadge && (
+                  {request.selectedAddons?.includes("priorityPlacement") && !request.selectedAddons?.includes("vipBundle") && (
                     <div className="flex items-center justify-between">
-                      <span>Featured Request Badge</span>
+                      <span>Priority Placement</span>
                       <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.featuredBadgeCents)}
+                        {formatUsd(REQUEST_ADDON_PRICING.priorityPlacementCents)}
                       </span>
                     </div>
                   )}
-                  {request.addOnDirectMessageCredits > 0 && (
+                  {request.selectedAddons?.includes("aiPriceEstimate") && !request.selectedAddons?.includes("vipBundle") && (
                     <div className="flex items-center justify-between">
-                      <span>
-                        Direct Message Credits ({request.addOnDirectMessageCredits})
-                      </span>
+                      <span>AI Price Estimate</span>
                       <span className="font-medium">
-                        {formatUsd(
-                          request.addOnDirectMessageCredits *
-                            REQUEST_ADDON_PRICING.directMessageCreditCents,
-                        )}
+                        {formatUsd(REQUEST_ADDON_PRICING.aiPriceEstimateCents)}
+                      </span>
+                    </div>
+                  )}
+                  {request.selectedAddons?.includes("preBookingChat") && !request.selectedAddons?.includes("vipBundle") && (
+                    <div className="flex items-center justify-between">
+                      <span>Pre-Booking Chat</span>
+                      <span className="font-medium">
+                        {formatUsd(REQUEST_ADDON_PRICING.preBookingChatCents)}
+                      </span>
+                    </div>
+                  )}
+                  {request.selectedAddons?.includes("perfectMatchRouter") && !request.selectedAddons?.includes("vipBundle") && (
+                    <div className="flex items-center justify-between">
+                      <span>Perfect Match Router</span>
+                      <span className="font-medium">
+                        {formatUsd(REQUEST_ADDON_PRICING.perfectMatchRouterCents)}
                       </span>
                     </div>
                   )}

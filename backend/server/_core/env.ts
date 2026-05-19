@@ -9,18 +9,19 @@ const envSchema = z.object({
     .default("development"),
   STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
   STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
-  // Artist subscription Stripe Price IDs (live — created 2026-04-20)
-  STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
-  STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR:  z.string().default("price_1TOraXQRJTQEheTOVr8zI9O4"),
-  STRIPE_ARTIST_PRO_PRICE_ID_MONTH:     z.string().default("price_1TOraYQRJTQEheTO3k4MS3PR"),
-  STRIPE_ARTIST_PRO_PRICE_ID_YEAR:      z.string().default("price_1TOraYQRJTQEheTOHNQL82m3"),
-  STRIPE_ARTIST_ICON_PRICE_ID_MONTH:    z.string().default("price_1TOraZQRJTQEheTOofBdpJwM"),
-  STRIPE_ARTIST_ICON_PRICE_ID_YEAR:     z.string().default("price_1TOraaQRJTQEheTOwDiBtF35"),
+  // Artist subscription Stripe Price IDs — REQUIRED. Must be set explicitly per environment.
+  // Create in Stripe Dashboard and set as env vars. Hardcoded defaults risk wrong-environment billing.
+  STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH is required"),
+  STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR:  z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR is required"),
+  STRIPE_ARTIST_PRO_PRICE_ID_MONTH:     z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_MONTH is required"),
+  STRIPE_ARTIST_PRO_PRICE_ID_YEAR:      z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_YEAR is required"),
+  STRIPE_ARTIST_ICON_PRICE_ID_MONTH:    z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_MONTH is required"),
+  STRIPE_ARTIST_ICON_PRICE_ID_YEAR:     z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
   // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
-  STRIPE_FOUNDING_ARTIST_PRICE_ID:      z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
-  // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
-  STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
-  STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
+  STRIPE_FOUNDING_ARTIST_PRICE_ID:      z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
+  // Client subscription Stripe Price IDs — REQUIRED for checkout. Set after creating Products in the Stripe Dashboard.
+  STRIPE_CLIENT_PLUS_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_PLUS_PRICE_ID is required"),
+  STRIPE_CLIENT_ELITE_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_ELITE_PRICE_ID is required"),
   RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -35,6 +36,12 @@ const envSchema = z.object({
   CORS_ALLOWED_ORIGINS: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().optional(),
   PORT: z.string().default("3000"),
+  // P1-3: n8n workflow integration
+  N8N_WEBHOOK_URL: z.string().url().optional().describe("n8n instance webhook base URL (e.g., https://n8n.example.com)"),
+  N8N_WEBHOOK_SECRET: z.string().optional().describe("Bearer token for n8n webhook authentication"),
+  // Onboarding and verification webhook URLs
+  N8N_ONBOARDING_WEBHOOK_URL: z.string().url().optional().describe("n8n onboarding webhook base URL (e.g., https://n8n.example.com)"),
+  N8N_VERIFICATION_WEBHOOK_URL: z.string().url().optional().describe("n8n verification webhook base URL (e.g., https://n8n.example.com)"),
 });
 
 // Validate env vars at startup - fail fast on missing required values
@@ -80,4 +87,37 @@ export const ENV = {
   publicBaseUrl: parsed.data.PUBLIC_BASE_URL,
   nodeEnv: parsed.data.NODE_ENV,
   port: parseInt(parsed.data.PORT, 10),
+  // P1-3: n8n workflow URLs and authentication
+  n8nWebhookUrl: parsed.data.N8N_WEBHOOK_URL,
+  n8nWebhookSecret: parsed.data.N8N_WEBHOOK_SECRET,
+  n8nOnboardingWebhookUrl: parsed.data.N8N_ONBOARDING_WEBHOOK_URL,
+  n8nVerificationWebhookUrl: parsed.data.N8N_VERIFICATION_WEBHOOK_URL,
 };
+
+// Additional validation: warn if production has mismatched Stripe config
+if (ENV.isProduction) {
+  const testModeStripeIds = [
+    "price_1TOraXQRJTQEheTOvLHhTihz", // Test IDs from default
+    "price_1TOraXQRJTQEheTOVr8zI9O4",
+    "price_1TOraYQRJTQEheTO3k4MS3PR",
+    "price_1TOraYQRJTQEheTOHNQL82m3",
+    "price_1TOraZQRJTQEheTOofBdpJwM",
+    "price_1TOraaQRJTQEheTOwDiBtF35",
+  ];
+  const priceIds = [
+    ENV.stripeArtistAmateurPriceIdMonth,
+    ENV.stripeArtistAmateurPriceIdYear,
+    ENV.stripeArtistProPriceIdMonth,
+    ENV.stripeArtistProPriceIdYear,
+    ENV.stripeArtistIconPriceIdMonth,
+    ENV.stripeArtistIconPriceIdYear,
+    ENV.stripeFoundingArtistPriceId,
+    ENV.stripeClientPlusPriceId,
+    ENV.stripeClientElitePriceId,
+  ];
+  
+  const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));
+  if (testIdUsed) {
+    console.warn("⚠️  WARNING: Production environment contains test Stripe Price IDs. This may cause unexpected billing.");
+  }
+}

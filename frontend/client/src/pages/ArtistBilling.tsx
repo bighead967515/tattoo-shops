@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 const BASE_URL = window.location.origin;
 
 // ── New 3-layer plan definitions ─────────────────────────────────────────────
-type TierKey = "free" | "payg" | "pro" | "founding";
+type TierKey = "free" | "payg" | "pro" | "elite";
 
 interface PlanDef {
   key: TierKey;
@@ -26,10 +26,10 @@ interface PlanDef {
   monthlyPrice: number; // cents
   yearlyPrice: number;  // cents
   transactionFee: string | null;
-  stripeTierArg: "artist_amateur" | "artist_icon" | null;
+  stripeTierArg: "artist_pro" | "artist_elite" | null;
   badge: string | null;
   isMostPopular: boolean;
-  isFounder: boolean;
+  isElite: boolean;
   features: { label: string; included: boolean }[];
 }
 
@@ -37,7 +37,7 @@ const PLANS: PlanDef[] = [
   {
     key: "free",
     canonicalTier: "artist_free",
-    name: "Free",
+    name: "Free Profile",
     tagline: "Get discovered. No credit card needed.",
     Icon: Users,
     monthlyPrice: 0,
@@ -46,7 +46,7 @@ const PLANS: PlanDef[] = [
     stripeTierArg: null,
     badge: null,
     isMostPopular: false,
-    isFounder: false,
+    isElite: false,
     features: [
       { label: "10 portfolio photos", included: true },
       { label: "Directory listing & search visibility", included: true },
@@ -61,23 +61,23 @@ const PLANS: PlanDef[] = [
   },
   {
     key: "payg",
-    canonicalTier: "artist_pro",
+    canonicalTier: "artist_paygo",
     name: "Pay-as-you-go",
-    tagline: "Bid on clients. Pay only when you win.",
+    tagline: "Bid on client posts. Pay per booking.",
     Icon: Zap,
     monthlyPrice: 0,
     yearlyPrice: 0,
-    transactionFee: "10% on accepted bids",
+    transactionFee: "15% booking fee",
     stripeTierArg: null,
     badge: "No subscription",
     isMostPopular: false,
-    isFounder: false,
+    isElite: false,
     features: [
-      { label: "10 portfolio photos", included: true },
+      { label: "20 portfolio photos", included: true },
       { label: "Directory listing & search visibility", included: true },
       { label: "Receive client inquiries", included: true },
-      { label: "Unlimited bidding on client posts", included: true },
-      { label: "10% platform fee on accepted bids", included: true },
+      { label: "Bid on client requests", included: true },
+      { label: "15% booking fee on successful deals", included: true },
       { label: "Booking calendar", included: false },
       { label: "Stripe payment processing", included: false },
       { label: "Verified artist badge", included: false },
@@ -86,51 +86,49 @@ const PLANS: PlanDef[] = [
   },
   {
     key: "pro",
-    canonicalTier: "artist_amateur",
-    name: "Pro",
-    tagline: "The full toolkit. Grow your clientele.",
+    canonicalTier: "artist_pro",
+    name: "Pro Studio",
+    tagline: "Unlimit your reach and minimize fees.",
     Icon: Star,
-    monthlyPrice: 2900, // $29/mo
-    yearlyPrice: 23200, // $232/yr ≈ $19.33/mo
-    transactionFee: "5% on accepted bids",
-    stripeTierArg: "artist_amateur",
+    monthlyPrice: 4900, // $49/mo
+    yearlyPrice: 49000, // $490/yr
+    transactionFee: "5% booking fee",
+    stripeTierArg: "artist_pro",
     badge: "Most Popular",
     isMostPopular: true,
-    isFounder: false,
+    isElite: false,
     features: [
       { label: "Unlimited portfolio photos", included: true },
       { label: "Directory listing & search visibility", included: true },
       { label: "Receive client inquiries", included: true },
       { label: "Unlimited bidding on client posts", included: true },
-      { label: "Reduced 5% platform fee on accepted bids", included: true },
+      { label: "50 AI design generations / month", included: true },
+      { label: "Reduced 5% platform booking fee", included: true },
       { label: "Integrated booking calendar", included: true },
       { label: "Stripe-powered payment processing", included: true },
-      { label: "Verified artist badge (after credential check)", included: true },
-      { label: "Analytics & profile insights", included: true },
+      { label: "Verified artist badge", included: true },
     ],
   },
   {
-    key: "founding",
-    canonicalTier: "artist_icon",
-    name: "Founding Artist",
-    tagline: "Pro features. Locked-in rate for life.",
+    key: "elite",
+    canonicalTier: "artist_elite",
+    name: "Elite Icon",
+    tagline: "Elite sponsored placement, lowest fees.",
     Icon: Crown,
-    monthlyPrice: 1900, // $19/mo locked
-    yearlyPrice: 19000, // $190/yr
-    transactionFee: "5% on accepted bids",
-    stripeTierArg: "artist_icon",
-    badge: "Limited — First 100",
+    monthlyPrice: 9900, // $99/mo
+    yearlyPrice: 99000, // $990/yr
+    transactionFee: "3% booking fee",
+    stripeTierArg: "artist_elite",
+    badge: "Elite sponsored",
     isMostPopular: false,
-    isFounder: true,
+    isElite: true,
     features: [
-      { label: "Everything in Pro", included: true },
-      { label: "$19/mo locked for life (vs. $29 standard)", included: true },
-      { label: "6 months FREE — use code FOUNDING_ARTIST_6MO", included: true },
-      { label: "Exclusive Founding Artist badge on profile", included: true },
-      { label: "Homepage carousel placement", included: true },
-      { label: "5% platform fee on accepted bids", included: true },
-      { label: "Early access to new features", included: true },
-      { label: "Founding Artist community access", included: true },
+      { label: "Everything in Pro Studio", included: true },
+      { label: "Lowest 3% platform booking fee", included: true },
+      { label: "Unlimited AI design generations", included: true },
+      { label: "Unlimited client messaging credits", included: true },
+      { label: "Elite sponsored homepage placement", included: true },
+      { label: "Priority customer support", included: true },
     ],
   },
 ];
@@ -270,16 +268,10 @@ export default function ArtistBilling() {
             <Crown className="h-8 w-8 text-amber-500 shrink-0" />
             <div className="flex-1">
               <p className="font-semibold text-amber-900 dark:text-amber-300">
-                🚀 Founding Artist Offer — First 100 Artists Only
+                👑 Elite Icon Offer — First 100 Artists Only
               </p>
               <p className="text-sm text-amber-800 dark:text-amber-400 mt-0.5">
-                Lock in <strong>$19/mo for life</strong> (vs. $29 standard) and get your first{" "}
-                <strong>6 months completely free</strong>. Apply coupon{" "}
-                <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded font-mono text-xs">
-                  FOUNDING_ARTIST_6MO
-                </code>{" "}
-                at checkout. In exchange: set up your full portfolio and respond to 3+ client
-                bids in your first 60 days.
+                Lock in <strong>Elite sponsored status</strong> with lowest 3% platform fees, unlimited design credits and free messages. Get early-bird pricing today and accelerate your bookings now.
               </p>
             </div>
             <Button
@@ -288,7 +280,7 @@ export default function ArtistBilling() {
               className="border-amber-400 text-amber-800 hover:bg-amber-100 shrink-0"
               onClick={() => {
                 document
-                  .getElementById("founding-card")
+                  .getElementById("elite-card")
                   ?.scrollIntoView({ behavior: "smooth" });
               }}
             >
@@ -313,12 +305,12 @@ export default function ArtistBilling() {
               return (
                 <Card
                   key={plan.key}
-                  id={plan.key === "founding" ? "founding-card" : undefined}
+                  id={plan.key === "elite" ? "elite-card" : undefined}
                   className={cn(
                     "p-6 flex flex-col relative transition-all",
                     plan.isMostPopular
                       ? "border-2 border-primary bg-gradient-to-br from-primary/10 to-background shadow-lg scale-[1.02]"
-                      : plan.isFounder
+                      : plan.isElite
                       ? "border-2 border-amber-400 bg-amber-50/50 dark:bg-amber-950/10"
                       : plan.key === "payg"
                       ? "border-2 border-blue-300 bg-blue-50/50 dark:bg-blue-950/10"
@@ -335,7 +327,7 @@ export default function ArtistBilling() {
                           "px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1",
                           plan.isMostPopular
                             ? "bg-primary text-primary-foreground"
-                            : plan.isFounder
+                            : plan.isElite
                             ? "bg-amber-500 text-white"
                             : "bg-blue-500 text-white",
                         )}
@@ -362,7 +354,7 @@ export default function ArtistBilling() {
                           "p-3 rounded-full",
                           plan.isMostPopular
                             ? "bg-primary/20"
-                            : plan.isFounder
+                            : plan.isElite
                             ? "bg-amber-100 dark:bg-amber-900/30"
                             : plan.key === "payg"
                             ? "bg-blue-100 dark:bg-blue-900/30"
@@ -374,7 +366,7 @@ export default function ArtistBilling() {
                             "h-6 w-6",
                             plan.isMostPopular
                               ? "text-primary"
-                              : plan.isFounder
+                              : plan.isElite
                               ? "text-amber-500"
                               : plan.key === "payg"
                               ? "text-blue-500"
@@ -421,7 +413,7 @@ export default function ArtistBilling() {
                   <Button
                     className={cn(
                       "w-full mb-5",
-                      plan.isFounder && !isCurrent
+                      plan.isElite && !isCurrent
                         ? "bg-amber-500 hover:bg-amber-600 text-white border-0"
                         : plan.key === "payg" && !isCurrent
                         ? "bg-blue-600 hover:bg-blue-700 text-white border-0"
@@ -444,8 +436,8 @@ export default function ArtistBilling() {
                       ? "Current Plan"
                       : plan.key === "free"
                       ? "Always Free"
-                      : plan.key === "founding"
-                      ? "Claim Founding Rate"
+                      : plan.key === "elite"
+                      ? "Go Elite Icon"
                       : plan.key === "payg"
                       ? "Start Bidding Free"
                       : isLoading
@@ -487,15 +479,15 @@ export default function ArtistBilling() {
                 <p className="text-muted-foreground text-xs">No bidding access</p>
               </div>
               <div className="bg-background rounded-lg p-3 border border-primary/30">
-                <p className="font-medium">Pro / Founding Artist</p>
+                <p className="font-medium">Pro Studio</p>
                 <p className="text-muted-foreground text-xs">
-                  5% fee — reduced as a reward for subscribing
+                  5% booking fee — reduced as a reward for subscribing
                 </p>
               </div>
-              <div className="bg-background rounded-lg p-3 border border-blue-200">
-                <p className="font-medium">Pay-as-you-go</p>
+              <div className="bg-background rounded-lg p-3 border border-amber-200">
+                <p className="font-medium">Elite Icon</p>
                 <p className="text-muted-foreground text-xs">
-                  10% fee — no monthly subscription required
+                  3% booking fee — lowest fee tier for elite members
                 </p>
               </div>
             </div>

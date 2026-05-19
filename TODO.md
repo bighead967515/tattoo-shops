@@ -1,6 +1,6 @@
 # Production Readiness Tracker
 
-Last updated: 2026-04-26
+Last updated: 2026-05-19
 
 ## Completed Baseline (Verified In Code)
 
@@ -14,12 +14,14 @@ Last updated: 2026-04-26
 - [x] Client onboarding and role/tier transitions covered by integration tests
 - [x] Artist search/filter, request board, bids, and client marketplace flow implemented
 - [x] SEO essentials present (dynamic sitemap + page metadata support)
+- [x] GA4-ready pageview tracking wired in frontend (`VITE_GA4_MEASUREMENT_ID` optional)
+- [x] Public messaging updated to all-tattoo positioning; cover-up/rework retained as a specialty
 
 ## Critical Before Launch (Blocking)
 
 ### Environment And Secrets
 
-- [ ] Configure all production environment variables in Hostinger
+- [ ] Configure all production environment variables in Render
   - DATABASE_URL, JWT_SECRET
   - SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
   - VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
@@ -27,14 +29,14 @@ Last updated: 2026-04-26
   - STRIPE_CLIENT_PLUS_PRICE_ID, STRIPE_CLIENT_ELITE_PRICE_ID
   - RESEND_API_KEY
   - GROQ_API_KEY, HUGGINGFACE_API_KEY
-- [ ] Verify Hostinger domain allowlist/cookies/CORS behavior
+- [ ] Verify Render domain allowlist/cookies/CORS behavior
 - [ ] Rotate any previously shared test keys
 
 ### Deployment And Reliability
 
 - [ ] Configure uptime monitor for /api/health with paging alerts
-- [ ] Confirm Hostinger build/start commands and runtime Node version match the repo
-- [ ] Verify Hostinger reverse proxy/SSL configuration for app traffic and Stripe webhooks
+- [ ] Confirm Render build/start commands and runtime Node version match the repo
+- [ ] Verify Render reverse proxy/SSL configuration for app traffic and Stripe webhooks
 - [ ] Add alerting for Stripe webhook failures and queue backlog growth
 - [ ] Validate Sentry alerts route to on-call channel
 - [ ] Confirm backups and recovery process for PostgreSQL/Supabase
@@ -79,7 +81,7 @@ Last updated: 2026-04-26
 
 ## Medium Priority (Month 1)
 
-- [ ] Event analytics for funnel: discovery -> profile -> booking/request
+- [ ] Event analytics for funnel: discovery -> profile -> booking/request (pageviews are live; conversion events pending)
 - [ ] Conversion dashboard for client and artist subscription upgrades
 - [ ] Advanced SEO: structured data QA, index coverage checks, rich result monitoring
 - [ ] Security hardening pass (headers, dependency audit, key rotation runbook)
@@ -100,7 +102,7 @@ Last updated: 2026-04-26
 
 - [ ] All Critical Before Launch items completed
 - [ ] Rollback plan tested and documented
-- [ ] Hostinger deployment steps documented for repeatable redeploys
+- [ ] Render deployment steps documented for repeatable redeploys
 - [ ] Terms, privacy, and compliance pages published
 
 ### Go-Live Day

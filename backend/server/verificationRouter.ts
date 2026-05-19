@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
+import { ENV } from "./_core/env";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import * as dbFns from "./db";
@@ -83,19 +84,8 @@ export const verificationRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify ownership: documentKey must start with user's private path
-      const expectedPrefix = `private/${ctx.user.id}/`;
-      if (!input.documentKey.startsWith(expectedPrefix)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Invalid document key: does not belong to this user",
-        });
-      }
-
-      // Wrap user update and document creation in a transaction
       const drizzleDb = await requireDb();
       const newDocument = await drizzleDb.transaction(async (tx) => {
-        // Update user's status to 'pending'
         await tx
           .update(users)
           .set({
@@ -105,7 +95,6 @@ export const verificationRouter = router({
           })
           .where(eq(users.id, ctx.user.id));
 
-        // Create the document record
         const [created] = await tx
           .insert(verificationDocuments)
           .values({
@@ -123,61 +112,20 @@ export const verificationRouter = router({
         return created;
       });
 
-      // Run Gemini OCR verification in the background (non-blocking)
-      // The document record is immediately available; OCR results are attached async.
-      if (newDocument && input.mimeType !== "application/pdf") {
-        (async () => {
-          try {
-            // Get a temporary signed URL for the private document
-            const signedUrl = await createSignedUrl(
-              BUCKETS.ID_DOCUMENTS,
-              input.documentKey,
-              300,
-            ); // 5 min
-
-            // Get artist profile for cross-referencing
-            const artist = await dbFns.getArtistByUserId(ctx.user.id);
-
-            const artistProfile = {
-              name: ctx.user.name || null,
-              shopName: artist?.shopName || null,
-              state: artist?.state || null,
-            };
-
-            // Run Gemini Vision OCR
-            const verification = await verifyLicenseDocument(
-              signedUrl,
-              input.mimeType,
-              artistProfile,
-            );
-
-            // Store OCR results on the document
-            await dbFns.updateVerificationDocumentOCR(newDocument.id, {
-              ocrDocumentType: verification.documentType,
-              ocrExtractedName: verification.extractedName,
-              ocrExtractedBusinessName: verification.extractedBusinessName,
-              ocrLicenseNumber: verification.licenseNumber,
-              ocrExpirationDate: verification.expirationDate,
-              ocrIssuingAuthority: verification.issuingAuthority,
-              ocrConfidence: verification.confidence,
-              ocrNameMatch: verification.nameMatch,
-              ocrVerdict: verification.overallVerdict,
-              ocrVerdictReason: verification.verdictReason,
-              ocrIssues: JSON.stringify(verification.issues),
-              ocrProcessedAt: new Date(),
-            });
-
-            logger.info(
-              `License OCR complete for doc #${newDocument.id}: verdict=${verification.overallVerdict}, confidence=${verification.confidence}`,
-            );
-          } catch (err) {
-            // Non-fatal — document is still saved; OCR just wasn't completed
-            logger.error(
-              `Background license OCR failed for doc #${newDocument.id}:`,
-              err,
-            );
-          }
-        })();
+      if (ENV.n8nVerificationWebhookUrl) {
+        fetch(ENV.n8nVerificationWebhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ENV.n8nWebhookSecret}`,
+          },
+          body: JSON.stringify({
+            documentId: newDocument.id,
+            userId: ctx.user.id,
+            email: ctx.user.email,
+            documentType: input.documentType,
+          }),
+        }).catch(() => {});
       }
 
       return newDocument;

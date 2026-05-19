@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2, Crown, Loader2, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { TIER_LIMITS, type ArtistTierKey } from "@shared/tierLimits";
-import { toLegacyArtistTier, type ArtistCanonicalTier } from "@shared/tierCompat";
+import { ARTIST_TIER_LIMITS, type ArtistSubscriptionTier } from "@shared/tierLimits";
+import { type ArtistCanonicalTier } from "@shared/tierCompat";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const TIER_NAMES: Record<string, string> = {
-  artist_amateur: TIER_LIMITS.amateur.name,
-  artist_pro: TIER_LIMITS.professional.name,
-  artist_icon: TIER_LIMITS.frontPage.name,
+  artist_paygo: ARTIST_TIER_LIMITS.artist_paygo.name,
+  artist_pro: ARTIST_TIER_LIMITS.artist_pro.name,
+  artist_elite: ARTIST_TIER_LIMITS.artist_elite.name,
 };
 
 export default function SubscriptionSuccess() {
@@ -22,19 +23,20 @@ export default function SubscriptionSuccess() {
   const tierName = TIER_NAMES[tier] ?? "your new plan";
 
   const [ready, setReady] = useState(false);
+  const { user } = useAuth();
 
-  // Poll the artist profile until the webhook has updated the tier
-  const { data: artist, refetch } = trpc.artists.getByUserId.useQuery(undefined, {
+  // Poll canonical user record until webhook updates subscription tier.
+  trpc.auth.me.useQuery(undefined, {
     refetchInterval: ready ? false : 3000,
   });
 
   useEffect(() => {
-    if (!artist) return;
-    const currentTier = artist.subscriptionTier ?? "artist_free";
+    if (!user) return;
+    const currentTier = user.subscriptionTier ?? "artist_free";
     if (currentTier === tier) {
       setReady(true);
     }
-  }, [artist, tier]);
+  }, [user, tier]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,16 +71,13 @@ export default function SubscriptionSuccess() {
               {tier && (
                 <ul className="text-sm text-left space-y-2">
                   {[
-                    tier !== "artist_free" && "✓ Accept bookings from clients",
-                    tier !== "artist_free" && "✓ Show direct contact info",
                     tier !== "artist_free" && "✓ Verified badge on your profile",
-                    (tier === "artist_pro" || tier === "artist_icon") &&
+                    tier !== "artist_free" && "✓ Accept bookings from clients",
+                    (tier === "artist_pro" || tier === "artist_elite") &&
                       "✓ Unlimited portfolio photos",
-                    (tier === "artist_pro" || tier === "artist_icon") &&
-                      "✓ Profile analytics dashboard",
-                    (tier === "artist_pro" || tier === "artist_icon") &&
-                      "✓ Respond to client reviews",
-                    tier === "artist_icon" && "✓ Homepage carousel feature placement",
+                    (tier === "artist_pro" || tier === "artist_elite") &&
+                      "✓ Pro AI Studio Access",
+                    tier === "artist_elite" && "✓ Homepage carousel feature placement",
                   ]
                     .filter(Boolean)
                     .map((item, i) => (

@@ -1,7 +1,7 @@
 import type { CookieOptions, Request } from "express";
 import { isIpAddress } from "./ipUtils";
 
-function isSecureRequest(req: Request) {
+export function isSecureRequest(req: Request) {
   if (req.protocol === "https") return true;
 
   const forwardedProto = req.headers["x-forwarded-proto"];
@@ -36,7 +36,9 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: secure ? "none" : "lax",
+    // P1-1 CSRF Fix: Use strict instead of none to prevent SameSite=none CSRF vulnerability
+    // strict blocks cross-site cookies entirely, preventing CSRF attacks via <form> + <img>
+    sameSite: "strict" as const,
     secure,
   };
 }

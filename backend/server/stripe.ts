@@ -57,62 +57,7 @@ export async function createCheckoutSession({
   });
 }
 
-/**
- * Create a Stripe Checkout Session for a client subscription upgrade.
- * Uses `mode: "subscription"` with the Stripe Price ID for the chosen tier.
- */
-export async function createSubscriptionCheckout({
-  priceId,
-  customerEmail,
-  stripeCustomerId,
-  metadata,
-  successUrl,
-  cancelUrl,
-}: {
-  priceId: string;
-  customerEmail: string;
-  stripeCustomerId?: string;
-  metadata: Record<string, string>;
-  successUrl: string;
-  cancelUrl: string;
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      mode: "subscription",
-      ...(stripeCustomerId
-        ? { customer: stripeCustomerId }
-        : { customer_email: customerEmail }),
-      metadata,
-      subscription_data: {
-        metadata,
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: true,
-    });
 
-    return session;
-  });
-}
-
-/**
- * Map a Stripe Price ID to a client subscription tier.
- * Returns null if the Price ID doesn't match a known client tier.
- */
-export function stripePriceToClientTier(
-  priceId: string,
-): "client_plus" | "client_elite" | null {
-  if (priceId === ENV.stripeClientPlusPriceId) return "client_plus";
-  if (priceId === ENV.stripeClientElitePriceId) return "client_elite";
-  return null;
-}
 
 /**
  * Map a Stripe Price ID to an artist subscription tier.
@@ -121,19 +66,19 @@ export function stripePriceToClientTier(
  */
 export function stripePriceToArtistTier(
   priceId: string,
-): "artist_amateur" | "artist_pro" | "artist_icon" | null {
+): "artist_paygo" | "artist_pro" | "artist_elite" | null {
   const { 
     stripeArtistAmateurPriceIdMonth, stripeArtistAmateurPriceIdYear,
     stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
     stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
   } = ENV;
 
-  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
-    return "artist_amateur";
   if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
-    return "artist_icon";
+    return "artist_elite";
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
+    return "artist_paygo";
 
   return null;
 }

@@ -25,7 +25,7 @@ Disallow: /license-upload
 Disallow: /api/
 
 # Sitemap location
-Sitemap: https://universalinc.com/sitemap.xml
+Sitemap: https://theinkednetwork.website/sitemap.xml
 
 # Crawl-delay for polite crawling
 Crawl-delay: 1

@@ -198,13 +198,13 @@ export default function RequestBoard() {
                         <Badge variant="secondary">{request.style}</Badge>
                       )}
                       {request.addOnPaymentStatus === "paid" &&
-                        request.addOnFeaturedBadge && (
+                        request.selectedAddons?.includes("featuredBadge") && (
                           <Badge className="bg-amber-500/15 text-amber-300 border border-amber-400/30">
                             Featured
                           </Badge>
                         )}
                       {request.addOnPaymentStatus === "paid" &&
-                        request.addOnPriorityBoost && (
+                        request.selectedAddons?.includes("priorityPlacement") && (
                           <Badge className="bg-sky-500/15 text-sky-300 border border-sky-400/30">
                             Boosted
                           </Badge>

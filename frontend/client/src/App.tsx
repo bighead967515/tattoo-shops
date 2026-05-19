@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -30,6 +31,7 @@ import RequestDetail from "./pages/RequestDetail";
 import AdminModeration from "./pages/AdminModeration";
 import AdminDashboard from "./pages/AdminDashboard";
 import DesignLab from "./pages/DesignLab";
+import ArtistDesignLab from "./pages/ArtistDesignLab";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ArtistBilling from "./pages/ArtistBilling";
@@ -47,6 +49,7 @@ function Router() {
       <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/for-artists" component={ForArtists} />
       <Route path="/cover-ups" component={CoverUps} />
+      <Route path="/tattoo-planning" component={CoverUps} />
       <Route path="/request-flow" component={RequestFlow} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/artist-dashboard" component={ArtistDashboard} />
@@ -73,6 +76,7 @@ function Router() {
       <Route path="/client/design-lab" component={DesignLab} />
       {/* Artist registration flow */}
       <Route path="/artist/register" component={ArtistRegister} />
+      <Route path="/artist/design-lab" component={ArtistDesignLab} />
       {/* Artist billing routes */}
       <Route path="/artist/billing" component={ArtistBilling} />
       <Route path="/artist/billing/success" component={SubscriptionSuccess} />
@@ -93,6 +97,7 @@ function usesPageHeader(path: string) {
     path.startsWith("/artist/") ||
     path === "/for-artists" ||
     path === "/cover-ups" ||
+    path === "/tattoo-planning" ||
     path === "/request-flow" ||
     path === "/dashboard" ||
     path === "/artist-dashboard" ||
@@ -104,6 +109,7 @@ function usesPageHeader(path: string) {
     path === "/privacy" ||
     path === "/pricing" ||
     path === "/client/design-lab" ||
+    path === "/artist/design-lab" ||
     path === "/artist/billing" ||
     path === "/artist/billing/success" ||
     path === "/404"
@@ -119,6 +125,33 @@ function App() {
   const [location] = useLocation();
   const showMarketingHomeHeader = location === "/";
   const showSidebarShell = !showMarketingHomeHeader && !usesPageHeader(location);
+
+  useEffect(() => {
+    const win = window as Window & {
+      dataLayer?: unknown[];
+      gtag?: (...args: unknown[]) => void;
+      __inkLastTrackedPath?: string;
+    };
+
+    if (win.__inkLastTrackedPath === location) {
+      return;
+    }
+    win.__inkLastTrackedPath = location;
+
+    // Keep analytics vendor-agnostic while still supporting GA if present.
+    win.dataLayer?.push({
+      event: "page_view",
+      page_path: location,
+      page_title: document.title,
+    });
+
+    if (typeof win.gtag === "function") {
+      win.gtag("event", "page_view", {
+        page_path: location,
+        page_title: document.title,
+      });
+    }
+  }, [location]);
 
   return (
     <ErrorBoundary>

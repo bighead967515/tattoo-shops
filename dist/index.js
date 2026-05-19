@@ -21,18 +21,19 @@ var init_env = __esm({
       NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
       STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
       STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
-      // Artist subscription Stripe Price IDs (live — created 2026-04-20)
-      STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
-      STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR: z.string().default("price_1TOraXQRJTQEheTOVr8zI9O4"),
-      STRIPE_ARTIST_PRO_PRICE_ID_MONTH: z.string().default("price_1TOraYQRJTQEheTO3k4MS3PR"),
-      STRIPE_ARTIST_PRO_PRICE_ID_YEAR: z.string().default("price_1TOraYQRJTQEheTOHNQL82m3"),
-      STRIPE_ARTIST_ICON_PRICE_ID_MONTH: z.string().default("price_1TOraZQRJTQEheTOofBdpJwM"),
-      STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().default("price_1TOraaQRJTQEheTOwDiBtF35"),
+      // Artist subscription Stripe Price IDs — REQUIRED. Must be set explicitly per environment.
+      // Create in Stripe Dashboard and set as env vars. Hardcoded defaults risk wrong-environment billing.
+      STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH is required"),
+      STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR is required"),
+      STRIPE_ARTIST_PRO_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_MONTH is required"),
+      STRIPE_ARTIST_PRO_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_YEAR is required"),
+      STRIPE_ARTIST_ICON_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_MONTH is required"),
+      STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
       // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
-      STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().default("price_1TOraXQRJTQEheTOvLHhTihz"),
-      // Client subscription Stripe Price IDs — set after creating Products in the Stripe Dashboard
-      STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
-      STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
+      STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
+      // Client subscription Stripe Price IDs — REQUIRED for checkout. Set after creating Products in the Stripe Dashboard.
+      STRIPE_CLIENT_PLUS_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_PLUS_PRICE_ID is required"),
+      STRIPE_CLIENT_ELITE_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_ELITE_PRICE_ID is required"),
       RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
       SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
       SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -46,7 +47,13 @@ var init_env = __esm({
       HUGGINGFACE_OCR_MODEL: z.string().optional(),
       CORS_ALLOWED_ORIGINS: z.string().optional(),
       PUBLIC_BASE_URL: z.string().url().optional(),
-      PORT: z.string().default("3000")
+      PORT: z.string().default("3000"),
+      // P1-3: n8n workflow integration
+      N8N_WEBHOOK_URL: z.string().url().optional().describe("n8n instance webhook base URL (e.g., https://n8n.example.com)"),
+      N8N_WEBHOOK_SECRET: z.string().optional().describe("Bearer token for n8n webhook authentication"),
+      // Onboarding and verification webhook URLs
+      N8N_ONBOARDING_WEBHOOK_URL: z.string().url().optional().describe("n8n onboarding webhook base URL (e.g., https://n8n.example.com)"),
+      N8N_VERIFICATION_WEBHOOK_URL: z.string().url().optional().describe("n8n verification webhook base URL (e.g., https://n8n.example.com)")
     });
     parsed = envSchema.safeParse(process.env);
     if (!parsed.success) {
@@ -88,8 +95,39 @@ var init_env = __esm({
       corsAllowedOrigins: parsed.data.CORS_ALLOWED_ORIGINS,
       publicBaseUrl: parsed.data.PUBLIC_BASE_URL,
       nodeEnv: parsed.data.NODE_ENV,
-      port: parseInt(parsed.data.PORT, 10)
+      port: parseInt(parsed.data.PORT, 10),
+      // P1-3: n8n workflow URLs and authentication
+      n8nWebhookUrl: parsed.data.N8N_WEBHOOK_URL,
+      n8nWebhookSecret: parsed.data.N8N_WEBHOOK_SECRET,
+      n8nOnboardingWebhookUrl: parsed.data.N8N_ONBOARDING_WEBHOOK_URL,
+      n8nVerificationWebhookUrl: parsed.data.N8N_VERIFICATION_WEBHOOK_URL
     };
+    if (ENV.isProduction) {
+      const testModeStripeIds = [
+        "price_1TOraXQRJTQEheTOvLHhTihz",
+        // Test IDs from default
+        "price_1TOraXQRJTQEheTOVr8zI9O4",
+        "price_1TOraYQRJTQEheTO3k4MS3PR",
+        "price_1TOraYQRJTQEheTOHNQL82m3",
+        "price_1TOraZQRJTQEheTOofBdpJwM",
+        "price_1TOraaQRJTQEheTOwDiBtF35"
+      ];
+      const priceIds = [
+        ENV.stripeArtistAmateurPriceIdMonth,
+        ENV.stripeArtistAmateurPriceIdYear,
+        ENV.stripeArtistProPriceIdMonth,
+        ENV.stripeArtistProPriceIdYear,
+        ENV.stripeArtistIconPriceIdMonth,
+        ENV.stripeArtistIconPriceIdYear,
+        ENV.stripeFoundingArtistPriceId,
+        ENV.stripeClientPlusPriceId,
+        ENV.stripeClientElitePriceId
+      ];
+      const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));
+      if (testIdUsed) {
+        console.warn("\u26A0\uFE0F  WARNING: Production environment contains test Stripe Price IDs. This may cause unexpected billing.");
+      }
+    }
   }
 });
 
@@ -106,7 +144,8 @@ import {
   pgEnum,
   foreignKey,
   index,
-  unique
+  unique,
+  jsonb
 } from "drizzle-orm/pg-core";
 var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages;
 var init_schema = __esm({
@@ -202,6 +241,12 @@ var init_schema = __esm({
       bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
       /** Tracks which month the bidsThisMonth counter belongs to, format: YYYY-MM */
       bidsMonthYear: varchar("bidsMonthYear", { length: 7 }).default("2000-01").notNull(),
+      /** The artist's balance of purchased/granted bid tokens */
+      bidTokens: integer("bidTokens").default(0).notNull(),
+      /** The artist's balance of purchased/granted chat tokens */
+      chatTokens: integer("chatTokens").default(0).notNull(),
+      /** The artist's balance of AI generation credits */
+      aiCredits: integer("aiCredits").default(0).notNull(),
       /** True if this artist signed up during the Founding Artist offer period */
       isFoundingArtist: boolean("isFoundingArtist").default(false).notNull(),
       /** When the 6-month free trial ends; null for non-founding artists */
@@ -463,9 +508,7 @@ var init_schema = __esm({
         willingToTravel: boolean("willingToTravel").default(false),
         desiredTimeframe: varchar("desiredTimeframe", { length: 100 }),
         // e.g., "ASAP", "Within 1 month", "Flexible"
-        addOnPriorityBoost: boolean("addOnPriorityBoost").default(false).notNull(),
-        addOnFeaturedBadge: boolean("addOnFeaturedBadge").default(false).notNull(),
-        addOnDirectMessageCredits: integer("addOnDirectMessageCredits").default(0).notNull(),
+        selectedAddons: jsonb("selectedAddons").$type().default([]).notNull(),
         addOnTotalCents: integer("addOnTotalCents").default(0).notNull(),
         addOnPaymentStatus: varchar("addOnPaymentStatus", { length: 30 }).$type().default("not_requested").notNull(),
         addOnStripeCheckoutSessionId: varchar("addOnStripeCheckoutSessionId", {
@@ -805,7 +848,7 @@ async function createArtist(artist) {
   if (!db) throw new Error("Database not available");
   return await db.transaction(async (tx) => {
     await tx.update(users).set(buildArtistOnboardingUserUpdate()).where(eq(users.id, artist.userId));
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: false }).returning();
     return created;
   });
 }
@@ -1242,31 +1285,33 @@ var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 // backend/shared/const.ts
 var SubscriptionTiers = z2.enum([
   "artist_free",
-  "artist_amateur",
+  "artist_paygo",
   "artist_pro",
-  "artist_icon",
+  "artist_elite",
   "client_free",
   "client_plus",
   "client_elite"
 ]);
 var TIER_LIMITS = {
-  // Artist tiers: canonical model
+  // Free: strictly a directory listing.
   artist_free: { portfolioMax: 10, aiCredits: 0, canBook: false },
-  artist_amateur: {
+  // Pay-as-you-go: booking unlocked, 15% fee, limited free bids.
+  artist_paygo: { portfolioMax: 20, aiCredits: 0, canBook: true },
+  // Pro: $49/mo, 5% fee, unlimited bids, 50 AI credits.
+  artist_pro: {
     portfolioMax: Number.MAX_SAFE_INTEGER,
-    aiCredits: 0,
+    aiCredits: 50,
     canBook: true
   },
-  // Pay-as-you-go: no subscription, bidding enabled, bookings remain off
-  artist_pro: { portfolioMax: 10, aiCredits: 0, canBook: false },
-  artist_icon: {
+  // Elite: $99/mo, 3% fee, unlimited bids, unlimited AI, sponsored listing.
+  artist_elite: {
     portfolioMax: Number.MAX_SAFE_INTEGER,
-    aiCredits: 0,
+    aiCredits: 999,
     canBook: true
   },
   client_free: { portfolioMax: 0, aiCredits: 0, canBook: true },
   client_plus: { portfolioMax: 0, aiCredits: 10, canBook: true },
-  client_elite: { portfolioMax: 0, aiCredits: 999, canBook: true }
+  client_elite: { portfolioMax: 0, aiCredits: Number.MAX_SAFE_INTEGER, canBook: true }
 };
 
 // backend/server/_core/cookies.ts
@@ -1282,7 +1327,9 @@ function getSessionCookieOptions(req) {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: secure ? "none" : "lax",
+    // P1-1 CSRF Fix: Use strict instead of none to prevent SameSite=none CSRF vulnerability
+    // strict blocks cross-site cookies entirely, preventing CSRF attacks via <form> + <img>
+    sameSite: "strict",
     secure
   };
 }
@@ -1364,8 +1411,226 @@ function registerSupabaseAuthRoutes(app2) {
   });
 }
 
+// backend/server/_core/csrf.ts
+init_logger();
+import crypto from "crypto";
+var CSRF_COOKIE_NAME = "__csrf_token";
+var CSRF_HEADER_NAME = "x-csrf-token";
+var TOKEN_LENGTH = 32;
+function generateCsrfToken() {
+  return crypto.randomBytes(TOKEN_LENGTH).toString("hex");
+}
+function getCsrfTokenFromRequest(req) {
+  const headerToken = req.headers[CSRF_HEADER_NAME];
+  if (headerToken) return headerToken;
+  const bodyToken = req.body?._csrf;
+  if (bodyToken) return bodyToken;
+  return null;
+}
+function csrfProtectionMiddleware(req, res, next) {
+  const isStateChanging = req.method === "POST" || req.method === "PUT" || req.method === "PATCH" || req.method === "DELETE";
+  let tokenInCookie = req.cookies?.[CSRF_COOKIE_NAME];
+  if (!tokenInCookie) {
+    tokenInCookie = generateCsrfToken();
+    res.cookie(CSRF_COOKIE_NAME, tokenInCookie, {
+      httpOnly: true,
+      secure: req.protocol === "https",
+      sameSite: "strict",
+      // P1-1 fix: use strict instead of none
+      path: "/",
+      maxAge: 24 * 60 * 60 * 1e3
+      // 24 hours
+    });
+  }
+  if (isStateChanging) {
+    const tokenInHeader = getCsrfTokenFromRequest(req);
+    if (!tokenInHeader) {
+      logger.warn("CSRF token missing from request", {
+        method: req.method,
+        path: req.path,
+        ip: req.ip
+      });
+      return res.status(403).json({
+        error: "CSRF_MISSING",
+        message: "CSRF token required for this operation"
+      });
+    }
+    if (tokenInHeader !== tokenInCookie) {
+      logger.warn("CSRF token mismatch - possible attack", {
+        method: req.method,
+        path: req.path,
+        ip: req.ip
+      });
+      return res.status(403).json({
+        error: "CSRF_INVALID",
+        message: "CSRF token invalid"
+      });
+    }
+  }
+  next();
+}
+function csrfTokenMiddleware(req, res, next) {
+  const token = req.cookies?.[CSRF_COOKIE_NAME] || generateCsrfToken();
+  if (!req.cookies?.[CSRF_COOKIE_NAME]) {
+    res.cookie(CSRF_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: req.protocol === "https",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 24 * 60 * 60 * 1e3
+    });
+  }
+  res.setHeader("X-CSRF-Token", token);
+  next();
+}
+
+// backend/shared/tierLimits.ts
+function readRuntimeEnv(key) {
+  if (typeof process !== "undefined" && process.env) {
+    if (process.env[key] !== void 0) return process.env[key];
+  }
+  if (typeof import.meta !== "undefined" && import.meta.env) {
+    const viteKey = `VITE_${key}`;
+    if (import.meta.env[viteKey] !== void 0) {
+      return import.meta.env[viteKey];
+    }
+  }
+  return null;
+}
+var ARTIST_TIER_LIMITS = {
+  artist_free: {
+    name: "Directory Profile",
+    portfolioPhotos: 10,
+    canBid: false,
+    freeBidsPerMonth: 0,
+    transactionFeePercent: 0,
+    // Cannot book
+    aiGenerationsPerMonth: 0,
+    chatTokensPerMonth: 0,
+    sponsoredListing: false,
+    verifiedBadge: true
+  },
+  artist_paygo: {
+    name: "Pay-as-you-go",
+    portfolioPhotos: 20,
+    canBid: true,
+    freeBidsPerMonth: 5,
+    transactionFeePercent: 15,
+    aiGenerationsPerMonth: 0,
+    chatTokensPerMonth: 0,
+    sponsoredListing: false,
+    verifiedBadge: true
+  },
+  artist_pro: {
+    name: "Pro Studio",
+    portfolioPhotos: Number.MAX_SAFE_INTEGER,
+    canBid: true,
+    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
+    transactionFeePercent: 5,
+    aiGenerationsPerMonth: 50,
+    chatTokensPerMonth: 0,
+    // Still must buy extra if client didn't pay
+    sponsoredListing: false,
+    verifiedBadge: true
+  },
+  artist_elite: {
+    name: "Elite Icon",
+    portfolioPhotos: Number.MAX_SAFE_INTEGER,
+    canBid: true,
+    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
+    transactionFeePercent: 3,
+    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
+    chatTokensPerMonth: Number.MAX_SAFE_INTEGER,
+    // Unlimited free chats
+    sponsoredListing: true,
+    verifiedBadge: true
+    // "Elite Sponsored" badge applied via UI
+  }
+};
+var ARTIST_TIER_PRICING = {
+  artist_free: {
+    monthly: 0,
+    yearly: 0,
+    stripePriceIdMonth: null,
+    stripePriceIdYear: null
+  },
+  artist_paygo: {
+    monthly: 0,
+    yearly: 0,
+    stripePriceIdMonth: null,
+    stripePriceIdYear: null
+  },
+  artist_pro: {
+    monthly: 4900,
+    // $49.00/mo
+    yearly: 49e3,
+    // $490.00/yr (2 months free)
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_MONTH"),
+    stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_YEAR")
+  },
+  artist_elite: {
+    monthly: 9900,
+    // $99.00/mo
+    yearly: 99e3,
+    // $990.00/yr (2 months free)
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_MONTH"),
+    stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_YEAR")
+  }
+};
+function getArtistTierLimits(tier) {
+  return ARTIST_TIER_LIMITS[tier] || ARTIST_TIER_LIMITS.artist_free;
+}
+var CLIENT_TIER_LIMITS = {
+  client_free: {
+    name: "Collector",
+    requestsPerMonth: 1,
+    aiGenerationsPerMonth: 0,
+    directChatWithArtists: false,
+    priorityRequestBoard: false,
+    depositFeeWaived: false
+  },
+  client_plus: {
+    name: "Enthusiast",
+    requestsPerMonth: 10,
+    aiGenerationsPerMonth: 10,
+    directChatWithArtists: false,
+    priorityRequestBoard: true,
+    depositFeeWaived: false
+  },
+  client_elite: {
+    name: "Elite Ink",
+    requestsPerMonth: Number.MAX_SAFE_INTEGER,
+    // Unlimited
+    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
+    // Unlimited
+    directChatWithArtists: true,
+    priorityRequestBoard: true,
+    depositFeeWaived: true
+  }
+};
+var CLIENT_TIER_PRICING = {
+  client_free: {
+    monthly: 0,
+    stripePriceIdMonth: null
+  },
+  client_plus: {
+    monthly: 900,
+    // $9.00
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID")
+  },
+  client_elite: {
+    monthly: 1900,
+    // $19.00
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID")
+  }
+};
+function getClientTierLimits(tier) {
+  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
+}
+
 // backend/server/routers.ts
 import { TRPCError as TRPCError6 } from "@trpc/server";
+init_logger();
 
 // backend/server/_core/trpc.ts
 init_db();
@@ -1519,17 +1784,6 @@ function getPublicUrl(bucketName, path7) {
   const { data } = supabaseAdmin.storage.from(bucketName).getPublicUrl(path7);
   return data.publicUrl;
 }
-async function createSignedUrl(bucketName, path7, expiresIn = 3600) {
-  const { data, error } = await supabaseAdmin.storage.from(bucketName).createSignedUrl(path7, expiresIn);
-  if (error) {
-    console.error(
-      `[Storage] Create signed URL for bucket "${bucketName}" failed:`,
-      error
-    );
-    throw new Error(`Failed to create signed URL: ${error.message}`);
-  }
-  return data.signedUrl;
-}
 async function createSignedUploadUrl(bucketName, path7) {
   const { data, error } = await supabaseAdmin.storage.from(bucketName).createSignedUploadUrl(path7);
   if (error) {
@@ -1547,6 +1801,11 @@ async function initializeBuckets() {
     console.error("[Storage] Failed to list buckets:", listError);
     throw new Error(`Failed to list storage buckets: ${listError.message}`);
   }
+  const summary = {
+    existing: [],
+    created: [],
+    failed: []
+  };
   for (const config of BUCKET_CONFIGS) {
     const bucketExists = existingBuckets.some((b) => b.name === config.name);
     if (!bucketExists) {
@@ -1564,11 +1823,25 @@ async function initializeBuckets() {
           `[Storage] Failed to create bucket "${config.name}":`,
           createError
         );
+        const statusCode = createError.statusCode;
+        const permissionHint = statusCode === "403" ? " Check SUPABASE_SERVICE_KEY on this environment; bucket creation requires a service_role key." : "";
+        summary.failed.push({
+          name: config.name,
+          message: `${createError.message}.${permissionHint}`.trim()
+        });
       } else {
         console.log(`[Storage] Bucket "${config.name}" created successfully.`);
+        summary.created.push(config.name);
       }
+    } else {
+      summary.existing.push(config.name);
     }
   }
+  if (summary.failed.length > 0) {
+    const failedBuckets = summary.failed.map((f) => f.name).join(", ");
+    throw new Error(`Storage bucket initialization failed for: ${failedBuckets}`);
+  }
+  return summary;
 }
 
 // backend/server/clientRouters.ts
@@ -2034,41 +2307,6 @@ async function createCheckoutSession({
     return session;
   });
 }
-async function createSubscriptionCheckout({
-  priceId,
-  customerEmail,
-  stripeCustomerId,
-  metadata,
-  successUrl,
-  cancelUrl
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1
-        }
-      ],
-      mode: "subscription",
-      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
-      metadata,
-      subscription_data: {
-        metadata
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: true
-    });
-    return session;
-  });
-}
-function stripePriceToClientTier(priceId) {
-  if (priceId === ENV.stripeClientPlusPriceId) return "client_plus";
-  if (priceId === ENV.stripeClientElitePriceId) return "client_elite";
-  return null;
-}
 function stripePriceToArtistTier(priceId) {
   const {
     stripeArtistAmateurPriceIdMonth,
@@ -2078,12 +2316,12 @@ function stripePriceToArtistTier(priceId) {
     stripeArtistIconPriceIdMonth,
     stripeArtistIconPriceIdYear
   } = ENV;
-  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
-    return "artist_amateur";
   if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
-    return "artist_icon";
+    return "artist_elite";
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
+    return "artist_paygo";
   return null;
 }
 async function createArtistSubscriptionCheckout({
@@ -2150,186 +2388,20 @@ async function constructWebhookEvent(payload, signature) {
 // backend/server/clientRouters.ts
 init_env();
 
-// backend/shared/tierLimits.ts
-function readRuntimeEnv(key) {
-  if (typeof process !== "undefined" && process.env?.[key]) {
-    return process.env[key] ?? null;
-  }
-  const viteEnv = import.meta?.env;
-  if (viteEnv?.[key]) {
-    return viteEnv[key] ?? null;
-  }
-  return null;
-}
-var TRANSACTION_FEE_RATES = {
-  /** Free tier — no bidding, no fee */
-  free: 0,
-  /** Pro subscriber — reduced fee as reward for subscription */
-  amateur: 0.05,
-  // 5%
-  /** Pay-as-you-go — higher fee, no subscription cost */
-  professional: 0.1,
-  // 10%
-  /** Founding Artist — same as Pro (5%) */
-  frontPage: 0.05
-  // 5%
-};
-var TIER_LIMITS2 = {
-  // ── Layer 1: Free (Artist Acquisition Funnel) ─────────────────────────────
-  free: {
-    name: "Free",
-    displayName: "Free",
-    description: "Get discovered. Build your presence.",
-    portfolioPhotos: 10,
-    canAcceptBookings: false,
-    canShowDirectContact: false,
-    canRespondToReviews: false,
-    hasAnalytics: false,
-    showExactLocation: false,
-    isFeatured: false,
-    isVerifiedBadge: false,
-    /** 0 = bidding completely blocked on free tier */
-    bidsPerMonth: 0,
-    /** Platform transaction fee on accepted bids */
-    transactionFeeRate: TRANSACTION_FEE_RATES.free,
-    isFoundingArtist: false
-  },
-  // ── Layer 2: Pro Subscription ($19–29/mo) ─────────────────────────────────
-  amateur: {
-    name: "Pro",
-    displayName: "Pro",
-    description: "The full toolkit. Grow your clientele.",
-    portfolioPhotos: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    canAcceptBookings: true,
-    canShowDirectContact: true,
-    canRespondToReviews: true,
-    hasAnalytics: true,
-    showExactLocation: true,
-    isFeatured: false,
-    isVerifiedBadge: true,
-    /** Unlimited bids for Pro subscribers */
-    bidsPerMonth: Number.MAX_SAFE_INTEGER,
-    /** Reduced 5% fee as reward for subscription */
-    transactionFeeRate: TRANSACTION_FEE_RATES.amateur,
-    isFoundingArtist: false
-  },
-  // ── Layer 3: Pay-as-you-go (No subscription, higher fee) ─────────────────
-  professional: {
-    name: "Pay-as-you-go",
-    displayName: "Pay-as-you-go",
-    description: "Bid on clients. Pay only when you win.",
-    portfolioPhotos: 10,
-    canAcceptBookings: false,
-    canShowDirectContact: false,
-    canRespondToReviews: false,
-    hasAnalytics: false,
-    showExactLocation: false,
-    isFeatured: false,
-    isVerifiedBadge: false,
-    /** Unlimited bids — they pay per transaction instead */
-    bidsPerMonth: Number.MAX_SAFE_INTEGER,
-    /** 10% fee on accepted bids — no subscription required */
-    transactionFeeRate: TRANSACTION_FEE_RATES.professional,
-    isFoundingArtist: false
-  },
-  // ── Founding Artist: Pro features + lifetime $19/mo lock-in ──────────────
-  frontPage: {
-    name: "Founding Artist",
-    displayName: "Founding Artist",
-    description: "Founding member. Pro features. Locked-in rate for life.",
-    portfolioPhotos: Number.MAX_SAFE_INTEGER,
-    canAcceptBookings: true,
-    canShowDirectContact: true,
-    canRespondToReviews: true,
-    hasAnalytics: true,
-    showExactLocation: true,
-    isFeatured: true,
-    // Featured badge on profile + homepage carousel
-    isVerifiedBadge: true,
-    /** Unlimited bids — same as Pro */
-    bidsPerMonth: Number.MAX_SAFE_INTEGER,
-    /** Same 5% fee as Pro */
-    transactionFeeRate: TRANSACTION_FEE_RATES.frontPage,
-    isFoundingArtist: true
-  }
-};
-function getTransactionFeeRate(tier) {
-  return TIER_LIMITS2[tier]?.transactionFeeRate ?? 0;
-}
-var CLIENT_TIER_LIMITS = {
-  client_free: {
-    name: "Collector",
-    requestsPerMonth: 1,
-    aiGenerationsPerMonth: 0,
-    directChatWithArtists: false,
-    priorityRequestBoard: false,
-    depositFeeWaived: false
-  },
-  client_plus: {
-    name: "Enthusiast",
-    requestsPerMonth: 10,
-    aiGenerationsPerMonth: 10,
-    directChatWithArtists: false,
-    priorityRequestBoard: true,
-    depositFeeWaived: false
-  },
-  client_elite: {
-    name: "Elite Ink",
-    requestsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    directChatWithArtists: true,
-    priorityRequestBoard: true,
-    depositFeeWaived: true
-  }
-};
-var CLIENT_TIER_PRICING = {
-  client_free: {
-    monthly: 0,
-    stripePriceIdMonth: null
-  },
-  client_plus: {
-    monthly: 900,
-    // $9.00
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID")
-  },
-  client_elite: {
-    monthly: 1900,
-    // $19.00
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID")
-  }
-};
-function getClientTierLimits(tier) {
-  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
-}
-
 // backend/shared/tierCompat.ts
-var FREE_ARTIST_TIERS = ["artist_free", "free"];
 var AI_BID_ASSISTANT_TIERS = [
-  "artist_amateur",
-  "artist_icon",
+  "artist_paygo",
+  "artist_pro",
+  "artist_elite",
   "amateur",
-  "frontPage"
+  "frontPage",
+  "professional"
 ];
 function hasTierValue(tier, allowed) {
   return !!tier && allowed.includes(tier);
 }
-function isFreeArtistTier(tier) {
-  return hasTierValue(tier, FREE_ARTIST_TIERS);
-}
 function canUseAiBidAssistant(tier) {
   return hasTierValue(tier, AI_BID_ASSISTANT_TIERS);
-}
-var LEGACY_ARTIST_TIER_BY_CANONICAL = {
-  artist_free: "free",
-  artist_amateur: "amateur",
-  artist_pro: "professional",
-  artist_icon: "frontPage"
-};
-function toLegacyArtistTier(tier) {
-  return LEGACY_ARTIST_TIER_BY_CANONICAL[tier];
 }
 
 // backend/server/clientRouters.ts
@@ -2337,11 +2409,15 @@ init_onboarding();
 
 // backend/shared/requestAddons.ts
 var REQUEST_ADDON_PRICING = {
-  priorityBoostCents: 199,
-  featuredBadgeCents: 99,
-  directMessageCreditCents: 49,
-  directMessageBundleCount: 5,
-  directMessageBundleCents: 199
+  priorityPlacementCents: 499,
+  preBookingChatCents: 999,
+  aiPriceEstimateCents: 299,
+  incognitoModeCents: 299,
+  conceptArtistCents: 499,
+  perfectMatchRouterCents: 399,
+  painAnalysisCents: 99,
+  vipBundleCents: 1999
+  // Discounted bundle of all
 };
 var REQUEST_ADDON_PAYMENT_STATUSES = {
   NOT_REQUESTED: "not_requested",
@@ -2349,13 +2425,19 @@ var REQUEST_ADDON_PAYMENT_STATUSES = {
   PAID: "paid",
   FAILED: "failed"
 };
-function clampDirectMessageCredits(value) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(20, Math.floor(value)));
-}
 function calculateRequestAddonTotalCents(selection) {
-  const credits = clampDirectMessageCredits(selection.directMessageCredits);
-  return (selection.priorityBoost ? REQUEST_ADDON_PRICING.priorityBoostCents : 0) + (selection.featuredBadge ? REQUEST_ADDON_PRICING.featuredBadgeCents : 0) + credits * REQUEST_ADDON_PRICING.directMessageCreditCents;
+  if (selection.vipBundle) {
+    return REQUEST_ADDON_PRICING.vipBundleCents;
+  }
+  let total = 0;
+  if (selection.priorityPlacement) total += REQUEST_ADDON_PRICING.priorityPlacementCents;
+  if (selection.preBookingChat) total += REQUEST_ADDON_PRICING.preBookingChatCents;
+  if (selection.aiPriceEstimate) total += REQUEST_ADDON_PRICING.aiPriceEstimateCents;
+  if (selection.incognitoMode) total += REQUEST_ADDON_PRICING.incognitoModeCents;
+  if (selection.conceptArtist) total += REQUEST_ADDON_PRICING.conceptArtistCents;
+  if (selection.perfectMatchRouter) total += REQUEST_ADDON_PRICING.perfectMatchRouterCents;
+  if (selection.painAnalysis) total += REQUEST_ADDON_PRICING.painAnalysisCents;
+  return total;
 }
 
 // backend/server/clientRouters.ts
@@ -2475,7 +2557,7 @@ var clientsRouter = router({
       });
     }
     const [user] = await db.select().from(users).where(eq2(users.id, ctx.user.id)).limit(1);
-    const session = await createSubscriptionCheckout({
+    const session = await createArtistSubscriptionCheckout({
       priceId,
       customerEmail: user?.email ?? "",
       stripeCustomerId: user?.stripeCustomerId ?? void 0,
@@ -2503,6 +2585,22 @@ var requestsRouter = router({
   ).query(async ({ input }) => {
     const db = await requireDb();
     const filters = input || { limit: 20, offset: 0 };
+    const whereConditions = [eq2(tattooRequests.status, "open")];
+    if (filters?.style) {
+      whereConditions.push(
+        sql2`${tattooRequests.style} ILIKE ${"%" + filters.style + "%"}`
+      );
+    }
+    if (filters?.city) {
+      whereConditions.push(
+        eq2(clients.city, filters.city)
+      );
+    }
+    if (filters?.state) {
+      whereConditions.push(
+        eq2(clients.state, filters.state)
+      );
+    }
     const results = await db.select({
       request: tattooRequests,
       client: clients,
@@ -2514,9 +2612,9 @@ var requestsRouter = router({
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
           )`.as("bidCount")
-    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
+    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(and2(...whereConditions)).orderBy(
       desc2(
-        sql2`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
@@ -2540,13 +2638,29 @@ var requestsRouter = router({
     const db = await requireDb();
     const [artist] = await db.select({ id: artists.id }).from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
     const canonicalTierForDashboard = ctx.user.subscriptionTier ?? "artist_free";
-    if (!artist || isFreeArtistTier(canonicalTierForDashboard)) {
+    if (!artist || canonicalTierForDashboard === "artist_free") {
       throw new TRPCError2({
         code: "FORBIDDEN",
         message: "This feature is only available for paid artist plans."
       });
     }
     const filters = input || { limit: 20, offset: 0 };
+    const whereConditions = [eq2(tattooRequests.status, "open")];
+    if (filters?.style) {
+      whereConditions.push(
+        sql2`${tattooRequests.style} ILIKE ${"%" + filters.style + "%"}`
+      );
+    }
+    if (filters?.city) {
+      whereConditions.push(
+        eq2(clients.city, filters.city)
+      );
+    }
+    if (filters?.state) {
+      whereConditions.push(
+        eq2(clients.state, filters.state)
+      );
+    }
     const results = await db.select({
       request: tattooRequests,
       client: clients,
@@ -2558,9 +2672,9 @@ var requestsRouter = router({
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
           )`.as("bidCount")
-    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
+    }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(and2(...whereConditions)).orderBy(
       desc2(
-        sql2`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
@@ -2587,7 +2701,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
       desc2(
-        sql2`CASE WHEN ${tattooRequests.addOnPriorityBoost} = true AND ${tattooRequests.addOnPaymentStatus} = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(8);
@@ -2661,9 +2775,14 @@ var requestsRouter = router({
       willingToTravel: z3.boolean().default(false),
       desiredTimeframe: z3.string().max(100).optional(),
       addOns: z3.object({
-        priorityBoost: z3.boolean().default(false),
-        featuredBadge: z3.boolean().default(false),
-        directMessageCredits: z3.number().int().min(0).max(20).default(0)
+        priorityPlacement: z3.boolean().default(false),
+        preBookingChat: z3.boolean().default(false),
+        aiPriceEstimate: z3.boolean().default(false),
+        incognitoMode: z3.boolean().default(false),
+        conceptArtist: z3.boolean().default(false),
+        perfectMatchRouter: z3.boolean().default(false),
+        painAnalysis: z3.boolean().default(false),
+        vipBundle: z3.boolean().default(false)
       }).optional(),
       guestEmail: z3.string().email().max(255).optional()
       // guests can optionally leave contact info
@@ -2672,11 +2791,14 @@ var requestsRouter = router({
     const db = await requireDb();
     const { guestEmail, addOns, ...requestInput } = input;
     const normalizedAddOns = {
-      priorityBoost: addOns?.priorityBoost ?? false,
-      featuredBadge: addOns?.featuredBadge ?? false,
-      directMessageCredits: clampDirectMessageCredits(
-        addOns?.directMessageCredits ?? 0
-      )
+      priorityPlacement: addOns?.priorityPlacement ?? false,
+      preBookingChat: addOns?.preBookingChat ?? false,
+      aiPriceEstimate: addOns?.aiPriceEstimate ?? false,
+      incognitoMode: addOns?.incognitoMode ?? false,
+      conceptArtist: addOns?.conceptArtist ?? false,
+      perfectMatchRouter: addOns?.perfectMatchRouter ?? false,
+      painAnalysis: addOns?.painAnalysis ?? false,
+      vipBundle: addOns?.vipBundle ?? false
     };
     const addOnTotalCents = calculateRequestAddonTotalCents(normalizedAddOns);
     let clientId = null;
@@ -2687,12 +2809,11 @@ var requestsRouter = router({
       const [userRow] = await db.select({ email: users.email }).from(users).where(eq2(users.id, ctx.user.id)).limit(1);
       userEmail = userRow?.email ?? "";
     }
+    const addOnArray = Object.entries(normalizedAddOns).filter(([_, value]) => value).map(([key]) => key);
     const [newRequest] = await db.insert(tattooRequests).values({
       clientId,
       guestEmail: clientId ? null : guestEmail ?? null,
-      addOnPriorityBoost: normalizedAddOns.priorityBoost,
-      addOnFeaturedBadge: normalizedAddOns.featuredBadge,
-      addOnDirectMessageCredits: normalizedAddOns.directMessageCredits,
+      selectedAddons: addOnArray,
       addOnTotalCents,
       addOnPaymentStatus: addOnTotalCents > 0 ? REQUEST_ADDON_PAYMENT_STATUSES.CHECKOUT_PENDING : REQUEST_ADDON_PAYMENT_STATUSES.NOT_REQUESTED,
       ...requestInput,
@@ -2979,9 +3100,8 @@ var bidsRouter = router({
       });
     }
     const canonicalTier = ctx.user.subscriptionTier ?? "artist_free";
-    const legacyTier = toLegacyArtistTier(canonicalTier);
-    const tierLimits = TIER_LIMITS2[legacyTier] ?? TIER_LIMITS2.free;
-    const bidsPerMonth = tierLimits.bidsPerMonth;
+    const tierLimits = getArtistTierLimits(canonicalTier);
+    const bidsPerMonth = tierLimits.freeBidsPerMonth;
     if (bidsPerMonth === 0) {
       throw new TRPCError2({
         code: "FORBIDDEN",
@@ -3028,7 +3148,7 @@ var bidsRouter = router({
         message: "Artist has already placed a bid on this request"
       });
     }
-    const feeRate = getTransactionFeeRate(legacyTier);
+    const feeRate = tierLimits.transactionFeePercent / 100;
     const platformFeeRateBps = Math.round(feeRate * 1e4);
     const [newBid] = await db.insert(bids).values({
       requestId: input.requestId,
@@ -3116,309 +3236,12 @@ import { eq as eq5 } from "drizzle-orm";
 
 // backend/server/verificationRouter.ts
 import { z as z4 } from "zod";
+init_env();
 init_db();
 init_db();
 init_schema();
 import { eq as eq3 } from "drizzle-orm";
 import { TRPCError as TRPCError3 } from "@trpc/server";
-
-// backend/server/geminiSafety.ts
-init_logger();
-var LICENSE_OCR_PROMPT_TEMPLATE = () => `You are a document verification specialist. Analyze this uploaded document image and extract all verifiable information. The document should be a tattoo/body art license, health permit, state-issued ID, or business permit related to tattooing.
-
-Return a JSON object with the following fields:
-
-{
-  "documentType": string,        // Detected document type: "tattoo_license", "health_permit", "business_permit", "state_id", "drivers_license", "other", "not_a_document"
-  "isLegible": boolean,          // Whether the document is legible enough to extract information
-  "extractedName": string|null,  // Full name as it appears on the document
-  "extractedBusinessName": string|null, // Business/shop name if present
-  "licenseNumber": string|null,  // License or permit number if present
-  "issuingAuthority": string|null, // Who issued the document (state, county, health department, etc.)
-  "issueDate": string|null,      // Issue date in ISO format (YYYY-MM-DD) if present
-  "expirationDate": string|null, // Expiration date in ISO format (YYYY-MM-DD) if present
-  "isExpired": boolean|null,     // Whether the document appears expired (based on expiration date vs today)
-  "state": string|null,          // State/jurisdiction if identifiable
-  "confidence": number,          // Overall extraction confidence 0-100
-  "issues": string[]             // Any issues detected: "blurry", "partially-obscured", "possibly-altered", "low-resolution", "glare", "cropped", "not-a-license", "expired", "unrecognized-format"
-}
-
-IMPORTANT:
-- Return ONLY the raw JSON object, no markdown code fences, no explanation.
-- If the image is not a document at all, set documentType to "not_a_document" and confidence to 0.
-- If the document is too blurry or obscured to read, set isLegible to false and confidence below 30.
-- Be conservative with confidence scores \u2014 only go above 80 if details are clearly readable.
-- Today's date is ${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]} \u2014 use this to determine if expired.
-- Extract names exactly as written on the document (preserve casing, middle names, suffixes).`;
-var DEFAULT_OCR_RESULT = {
-  documentType: "not_a_document",
-  isLegible: false,
-  extractedName: null,
-  extractedBusinessName: null,
-  licenseNumber: null,
-  issuingAuthority: null,
-  issueDate: null,
-  expirationDate: null,
-  isExpired: null,
-  state: null,
-  confidence: 0,
-  issues: ["analysis-failed"]
-};
-function compareNames(extractedName, profileName) {
-  if (!extractedName || !profileName) {
-    return { match: "unavailable", details: "One or both names are missing" };
-  }
-  const normalize = (n) => n.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/).filter(Boolean).sort();
-  const extracted = normalize(extractedName);
-  const profile = normalize(profileName);
-  if (extracted.join(" ") === profile.join(" ")) {
-    return {
-      match: "exact",
-      details: `Names match exactly: "${extractedName}"`
-    };
-  }
-  const overlap = extracted.filter((t2) => profile.includes(t2));
-  const overlapRatio = overlap.length / Math.max(extracted.length, profile.length);
-  if (overlapRatio >= 0.5) {
-    return {
-      match: "partial",
-      details: `Partial match (${Math.round(overlapRatio * 100)}%): extracted "${extractedName}" vs profile "${profileName}". Common tokens: ${overlap.join(", ")}`
-    };
-  }
-  return {
-    match: "mismatch",
-    details: `Name mismatch: extracted "${extractedName}" does not match profile "${profileName}"`
-  };
-}
-async function verifyLicenseDocument(imageData, mimeType, artistProfile) {
-  try {
-    let base64Data;
-    if (imageData.startsWith("http")) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15e3);
-      try {
-        const response = await fetch(imageData, { signal: controller.signal });
-        if (!response.ok) {
-          logger.warn(`Failed to fetch document for OCR: ${response.status}`);
-          return {
-            ...DEFAULT_OCR_RESULT,
-            nameMatch: "unavailable",
-            nameMatchDetails: "Could not fetch document image",
-            overallVerdict: "needs_review",
-            verdictReason: "Document image could not be retrieved for analysis"
-          };
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        base64Data = Buffer.from(arrayBuffer).toString("base64");
-        mimeType = response.headers.get("content-type") || mimeType;
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    } else {
-      base64Data = imageData;
-    }
-    if (mimeType === "application/pdf") {
-      return {
-        ...DEFAULT_OCR_RESULT,
-        documentType: "unknown",
-        issues: ["pdf-format-requires-manual-review"],
-        nameMatch: "unavailable",
-        nameMatchDetails: "PDF documents require manual review",
-        overallVerdict: "needs_review",
-        verdictReason: "PDF documents cannot be analyzed via OCR \u2014 requires manual admin review"
-      };
-    }
-    const imageBuffer = Buffer.from(base64Data, "base64");
-    const ocrText = await imageToTextWithHuggingFace(
-      imageBuffer,
-      mimeType,
-      "ocr"
-    );
-    if (!ocrText) {
-      return {
-        ...DEFAULT_OCR_RESULT,
-        issues: ["ocr-no-text-extracted"],
-        nameMatch: "unavailable",
-        nameMatchDetails: "No OCR text could be extracted",
-        overallVerdict: "needs_review",
-        verdictReason: "OCR returned no text \u2014 requires manual review"
-      };
-    }
-    const parsed2 = await groqGenerateJson(
-      LICENSE_OCR_PROMPT_TEMPLATE(),
-      `OCR extracted text:
-${ocrText.slice(0, 4e3)}
-
-Artist profile context:
-- Profile name: ${artistProfile.name || "unknown"}
-- Shop name: ${artistProfile.shopName || "unknown"}
-- State: ${artistProfile.state || "unknown"}`,
-      { maxTokens: 1600 }
-    );
-    const ocr = {
-      documentType: parsed2.documentType || "other",
-      isLegible: Boolean(parsed2.isLegible),
-      extractedName: parsed2.extractedName || null,
-      extractedBusinessName: parsed2.extractedBusinessName || null,
-      licenseNumber: parsed2.licenseNumber || null,
-      issuingAuthority: parsed2.issuingAuthority || null,
-      issueDate: parsed2.issueDate || null,
-      expirationDate: parsed2.expirationDate || null,
-      isExpired: parsed2.isExpired ?? null,
-      state: parsed2.state || null,
-      confidence: typeof parsed2.confidence === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.confidence))) : 0,
-      issues: Array.isArray(parsed2.issues) ? parsed2.issues : []
-    };
-    const nameComparison = compareNames(ocr.extractedName, artistProfile.name);
-    let shopNameComparison = null;
-    if (nameComparison.match === "mismatch" && ocr.extractedBusinessName) {
-      shopNameComparison = compareNames(
-        ocr.extractedBusinessName,
-        artistProfile.shopName
-      );
-    }
-    let verdict;
-    let verdictReason;
-    if (ocr.documentType === "not_a_document") {
-      verdict = "rejected";
-      verdictReason = "Uploaded file does not appear to be a valid document";
-    } else if (!ocr.isLegible || ocr.confidence < 30) {
-      verdict = "needs_review";
-      verdictReason = "Document is too unclear for automated verification \u2014 needs manual review";
-    } else if (ocr.isExpired === true) {
-      verdict = "rejected";
-      verdictReason = `Document appears to be expired (expiration: ${ocr.expirationDate})`;
-    } else if (nameComparison.match === "exact" && ocr.confidence >= 70 && !ocr.isExpired) {
-      verdict = "verified";
-      verdictReason = `Name matches profile exactly, document type: ${ocr.documentType}, confidence: ${ocr.confidence}%`;
-    } else if (nameComparison.match === "partial" || shopNameComparison && shopNameComparison.match !== "mismatch") {
-      verdict = "needs_review";
-      verdictReason = `Partial name match detected \u2014 admin should verify. ${nameComparison.details}`;
-    } else if (nameComparison.match === "mismatch") {
-      verdict = "needs_review";
-      verdictReason = `Name on document does not match profile \u2014 possible issue. ${nameComparison.details}`;
-    } else {
-      verdict = "needs_review";
-      verdictReason = "Automated checks inconclusive \u2014 requires manual admin review";
-    }
-    if (ocr.issues.includes("possibly-altered") && verdict !== "rejected") {
-      verdict = "needs_review";
-      verdictReason += " | Document may have been altered";
-    }
-    logger.info(
-      `License OCR: type=${ocr.documentType} confidence=${ocr.confidence} name=${nameComparison.match} verdict=${verdict}`
-    );
-    return {
-      ...ocr,
-      nameMatch: nameComparison.match,
-      nameMatchDetails: nameComparison.details,
-      overallVerdict: verdict,
-      verdictReason
-    };
-  } catch (error) {
-    logger.error("Hugging Face/Groq license OCR failed:", error);
-    return {
-      ...DEFAULT_OCR_RESULT,
-      nameMatch: "unavailable",
-      nameMatchDetails: "OCR analysis failed",
-      overallVerdict: "needs_review",
-      verdictReason: "Automated verification failed \u2014 requires manual review"
-    };
-  }
-}
-var REVIEW_ANALYSIS_PROMPT = `You are a content moderation specialist for a tattoo artist booking platform. Analyze this review for potential issues that warrant human moderation.
-
-Review details:
-- Rating: {rating}/5
-- Comment: "{comment}"
-- Reviewer has verified booking: {verifiedBooking}
-
-Analyze for the following concerns and return a JSON object:
-
-{
-  "overallSentiment": string,     // "positive", "neutral", "negative", "mixed"
-  "toxicityScore": number,        // 0-100: How toxic/abusive the language is (0 = completely clean, 100 = severely abusive)
-  "spamScore": number,            // 0-100: Likelihood of spam (generic text, SEO stuffing, promotional links, etc.)
-  "fraudScore": number,           // 0-100: Likelihood of being fraudulent/fake. Consider:
-                                  //   - Suspiciously generic praise/criticism
-                                  //   - Mismatch between rating and comment tone
-                                  //   - Competitor sabotage patterns (detailed negative review mentioning another shop)
-                                  //   - Review bombing language
-                                  //   - Impossible claims ("I've never been here but...")
-  "flags": string[],              // Specific flags: "abusive-language", "hate-speech", "threats", "personal-info-exposed",
-                                  //   "competitor-mention", "spam-link", "fake-positive", "fake-negative",
-                                  //   "rating-comment-mismatch", "review-bombing", "irrelevant-content",
-                                  //   "harassment", "defamation", "solicitation"
-  "moderationAction": string,     // Recommended action: "approve", "flag_for_review", "auto_hide"
-  "moderationReason": string,     // Brief explanation for the recommended action
-  "summary": string               // 1-sentence summary of the review's content and tone
-}
-
-IMPORTANT:
-- Return ONLY the raw JSON object, no markdown code fences.
-- Most reviews are legitimate \u2014 don't over-flag. Only flag genuinely suspicious content.
-- A negative review alone is NOT suspicious. Even harsh but factual criticism is legitimate.
-- "auto_hide" should only be recommended for clearly abusive, spam, or obviously fake content.
-- "flag_for_review" for borderline cases that need human judgment.
-- "approve" for reviews that appear legitimate, even if negative.
-- Rating-comment mismatch: e.g., 5-star rating with a scathing negative comment or 1-star with glowing praise.
-- A verified booking review should have a lower fraud score since it's tied to an actual transaction.`;
-var DEFAULT_REVIEW_ANALYSIS = {
-  overallSentiment: "neutral",
-  toxicityScore: 0,
-  spamScore: 0,
-  fraudScore: 0,
-  flags: [],
-  moderationAction: "approve",
-  moderationReason: "Analysis unavailable \u2014 defaulting to approve",
-  summary: "Review analysis could not be completed"
-};
-async function analyzeReviewSentiment(review) {
-  if (!review.comment || review.comment.trim().length === 0) {
-    return {
-      ...DEFAULT_REVIEW_ANALYSIS,
-      moderationReason: "No comment text to analyze \u2014 rating-only review auto-approved"
-    };
-  }
-  try {
-    const sanitizedComment = review.comment.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
-    const prompt = REVIEW_ANALYSIS_PROMPT.replace(
-      "{rating}",
-      String(review.rating)
-    ).replace("{verifiedBooking}", String(review.verifiedBooking ?? false)).replace("{comment}", sanitizedComment);
-    const parsed2 = await groqGenerateJson(
-      REVIEW_ANALYSIS_PROMPT,
-      prompt,
-      { maxTokens: 1400 }
-    );
-    const overallSentimentValue = typeof parsed2.overallSentiment === "string" ? parsed2.overallSentiment : "";
-    const moderationActionValue = typeof parsed2.moderationAction === "string" ? parsed2.moderationAction : "";
-    const analysis = {
-      overallSentiment: ["positive", "neutral", "negative", "mixed"].includes(
-        overallSentimentValue
-      ) ? overallSentimentValue : "neutral",
-      toxicityScore: typeof parsed2.toxicityScore === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.toxicityScore))) : 0,
-      spamScore: typeof parsed2.spamScore === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.spamScore))) : 0,
-      fraudScore: typeof parsed2.fraudScore === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.fraudScore))) : 0,
-      flags: Array.isArray(parsed2.flags) ? parsed2.flags : [],
-      moderationAction: ["approve", "flag_for_review", "auto_hide"].includes(
-        moderationActionValue
-      ) ? moderationActionValue : "approve",
-      moderationReason: typeof parsed2.moderationReason === "string" ? parsed2.moderationReason.slice(0, 500) : "No reason provided",
-      summary: typeof parsed2.summary === "string" ? parsed2.summary.slice(0, 300) : "No summary available"
-    };
-    logger.info(
-      `Review sentiment: ${analysis.overallSentiment} | toxicity=${analysis.toxicityScore} spam=${analysis.spamScore} fraud=${analysis.fraudScore} | action=${analysis.moderationAction}`
-    );
-    return analysis;
-  } catch (error) {
-    logger.error("Groq review sentiment analysis failed:", error);
-    return DEFAULT_REVIEW_ANALYSIS;
-  }
-}
-
-// backend/server/verificationRouter.ts
-init_logger();
 import path2 from "path";
 async function requireDb2() {
   const db = await getDb();
@@ -3475,13 +3298,6 @@ var verificationRouter = router({
       mimeType: z4.enum(["image/jpeg", "image/png", "application/pdf"])
     })
   ).mutation(async ({ ctx, input }) => {
-    const expectedPrefix = `private/${ctx.user.id}/`;
-    if (!input.documentKey.startsWith(expectedPrefix)) {
-      throw new TRPCError3({
-        code: "FORBIDDEN",
-        message: "Invalid document key: does not belong to this user"
-      });
-    }
     const drizzleDb = await requireDb2();
     const newDocument = await drizzleDb.transaction(async (tx) => {
       await tx.update(users).set({
@@ -3501,49 +3317,21 @@ var verificationRouter = router({
       }).returning();
       return created;
     });
-    if (newDocument && input.mimeType !== "application/pdf") {
-      (async () => {
-        try {
-          const signedUrl = await createSignedUrl(
-            BUCKETS.ID_DOCUMENTS,
-            input.documentKey,
-            300
-          );
-          const artist = await getArtistByUserId(ctx.user.id);
-          const artistProfile = {
-            name: ctx.user.name || null,
-            shopName: artist?.shopName || null,
-            state: artist?.state || null
-          };
-          const verification = await verifyLicenseDocument(
-            signedUrl,
-            input.mimeType,
-            artistProfile
-          );
-          await updateVerificationDocumentOCR(newDocument.id, {
-            ocrDocumentType: verification.documentType,
-            ocrExtractedName: verification.extractedName,
-            ocrExtractedBusinessName: verification.extractedBusinessName,
-            ocrLicenseNumber: verification.licenseNumber,
-            ocrExpirationDate: verification.expirationDate,
-            ocrIssuingAuthority: verification.issuingAuthority,
-            ocrConfidence: verification.confidence,
-            ocrNameMatch: verification.nameMatch,
-            ocrVerdict: verification.overallVerdict,
-            ocrVerdictReason: verification.verdictReason,
-            ocrIssues: JSON.stringify(verification.issues),
-            ocrProcessedAt: /* @__PURE__ */ new Date()
-          });
-          logger.info(
-            `License OCR complete for doc #${newDocument.id}: verdict=${verification.overallVerdict}, confidence=${verification.confidence}`
-          );
-        } catch (err) {
-          logger.error(
-            `Background license OCR failed for doc #${newDocument.id}:`,
-            err
-          );
-        }
-      })();
+    if (ENV.n8nVerificationWebhookUrl) {
+      fetch(ENV.n8nVerificationWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ENV.n8nWebhookSecret}`
+        },
+        body: JSON.stringify({
+          documentId: newDocument.id,
+          userId: ctx.user.id,
+          email: ctx.user.email,
+          documentType: input.documentType
+        })
+      }).catch(() => {
+      });
     }
     return newDocument;
   }),
@@ -3786,6 +3574,99 @@ async function parseDiscoveryQuery(query) {
   }
 }
 
+// backend/server/geminiSafety.ts
+init_logger();
+var REVIEW_ANALYSIS_PROMPT = `You are a content moderation specialist for a tattoo artist booking platform. Analyze this review for potential issues that warrant human moderation.
+
+Review details:
+- Rating: {rating}/5
+- Comment: "{comment}"
+- Reviewer has verified booking: {verifiedBooking}
+
+Analyze for the following concerns and return a JSON object:
+
+{
+  "overallSentiment": string,     // "positive", "neutral", "negative", "mixed"
+  "toxicityScore": number,        // 0-100: How toxic/abusive the language is (0 = completely clean, 100 = severely abusive)
+  "spamScore": number,            // 0-100: Likelihood of spam (generic text, SEO stuffing, promotional links, etc.)
+  "fraudScore": number,           // 0-100: Likelihood of being fraudulent/fake. Consider:
+                                  //   - Suspiciously generic praise/criticism
+                                  //   - Mismatch between rating and comment tone
+                                  //   - Competitor sabotage patterns (detailed negative review mentioning another shop)
+                                  //   - Review bombing language
+                                  //   - Impossible claims ("I've never been here but...")
+  "flags": string[],              // Specific flags: "abusive-language", "hate-speech", "threats", "personal-info-exposed",
+                                  //   "competitor-mention", "spam-link", "fake-positive", "fake-negative",
+                                  //   "rating-comment-mismatch", "review-bombing", "irrelevant-content",
+                                  //   "harassment", "defamation", "solicitation"
+  "moderationAction": string,     // Recommended action: "approve", "flag_for_review", "auto_hide"
+  "moderationReason": string,     // Brief explanation for the recommended action
+  "summary": string               // 1-sentence summary of the review's content and tone
+}
+
+IMPORTANT:
+- Return ONLY the raw JSON object, no markdown code fences.
+- Most reviews are legitimate \u2014 don't over-flag. Only flag genuinely suspicious content.
+- A negative review alone is NOT suspicious. Even harsh but factual criticism is legitimate.
+- "auto_hide" should only be recommended for clearly abusive, spam, or obviously fake content.
+- "flag_for_review" for borderline cases that need human judgment.
+- "approve" for reviews that appear legitimate, even if negative.
+- Rating-comment mismatch: e.g., 5-star rating with a scathing negative comment or 1-star with glowing praise.
+- A verified booking review should have a lower fraud score since it's tied to an actual transaction.`;
+var DEFAULT_REVIEW_ANALYSIS = {
+  overallSentiment: "neutral",
+  toxicityScore: 0,
+  spamScore: 0,
+  fraudScore: 0,
+  flags: [],
+  moderationAction: "approve",
+  moderationReason: "Analysis unavailable \u2014 defaulting to approve",
+  summary: "Review analysis could not be completed"
+};
+async function analyzeReviewSentiment(review) {
+  if (!review.comment || review.comment.trim().length === 0) {
+    return {
+      ...DEFAULT_REVIEW_ANALYSIS,
+      moderationReason: "No comment text to analyze \u2014 rating-only review auto-approved"
+    };
+  }
+  try {
+    const sanitizedComment = review.comment.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+    const prompt = REVIEW_ANALYSIS_PROMPT.replace(
+      "{rating}",
+      String(review.rating)
+    ).replace("{verifiedBooking}", String(review.verifiedBooking ?? false)).replace("{comment}", sanitizedComment);
+    const parsed2 = await groqGenerateJson(
+      REVIEW_ANALYSIS_PROMPT,
+      prompt,
+      { maxTokens: 1400 }
+    );
+    const overallSentimentValue = typeof parsed2.overallSentiment === "string" ? parsed2.overallSentiment : "";
+    const moderationActionValue = typeof parsed2.moderationAction === "string" ? parsed2.moderationAction : "";
+    const analysis = {
+      overallSentiment: ["positive", "neutral", "negative", "mixed"].includes(
+        overallSentimentValue
+      ) ? overallSentimentValue : "neutral",
+      toxicityScore: typeof parsed2.toxicityScore === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.toxicityScore))) : 0,
+      spamScore: typeof parsed2.spamScore === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.spamScore))) : 0,
+      fraudScore: typeof parsed2.fraudScore === "number" ? Math.max(0, Math.min(100, Math.round(parsed2.fraudScore))) : 0,
+      flags: Array.isArray(parsed2.flags) ? parsed2.flags : [],
+      moderationAction: ["approve", "flag_for_review", "auto_hide"].includes(
+        moderationActionValue
+      ) ? moderationActionValue : "approve",
+      moderationReason: typeof parsed2.moderationReason === "string" ? parsed2.moderationReason.slice(0, 500) : "No reason provided",
+      summary: typeof parsed2.summary === "string" ? parsed2.summary.slice(0, 300) : "No summary available"
+    };
+    logger.info(
+      `Review sentiment: ${analysis.overallSentiment} | toxicity=${analysis.toxicityScore} spam=${analysis.spamScore} fraud=${analysis.fraudScore} | action=${analysis.moderationAction}`
+    );
+    return analysis;
+  } catch (error) {
+    logger.error("Groq review sentiment analysis failed:", error);
+    return DEFAULT_REVIEW_ANALYSIS;
+  }
+}
+
 // backend/server/aiRouter.ts
 import { z as z5 } from "zod";
 init_db();
@@ -3884,35 +3765,50 @@ var aiRouter = router({
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb3();
-    const [clientProfile] = await db.select().from(clients).where(eq4(clients.userId, ctx.user.id)).limit(1);
-    if (!clientProfile) {
-      throw new TRPCError4({
-        code: "FORBIDDEN",
-        message: "You need a client profile to use AI Generation. Complete client onboarding first."
-      });
+    const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
+    let profileId;
+    let availableCredits;
+    let limitMax;
+    let tableName;
+    if (isArtist) {
+      const [artistProfile] = await db.select().from(artists).where(eq4(artists.userId, ctx.user.id)).limit(1);
+      if (!artistProfile) throw new TRPCError4({ code: "FORBIDDEN", message: "Artist profile not found" });
+      const tier = ctx.user.subscriptionTier || "artist_free";
+      const tierLimits = getArtistTierLimits(tier);
+      if (tierLimits.aiGenerationsPerMonth === 0) {
+        throw new TRPCError4({ code: "FORBIDDEN", message: "AI Studio is a Pro feature. Upgrade to Pro ($49/mo) to unlock." });
+      }
+      profileId = artistProfile.id;
+      availableCredits = artistProfile.aiCredits;
+      limitMax = tierLimits.aiGenerationsPerMonth;
+      tableName = artists;
+    } else {
+      const [clientProfile] = await db.select().from(clients).where(eq4(clients.userId, ctx.user.id)).limit(1);
+      if (!clientProfile) throw new TRPCError4({ code: "FORBIDDEN", message: "Profile not found." });
+      const tier = ctx.user.subscriptionTier || "client_free";
+      const tierLimits = getClientTierLimits(tier);
+      if (tierLimits.aiGenerationsPerMonth === 0) {
+        throw new TRPCError4({ code: "FORBIDDEN", message: "AI Generation requires AI credits. Buy an add-on to generate." });
+      }
+      profileId = clientProfile.id;
+      availableCredits = clientProfile.aiCredits;
+      limitMax = tierLimits.aiGenerationsPerMonth;
+      tableName = clients;
     }
-    const tier = ctx.user.subscriptionTier || "client_free";
-    const tierLimits = getClientTierLimits(tier);
-    if (tierLimits.aiGenerationsPerMonth === 0) {
-      throw new TRPCError4({
-        code: "FORBIDDEN",
-        message: "AI Generation is a premium feature. Upgrade to Enthusiast ($9/mo) or Elite Ink ($19/mo) to unlock tattoo design generation."
-      });
-    }
-    if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
-      const [updated] = await db.update(clients).set({
-        aiCredits: sql3`${clients.aiCredits} - 1`,
+    if (limitMax !== Number.MAX_SAFE_INTEGER) {
+      const [updated] = await db.update(tableName).set({
+        aiCredits: sql3`${tableName.aiCredits} - 1`,
         updatedAt: /* @__PURE__ */ new Date()
       }).where(
-        and3(eq4(clients.id, clientProfile.id), gt(clients.aiCredits, 0))
-      ).returning({ aiCredits: clients.aiCredits });
+        and3(eq4(tableName.id, profileId), gt(tableName.aiCredits, 0))
+      ).returning({ aiCredits: tableName.aiCredits });
       if (!updated) {
         throw new TRPCError4({
           code: "FORBIDDEN",
-          message: `You've used all ${tierLimits.aiGenerationsPerMonth} AI generation credits for this billing period. Upgrade to Elite Ink for unlimited generations.`
+          message: `You've used all your AI generation credits. Please upgrade or purchase more.`
         });
       }
-      clientProfile.aiCredits = updated.aiCredits;
+      availableCredits = updated.aiCredits;
     }
     try {
       const result = await generateTattooDesign(
@@ -3921,17 +3817,17 @@ var aiRouter = router({
         ctx.user.id
       );
       logger.info(
-        `AI tattoo generated for client #${clientProfile.id} (user #${ctx.user.id}), credits remaining: ${tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? "unlimited" : clientProfile.aiCredits}`
+        `AI tattoo generated for user #${ctx.user.id}, credits remaining: ${limitMax === Number.MAX_SAFE_INTEGER ? "unlimited" : availableCredits}`
       );
       return {
         imageUrl: result.imageUrl,
         imageKey: result.imageKey,
-        creditsRemaining: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? null : clientProfile.aiCredits
+        creditsRemaining: limitMax === Number.MAX_SAFE_INTEGER ? null : availableCredits
       };
     } catch (error) {
       logger.error("AI tattoo generation failed:", error);
-      if (tierLimits.aiGenerationsPerMonth !== Number.MAX_SAFE_INTEGER) {
-        await db.update(clients).set({ aiCredits: sql3`${clients.aiCredits} + 1`, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(clients.id, clientProfile.id));
+      if (limitMax !== Number.MAX_SAFE_INTEGER) {
+        await db.update(tableName).set({ aiCredits: sql3`${tableName.aiCredits} + 1`, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(tableName.id, profileId));
       }
       throw new TRPCError4({
         code: "INTERNAL_SERVER_ERROR",
@@ -3944,25 +3840,32 @@ var aiRouter = router({
    */
   getCredits: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb3();
-    const [clientProfile] = await db.select().from(clients).where(eq4(clients.userId, ctx.user.id)).limit(1);
-    if (!clientProfile) {
+    const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
+    if (isArtist) {
+      const [artistProfile] = await db.select().from(artists).where(eq4(artists.userId, ctx.user.id)).limit(1);
+      if (!artistProfile) return { tier: "artist_free", tierName: "Directory Profile", aiCredits: 0, maxCredits: 0, isUnlimited: false };
+      const tier = ctx.user.subscriptionTier || "artist_free";
+      const tierLimits = getArtistTierLimits(tier);
       return {
-        tier: "client_free",
-        tierName: "Collector",
-        aiCredits: 0,
-        maxCredits: 0,
-        isUnlimited: false
+        tier,
+        tierName: tierLimits.name,
+        aiCredits: artistProfile.aiCredits,
+        maxCredits: tierLimits.aiGenerationsPerMonth,
+        isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+      };
+    } else {
+      const [clientProfile] = await db.select().from(clients).where(eq4(clients.userId, ctx.user.id)).limit(1);
+      if (!clientProfile) return { tier: "client_free", tierName: "Collector", aiCredits: 0, maxCredits: 0, isUnlimited: false };
+      const tier = ctx.user.subscriptionTier || "client_free";
+      const tierLimits = getClientTierLimits(tier);
+      return {
+        tier,
+        tierName: tierLimits.name,
+        aiCredits: clientProfile.aiCredits,
+        maxCredits: tierLimits.aiGenerationsPerMonth,
+        isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
       };
     }
-    const tier = ctx.user.subscriptionTier || "client_free";
-    const tierLimits = getClientTierLimits(tier);
-    return {
-      tier,
-      tierName: tierLimits.name,
-      aiCredits: clientProfile.aiCredits,
-      maxCredits: tierLimits.aiGenerationsPerMonth,
-      isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
-    };
   })
 });
 
@@ -4054,6 +3957,34 @@ var appRouter = router({
     /** Admin: approve or reject an artist */
     adminSetApproval: adminProcedure.input(z7.object({ artistId: z7.number(), approved: z7.boolean() })).mutation(async ({ input }) => {
       await updateArtist(input.artistId, { isApproved: input.approved });
+      if (ENV.n8nWebhookUrl && ENV.n8nWebhookSecret) {
+        try {
+          const webhookUrl = `${ENV.n8nWebhookUrl}/webhook/artist-approval`;
+          const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${ENV.n8nWebhookSecret}`
+            },
+            body: JSON.stringify({
+              artistId: input.artistId,
+              approved: input.approved
+            })
+          });
+          if (!response.ok) {
+            logger.warn("n8n webhook returned non-2xx status", {
+              artistId: input.artistId,
+              status: response.status,
+              statusText: response.statusText
+            });
+          }
+        } catch (err) {
+          logger.error("Failed to trigger n8n approval notification workflow", {
+            artistId: input.artistId,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
       return { success: true };
     }),
     /**
@@ -4062,7 +3993,7 @@ var appRouter = router({
      */
     createSubscriptionCheckout: protectedProcedure.input(
       z7.object({
-        tier: z7.enum(["artist_amateur", "artist_icon"]),
+        tier: z7.enum(["artist_pro", "artist_elite"]),
         interval: z7.enum(["month", "year"]).default("month"),
         successUrl: z7.string().url(),
         cancelUrl: z7.string().url()
@@ -4078,10 +4009,10 @@ var appRouter = router({
         });
       }
       const priceIdMap = {
-        artist_amateur_month: ENV.stripeArtistAmateurPriceIdMonth,
-        artist_amateur_year: ENV.stripeArtistAmateurPriceIdYear,
-        artist_icon_month: ENV.stripeArtistIconPriceIdMonth,
-        artist_icon_year: ENV.stripeArtistIconPriceIdYear
+        artist_pro_month: ENV.stripeArtistProPriceIdMonth,
+        artist_pro_year: ENV.stripeArtistProPriceIdYear,
+        artist_elite_month: ENV.stripeArtistIconPriceIdMonth,
+        artist_elite_year: ENV.stripeArtistIconPriceIdYear
       };
       const priceId = priceIdMap[`${input.tier}_${input.interval}`];
       if (!priceId) {
@@ -4141,7 +4072,7 @@ var appRouter = router({
         metadata: {
           userId: String(ctx.user.id),
           artistId: String(artist.id),
-          tier: "artist_amateur",
+          tier: "artist_pro",
           interval: "month",
           isFoundingArtist: "true"
         },
@@ -4205,27 +4136,36 @@ var appRouter = router({
       z7.object({
         shopName: z7.string(),
         bio: z7.string().optional(),
+        experience: z7.number().int().positive().optional(),
+        city: z7.string().default(""),
+        state: z7.string().default(""),
+        styles: z7.string().optional(),
         specialties: z7.string().optional(),
-        experience: z7.number().optional(),
-        address: z7.string().optional(),
-        city: z7.string().optional(),
-        state: z7.string().optional(),
-        zipCode: z7.string().optional(),
-        phone: z7.string().optional(),
-        website: z7.string().optional(),
-        instagram: z7.string().optional(),
-        facebook: z7.string().optional(),
-        lat: z7.string().optional(),
-        lng: z7.string().optional()
+        instagram: z7.string().optional()
       })
     ).mutation(async ({ ctx, input }) => {
-      return await createArtist({
-        userId: ctx.user.id,
+      const newArtist = await createArtist({
         ...input,
-        shopName: sanitizeInput(input.shopName, 255),
-        bio: input.bio ? sanitizeInput(input.bio, 2e3) : void 0,
-        specialties: input.specialties ? sanitizeInput(input.specialties, 500) : void 0
+        userId: ctx.user.id
       });
+      if (ENV.n8nOnboardingWebhookUrl) {
+        fetch(ENV.n8nOnboardingWebhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ENV.n8nWebhookSecret}`
+          },
+          body: JSON.stringify({
+            artistId: newArtist.id,
+            userId: ctx.user.id,
+            email: ctx.user.email,
+            firstName: ctx.user.name?.split(" ")[0] ?? "there",
+            shopName: input.shopName
+          })
+        }).catch(() => {
+        });
+      }
+      return newArtist;
     }),
     update: artistOwnerProcedure.input(
       z7.object({
@@ -4303,7 +4243,7 @@ var appRouter = router({
       })
     ).mutation(async ({ ctx, input }) => {
       const tier = ctx.user?.subscriptionTier ?? "artist_free";
-      const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
+      const limit = getArtistTierLimits(tier).portfolioPhotos;
       const currentCount = await getPortfolioCountByArtistId(
         input.artistId
       );
@@ -4326,7 +4266,7 @@ var appRouter = router({
       })
     ).mutation(async ({ ctx, input }) => {
       const tier = ctx.user?.subscriptionTier ?? "artist_free";
-      const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
+      const limit = getArtistTierLimits(tier).portfolioPhotos;
       const currentCount = await getPortfolioCountByArtistId(
         input.artistId
       );
@@ -5095,8 +5035,6 @@ async function resolveUserForSubscription(database, stripeCustomerId, metadata) 
 async function handleSubscriptionCheckoutCompleted(session) {
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
   const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
-  const metadataTier = session.metadata?.tier;
-  const tier = metadataTier === "client_plus" || metadataTier === "client_elite" ? metadataTier : null;
   const database = await getDb();
   if (!database) {
     throw new Error(
@@ -5121,23 +5059,11 @@ async function handleSubscriptionCheckoutCompleted(session) {
     const userUpdate = { updatedAt: /* @__PURE__ */ new Date() };
     if (customerId) userUpdate.stripeCustomerId = customerId;
     if (subscriptionId) userUpdate.stripeSubscriptionId = subscriptionId;
-    if (tier) userUpdate.subscriptionTier = tier;
     await tx.update(users).set(userUpdate).where(eq8(users.id, user.id));
-    if (tier) {
-      const tierLimits = CLIENT_TIER_LIMITS[tier];
-      const aiCredits = tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? 999 : tierLimits.aiGenerationsPerMonth;
-      await tx.update(clients).set({
-        subscriptionTier: tier,
-        aiCredits,
-        stripeSubscriptionId: subscriptionId ?? null,
-        updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq8(clients.userId, user.id));
-    }
   });
   logger.info("Subscription checkout completed and customer reconciled", {
     userId: user.id,
     sessionId: session.id,
-    tier,
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscriptionId
   });
@@ -5157,71 +5083,13 @@ async function handleSubscriptionChange(subscription, eventType) {
     await handleArtistSubscriptionChange(subscription, artistTier, eventType);
     return;
   }
-  const tier = stripePriceToClientTier(priceId);
-  if (!tier) {
-    logger.debug(
-      "Subscription price does not match any known tier",
-      {
-        priceId,
-        subscriptionId: subscription.id
-      }
-    );
-    return;
-  }
-  const grantableStatuses = /* @__PURE__ */ new Set([
-    "active",
-    "trialing"
-  ]);
-  if (!grantableStatuses.has(subscription.status)) {
-    logger.info("Skipping tier grant for non-grantable subscription status", {
-      subscriptionId: subscription.id,
-      status: subscription.status,
-      eventType
-    });
-    return;
-  }
-  const database = await getDb();
-  if (!database) {
-    throw new Error("Database not available for subscription webhook");
-  }
-  const user = await resolveUserForSubscription(
-    database,
-    stripeCustomerId,
-    subscription.metadata
+  logger.debug(
+    "Subscription price does not match any known artist tier",
+    {
+      priceId,
+      subscriptionId: subscription.id
+    }
   );
-  if (!user) {
-    logger.warn(
-      "No user found for stripeCustomerId during subscription change",
-      {
-        stripeCustomerId,
-        subscriptionId: subscription.id
-      }
-    );
-    return;
-  }
-  const tierLimits = CLIENT_TIER_LIMITS[tier];
-  const aiCredits = tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? 999 : tierLimits.aiGenerationsPerMonth;
-  await database.transaction(async (tx) => {
-    await tx.update(users).set({
-      stripeCustomerId,
-      subscriptionTier: tier,
-      stripeSubscriptionId: subscription.id,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(users.id, user.id));
-    await tx.update(clients).set({
-      subscriptionTier: tier,
-      aiCredits,
-      stripeSubscriptionId: subscription.id,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq8(clients.userId, user.id));
-  });
-  logger.info("Client subscription changed", {
-    userId: user.id,
-    tier,
-    aiCredits,
-    subscriptionId: subscription.id,
-    eventType
-  });
 }
 async function handleArtistSubscriptionChange(subscription, tier, eventType) {
   const stripeCustomerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
@@ -5482,7 +5350,9 @@ app.use(
       callback(null, allowedOrigins.includes(origin));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-csrf-token"],
+    exposedHeaders: ["X-CSRF-Token"]
   })
 );
 var limiter = rateLimit({
@@ -5522,6 +5392,8 @@ app.post(
 app.use(cookieParser());
 app.use(express2.json({ limit: "50mb" }));
 app.use(express2.urlencoded({ limit: "50mb", extended: true }));
+app.use(csrfTokenMiddleware);
+app.use(csrfProtectionMiddleware);
 registerSupabaseAuthRoutes(app);
 app.get("/api/health", async (_req, res) => {
   try {
@@ -5533,12 +5405,19 @@ app.get("/api/health", async (_req, res) => {
       dbStatus = "connected";
     }
     const webhookStats = await getWebhookQueueStats();
+    const storageReady = ENV.isProduction ? true : true;
+    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth && ENV.stripeClientPlusPriceId ? true : false;
+    const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
     res.json({
-      status: "ok",
+      status: overallStatus,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       environment: ENV.nodeEnv,
-      database: dbStatus,
-      webhookQueue: webhookStats,
+      dependencies: {
+        database: { status: dbStatus },
+        storage: { ready: storageReady },
+        webhookQueue: webhookStats,
+        stripe: { ready: stripeReady }
+      },
       version: process.env.npm_package_version || "unknown"
     });
   } catch (error) {
@@ -5546,7 +5425,12 @@ app.get("/api/health", async (_req, res) => {
     res.status(503).json({
       status: "error",
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      error: "Health check failed"
+      dependencies: {
+        database: { status: "error" },
+        storage: { ready: false },
+        stripe: { ready: false }
+      },
+      error: error instanceof Error ? error.message : "Health check failed"
     });
   }
 });
@@ -5627,10 +5511,18 @@ app.use(
   const server = createServer(app);
   const startServer = async () => {
     try {
-      await initializeBuckets();
-      logger.info("Supabase storage buckets initialized successfully");
+      const storageInit = await initializeBuckets();
+      logger.info("Supabase storage buckets initialized successfully", {
+        existing: storageInit.existing,
+        created: storageInit.created
+      });
     } catch (error) {
-      logger.error("Failed to initialize storage buckets", { error });
+      if (ENV.isProduction) {
+        logger.error("FATAL: Storage bucket initialization failed in production", { error });
+        process.exit(1);
+      } else {
+        logger.warn("Storage bucket initialization failed in development (non-fatal)", { error });
+      }
     }
     try {
       initWebhookProcessor();

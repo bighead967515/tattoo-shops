@@ -1,0 +1,263 @@
+{
+  "name": "Artist Approval Notification",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "name": "trigger_webhook_artist_approval",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "artist-approval",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "name": "api_supabase_fetch_artist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/artists?id=eq.' + $json.body.artistId + '&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "api_supabase_fetch_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/users?id=eq.' + $json[0].userId + '&select=email,name' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "check_is_approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [940, 300],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $node['trigger_webhook_artist_approval'].json.body.approved }}",
+              "operation": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "compose_email_approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 220],
+      "parameters": {
+        "jsCode": "const webhookBody = $node['trigger_webhook_artist_approval'].json.body;\nconst artist = $node['api_supabase_fetch_artist'].json[0] || {};\nconst user = $node['api_supabase_fetch_user'].json[0] || {};\nconst subject = 'Your Artist Profile is Now Live';\nconst htmlBody = `<h2>Welcome to Ink Connect, ${user.name || 'Artist'}!</h2>\n<p>Your profile for <strong>${artist.shopName || 'your studio'}</strong> has been approved.</p>\n<p><a href=\"${$env.PUBLIC_BASE_URL}/artist-dashboard\">Go to Dashboard</a></p>\n<hr><p style=\"font-size:12px;color:#666;\">If you no longer wish to receive these emails, <a href=\"${$env.PUBLIC_BASE_URL}/unsubscribe?email=${encodeURIComponent(user.email || '')}\">Unsubscribe</a>.</p>`;\nreturn [{ json: { ...webhookBody, email: user.email, subject, htmlBody } }];"
+      }
+    },
+    {
+      "name": "compose_email_rejected",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 380],
+      "parameters": {
+        "jsCode": "const webhookBody = $node['trigger_webhook_artist_approval'].json.body;\nconst user = $node['api_supabase_fetch_user'].json[0] || {};\nconst reason = webhookBody.rejectionReason || 'Profile does not meet our guidelines';\nconst subject = 'Artist Profile Review Status';\nconst htmlBody = `<h2>Hello ${user.name || 'Artist'},</h2>\n<p>We are unable to approve your profile at this time.</p>\n<p><strong>Reason:</strong> ${reason}</p>\n<hr><p style=\"font-size:12px;color:#666;\">If you no longer wish to receive these emails, <a href=\"${$env.PUBLIC_BASE_URL}/unsubscribe?email=${encodeURIComponent(user.email || '')}\">Unsubscribe</a>.</p>`;\nreturn [{ json: { ...webhookBody, email: user.email, subject, htmlBody } }];"
+      }
+    },
+    {
+      "name": "send_email_artist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1420, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'Ink Connect <noreply@inkconnect.co>', to: $json.email, subject: $json.subject, html: $json.htmlBody, reply_to: 'support@inkconnect.co' } }}"
+      }
+    },
+    {
+      "name": "db_log_notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1660, 300],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/artists?id=eq.' + $node['trigger_webhook_artist_approval'].json.body.artistId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { approvalNotificationStatus: 'sent' } }}"
+      }
+    },
+    {
+      "name": "respond_webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1900, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, artistId: $node['trigger_webhook_artist_approval'].json.body.artistId } }}"
+      }
+    }
+  ],
+  "connections": {
+    "trigger_webhook_artist_approval": {
+      "main": [
+        [
+          {
+            "node": "api_supabase_fetch_artist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "api_supabase_fetch_artist": {
+      "main": [
+        [
+          {
+            "node": "api_supabase_fetch_user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "api_supabase_fetch_user": {
+      "main": [
+        [
+          {
+            "node": "check_is_approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_is_approved": {
+      "main": [
+        [
+          {
+            "node": "compose_email_approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "compose_email_rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "compose_email_approved": {
+      "main": [
+        [
+          {
+            "node": "send_email_artist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "compose_email_rejected": {
+      "main": [
+        [
+          {
+            "node": "send_email_artist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email_artist": {
+      "main": [
+        [
+          {
+            "node": "db_log_notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "db_log_notification": {
+      "main": [
+        [
+          {
+            "node": "respond_webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

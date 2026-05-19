@@ -23,6 +23,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
    - `SUPABASE_SERVICE_KEY` - service_role key (backend only, SECRET!)
    - `VITE_SUPABASE_URL` - Same as SUPABASE_URL
    - `VITE_SUPABASE_ANON_KEY` - Same as SUPABASE_ANON_KEY
+   - Optional: `VITE_GA4_MEASUREMENT_ID` - Google Analytics 4 measurement ID for frontend pageview tracking
 9. Important note:
    - `SUPABASE_ANON_KEY` is intentionally public and does not need to be hidden
    - Protect data using Supabase RLS policies; never expose `SUPABASE_SERVICE_KEY`
