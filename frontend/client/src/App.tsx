@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/for-artists" component={ForArtists} />
       <Route path="/cover-ups" component={CoverUps} />
+      <Route path="/tattoo-planning" component={CoverUps} />
       <Route path="/request-flow" component={RequestFlow} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/artist-dashboard" component={ArtistDashboard} />
@@ -95,6 +97,7 @@ function usesPageHeader(path: string) {
     path.startsWith("/artist/") ||
     path === "/for-artists" ||
     path === "/cover-ups" ||
+    path === "/tattoo-planning" ||
     path === "/request-flow" ||
     path === "/dashboard" ||
     path === "/artist-dashboard" ||
@@ -122,6 +125,33 @@ function App() {
   const [location] = useLocation();
   const showMarketingHomeHeader = location === "/";
   const showSidebarShell = !showMarketingHomeHeader && !usesPageHeader(location);
+
+  useEffect(() => {
+    const win = window as Window & {
+      dataLayer?: unknown[];
+      gtag?: (...args: unknown[]) => void;
+      __inkLastTrackedPath?: string;
+    };
+
+    if (win.__inkLastTrackedPath === location) {
+      return;
+    }
+    win.__inkLastTrackedPath = location;
+
+    // Keep analytics vendor-agnostic while still supporting GA if present.
+    win.dataLayer?.push({
+      event: "page_view",
+      page_path: location,
+      page_title: document.title,
+    });
+
+    if (typeof win.gtag === "function") {
+      win.gtag("event", "page_view", {
+        page_path: location,
+        page_title: document.title,
+      });
+    }
+  }, [location]);
 
   return (
     <ErrorBoundary>

@@ -6,18 +6,18 @@ import { ArrowRight, FileText, Goal, MessageSquare, CheckCircle2 } from "lucide-
 
 const flowSteps = [
   {
-    title: "Step 1: Share your current tattoo",
-    body: "Upload photos and key details so artists can evaluate what exists today.",
+    title: "Step 1: Share your tattoo idea",
+    body: "Upload photos or describe your vision so artists can evaluate your project.",
     icon: FileText,
   },
   {
-    title: "Step 2: Define your cover-up goal",
-    body: "Describe your target style, budget range, and timeline preferences.",
+    title: "Step 2: Define your goals",
+    body: "Describe your style, budget range, and timeline preferences.",
     icon: Goal,
   },
   {
     title: "Step 3: Receive artist responses",
-    body: "Artists reply with approach, scope, and expected timing.",
+    body: "Artists reply with their approach, scope, and expected timing.",
     icon: MessageSquare,
   },
   {
@@ -37,13 +37,13 @@ export default function RequestFlow() {
       <section className="border-b bg-gradient-to-br from-background via-background to-primary/10 py-20">
         <div className="container mx-auto max-w-5xl px-4 text-center">
           <h1 className="mb-5 text-3xl font-bold leading-tight sm:text-4xl md:text-6xl">
-            How cover-up requests work on Ink Connect
+            How tattoo requests work on Ink Connect
           </h1>
           <p className="mx-auto mb-8 max-w-3xl text-lg text-muted-foreground md:text-xl">
-            A clear process that helps clients submit better requests and helps artists respond with better-fit plans.
+            A clear process that helps clients submit better tattoo requests and helps artists respond with better-fit plans.
           </p>
-          <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}>
-            Start your cover-up request
+          <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
+            Start your tattoo request
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -73,9 +73,9 @@ export default function RequestFlow() {
       </section>
 
       <section className="container py-16 text-center">
-        <h2 className="mb-4 text-3xl font-bold">Your best cover-up starts with a better request.</h2>
-        <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}>
-          Start your cover-up request
+        <h2 className="mb-4 text-3xl font-bold">Your best tattoo starts with a better request.</h2>
+        <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
+          Start your tattoo request
         </Button>
       </section>
     </div>

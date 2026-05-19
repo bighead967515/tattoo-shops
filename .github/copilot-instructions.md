@@ -495,6 +495,9 @@ Defined in `frontend/client/src/App.tsx` using Wouter:
 | `/artists`             | ArtistBrowse       | Browse/filter artists       |
 | `/artist/:id`          | ArtistProfile      | Artist detail page          |
 | `/for-artists`         | ForArtists         | Artist info/signup          |
+| `/tattoo-planning`     | CoverUps           | Tattoo planning guide       |
+| `/cover-ups`           | CoverUps           | Legacy alias route          |
+| `/request-flow`        | RequestFlow        | Request flow guide          |
 | `/dashboard`           | Dashboard          | User dashboard              |
 | `/artist-dashboard`    | ArtistDashboard    | Artist dashboard            |
 | `/login`               | Login              | Login/signup                |
@@ -609,6 +612,10 @@ Legacy aliases (`free`, `amateur`, `professional`, `frontPage`) still appear in 
 - **Storage**: `backend/server/_core/supabaseStorage.ts` — bucket management, signed URLs, upload/delete
 - **Admin client**: `backend/server/_core/supabase.ts` — service role client (bypasses RLS)
 - **Frontend client**: `frontend/client/src/lib/supabase.ts` — browser client with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+
+### Analytics
+
+- **Frontend analytics**: `frontend/client/src/lib/analytics.ts` + `frontend/client/src/App.tsx` — GA4-ready pageview tracking via optional `VITE_GA4_MEASUREMENT_ID`
 
 ### Stripe
 

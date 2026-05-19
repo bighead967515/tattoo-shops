@@ -116,6 +116,9 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | `/artist/:id`          | Artist Profile           | Public        |
 | `/artist-finder`       | AI-powered Artist Finder | Public        |
 | `/for-artists`         | Artist Landing Page      | Public        |
+| `/tattoo-planning`     | Tattoo Planning Guide    | Public        |
+| `/cover-ups`           | Tattoo Planning Guide    | Public (legacy alias) |
+| `/request-flow`        | Request Flow Guide       | Public        |
 | `/pricing`             | Subscription Pricing     | Public        |
 | `/requests`            | Request Board            | Public        |
 | `/requests/:id`        | Request Detail           | Public        |
@@ -199,6 +202,7 @@ SUPABASE_SERVICE_KEY=...               # Supabase service role key
 SUPABASE_ANON_KEY=...                  # Supabase anon/public key (safe for frontend)
 VITE_SUPABASE_URL=https://...          # Frontend Supabase URL (same as SUPABASE_URL)
 VITE_SUPABASE_ANON_KEY=...             # Frontend anon/public key (same as SUPABASE_ANON_KEY)
+VITE_GA4_MEASUREMENT_ID=G-...          # Optional GA4 measurement ID for client analytics
 STRIPE_SECRET_KEY=sk_...               # Stripe secret key
 STRIPE_WEBHOOK_SECRET=whsec_...        # Stripe webhook signing secret
 

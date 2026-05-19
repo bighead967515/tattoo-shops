@@ -18,18 +18,18 @@ import {
 
 const audienceLanes = [
   {
-    title: "Specialize in cover-ups?",
+    title: "Showcase your tattoo artistry",
     body:
-      "Review clear request details, respond with your approach, and focus on cover-up projects that match your style and process.",
-    cta: "Join as a cover-up artist",
+      "Display your portfolio, styles, and specialties to attract clients looking for quality work.",
+    cta: "Join as an artist",
     href: "/for-artists",
     icon: Palette,
   },
   {
-    title: "Need a cover-up or rework?",
+    title: "Looking for a new tattoo?",
     body:
-      "Share your current tattoo, your goals, and your timeline. Artists with relevant experience can respond with realistic next-step options.",
-    cta: "Start your cover-up request",
+      "Describe your idea, style preferences, and budget. Artists will respond with proposals tailored to you.",
+    cta: "Start your request",
     href: "/client/new-request",
     icon: FileText,
   },
@@ -58,48 +58,48 @@ const clientSteps = [
 
 const artistSteps = [
   {
-    title: "Show your cover-up proof",
+    title: "Show your tattoo portfolio",
     body:
-      "Present work that reflects your process and style strengths so clients can assess whether you are the right fit for their request.",
+      "Showcase your best work and style strengths so clients can see why you are the perfect fit for their tattoo.",
     icon: Palette,
   },
   {
     title: "Review detailed requests",
     body:
-      "See project details before responding, including placement, style goals, budget range, and timeline preferences.",
+      "Review detailed client requests, including placement, style goals, budget range, and timeline preferences.",
     icon: MapPin,
   },
   {
     title: "Respond with clarity",
     body:
-      "Share your recommended approach and expected scope so clients can make informed decisions and you can focus on better-fit work.",
+      "Provide clear proposals and timelines so clients can make informed decisions and choose the best artist for their vision.",
     icon: Calendar,
   },
 ];
 
 const whyInkConnect = [
   {
-    title: "Built for cover-up decisions",
+    title: "Built for informed decisions",
     body:
-      "Requests capture details that matter for cover-ups, so artists can respond with useful guidance instead of generic replies.",
+      "Requests capture essential details, so artists can respond with useful guidance tailored to each client.",
     icon: Star,
   },
   {
     title: "Portfolio-first trust",
     body:
-      "Clients can evaluate artist work and approach before choosing who to contact next.",
+      "Clients can evaluate artist portfolios and styles before deciding who to contact.",
     icon: Wallet,
   },
   {
     title: "Clear process on both sides",
     body:
-      "Clients submit structured requests. Artists respond with specifics. Everyone saves time by starting with better information.",
+      "Clients submit structured requests. Artists respond with specifics. Everyone saves time by starting with clear expectations.",
     icon: Award,
   },
   {
     title: "Practical expectations",
     body:
-      "Cover-ups vary by tattoo and goals. Ink Connect is designed to support realistic planning, not one-size-fits-all promises.",
+      "Tattoo projects vary by design and goals. Ink Connect supports realistic planning, not one-size-fits-all promises.",
     icon: Shield,
   },
 ];
@@ -108,7 +108,7 @@ const faqs = [
   {
     question: "What if my tattoo is very dark or complex?",
     answer:
-      "Artists can review your details and explain whether direct cover-up may be possible or whether a staged approach may be more realistic.",
+      "Artists can review your details and explain whether your goals are feasible now or whether a staged approach may be more realistic.",
   },
   {
     question: "I do not know how to describe what I want. Can I still start?",
@@ -140,10 +140,10 @@ export default function Home() {
               Ink Connect
             </p>
             <h1 className="mb-6 text-3xl font-bold leading-tight sm:text-4xl md:text-6xl">
-              Cover-up work needs a clear plan and the right artist.
+              Find the perfect tattoo artist for your next ink.
             </h1>
             <p className="mx-auto mb-8 max-w-3xl text-lg text-muted-foreground md:text-2xl">
-              Ink Connect helps clients submit better cover-up requests and helps artists find serious clients actively looking for cover-up specialists.
+              Ink Connect connects clients with talented tattoo artists and helps artists showcase their skills to attract the right clients.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -152,7 +152,7 @@ export default function Home() {
                 onClick={() => setLocation("/client/new-request")}
                 className="w-full px-8 py-6 text-lg sm:w-auto"
               >
-                Start your cover-up request
+                Start your tattoo request
               </Button>
               <Button
                 size="lg"
@@ -160,13 +160,13 @@ export default function Home() {
                 onClick={() => setLocation("/for-artists")}
                 className="h-auto px-0 text-base text-foreground"
               >
-                I'm a cover-up artist
+                I'm a tattoo artist
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
 
             <p className="mt-5 text-sm text-muted-foreground">
-              Built for both sides: clients who need a better next step and artists who want better-fit cover-up clients.
+              Built for both sides: clients who need a better next step and artists who want better-fit tattoo clients.
             </p>
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function Home() {
 
         <div className="mt-10 text-center">
           <Button size="lg" className="w-full sm:w-auto" variant="outline" onClick={() => setLocation("/artist/register")}> 
-            Join as a cover-up artist
+            Join as a tattoo artist
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -254,7 +254,7 @@ export default function Home() {
 
           <div className="mt-10 text-center">
             <Button size="lg" className="w-full sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
-              Start your cover-up request
+              Start your tattoo request
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -264,7 +264,7 @@ export default function Home() {
       <section className="container py-20">
         <div className="mx-auto mb-12 max-w-3xl text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Why clients and artists use Ink Connect for cover-up work
+            Why clients and artists use Ink Connect
           </h2>
         </div>
 
@@ -327,21 +327,21 @@ export default function Home() {
       <section className="container pb-20">
         <Card className="rounded-[2rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-12 text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Ready to move forward on your cover-up?
+            Ready to move forward on your tattoo?
           </h2>
           <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground">
-            Submit your request as a client, or join as an artist to connect with people actively looking for cover-up specialists.
+            Submit your request as a client, or join as an artist to connect with people actively looking for tattoo work.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <Button size="lg" className="w-full sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
-              Start your cover-up request
+              Start your tattoo request
             </Button>
             <Button
               size="lg"
               variant="outline"
               onClick={() => setLocation("/artist/register")}
             >
-              Join as a cover-up artist
+              Join as a tattoo artist
             </Button>
           </div>
           <p className="mt-5 text-sm text-muted-foreground">
@@ -356,7 +356,7 @@ export default function Home() {
             <div>
               <h3 className="mb-3 text-2xl font-bold">Ink Connect</h3>
               <p className="text-muted-foreground">
-                Ink Connect helps clients and artists connect around clear, realistic cover-up planning.
+                Ink Connect helps clients and artists connect around clear, realistic tattoo planning.
               </p>
             </div>
 
@@ -375,8 +375,8 @@ export default function Home() {
                     </Link>
                   </li>
                   <li>
-                    <Link href="/cover-ups" className="hover:text-primary">
-                      Cover-Up Help
+                    <Link href="/tattoo-planning" className="hover:text-primary">
+                      Tattoo Planning Help
                     </Link>
                   </li>
                   <li>

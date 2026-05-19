@@ -1,6 +1,6 @@
 # Production Readiness Tracker
 
-Last updated: 2026-04-26
+Last updated: 2026-05-19
 
 ## Completed Baseline (Verified In Code)
 
@@ -14,6 +14,8 @@ Last updated: 2026-04-26
 - [x] Client onboarding and role/tier transitions covered by integration tests
 - [x] Artist search/filter, request board, bids, and client marketplace flow implemented
 - [x] SEO essentials present (dynamic sitemap + page metadata support)
+- [x] GA4-ready pageview tracking wired in frontend (`VITE_GA4_MEASUREMENT_ID` optional)
+- [x] Public messaging updated to all-tattoo positioning; cover-up/rework retained as a specialty
 
 ## Critical Before Launch (Blocking)
 
@@ -79,7 +81,7 @@ Last updated: 2026-04-26
 
 ## Medium Priority (Month 1)
 
-- [ ] Event analytics for funnel: discovery -> profile -> booking/request
+- [ ] Event analytics for funnel: discovery -> profile -> booking/request (pageviews are live; conversion events pending)
 - [ ] Conversion dashboard for client and artist subscription upgrades
 - [ ] Advanced SEO: structured data QA, index coverage checks, rich result monitoring
 - [ ] Security hardening pass (headers, dependency audit, key rotation runbook)

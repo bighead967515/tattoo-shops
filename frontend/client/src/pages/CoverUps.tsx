@@ -40,13 +40,13 @@ export default function CoverUps() {
       <section className="border-b bg-gradient-to-br from-background via-background to-primary/10 py-20">
         <div className="container mx-auto max-w-5xl px-4 text-center">
           <h1 className="mb-5 text-3xl font-bold leading-tight sm:text-4xl md:text-6xl">
-            From tattoo regret to a realistic cover-up plan.
+            From tattoo regret to a new masterpiece.
           </h1>
           <p className="mx-auto mb-8 max-w-3xl text-lg text-muted-foreground md:text-xl">
-            You are not stuck. Start a clear request so artists who specialize in cover-ups can evaluate your options.
+            You are not stuck. Start a clear tattoo request so artists can evaluate your options and help you move forward.
           </p>
-          <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}>
-            Start your cover-up request
+          <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
+            Start your tattoo request
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -102,10 +102,10 @@ export default function CoverUps() {
       <section className="container py-16 text-center">
         <h2 className="mb-4 text-3xl font-bold">Ready to take the next step?</h2>
         <p className="mx-auto mb-8 max-w-2xl text-muted-foreground">
-          Start your request and hear from artists who understand cover-up work.
+          Start your request and hear from artists who understand how to transform your tattoo vision.
         </p>
-        <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}>
-          Start your cover-up request
+        <Button size="lg" className="w-full px-8 py-6 text-lg sm:w-auto" onClick={() => setLocation("/client/new-request")}> 
+          Start your tattoo request
         </Button>
       </section>
     </div>

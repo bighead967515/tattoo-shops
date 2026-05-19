@@ -43,6 +43,7 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TATTOO_STYLES = [
+  "Cover-up / Rework",
   "Traditional",
   "Neo-Traditional",
   "Realism",

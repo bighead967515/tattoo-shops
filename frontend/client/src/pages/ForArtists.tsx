@@ -41,14 +41,14 @@ export default function ForArtists() {
       <section className="relative bg-gradient-to-br from-background via-background to-primary/10 border-b py-24">
         <div className="container max-w-5xl mx-auto text-center space-y-6 px-4">
           <Badge className="mb-2 px-4 py-1 text-sm bg-primary/20 text-primary border-primary/30">
-            Cover-up specialists wanted
+            Tattoo artists wanted
           </Badge>
           <h1 className="text-4xl md:text-6xl font-bold leading-tight">
             Find clients who are actively looking for
-            <span className="text-primary"> cover-ups and reworks.</span>
+            <span className="text-primary"> unique tattoo projects.</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Ink Connect helps artists who do complex cover-up work attract better-fit clients and respond to requests with clear project details.
+            Ink Connect helps artists of all styles attract better-fit clients and respond to requests with clear project details.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
             <Button
@@ -56,7 +56,7 @@ export default function ForArtists() {
               className="w-full text-lg px-10 py-6 shadow-lg shadow-primary/20 sm:w-auto"
               onClick={() => setLocation("/artist/register")}
             >
-              Join as a cover-up artist
+              Join as a tattoo artist
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
             <Button
@@ -84,7 +84,7 @@ export default function ForArtists() {
               </div>
               <h3 className="text-lg font-bold mb-2">Clients Come to You</h3>
               <p className="text-sm text-muted-foreground">
-                Clients submit structured cover-up requests so you can focus on finding and responding to projects that match your style.
+                Clients submit structured tattoo requests so you can focus on finding and responding to projects that match your style.
               </p>
             </div>
             <div className="flex flex-col items-center text-center p-8 rounded-2xl bg-muted/30 border border-border/60 hover:border-primary/40 transition-all group">
@@ -102,7 +102,7 @@ export default function ForArtists() {
               </div>
               <h3 className="text-lg font-bold mb-2">Build Your Reputation</h3>
               <p className="text-sm text-muted-foreground">
-                Show portfolio proof, communicate your process clearly, and build trust with clients who care about cover-up results.
+                Show portfolio proof, communicate your process clearly, and build trust with clients who care about quality tattoo results.
               </p>
             </div>
           </div>
@@ -292,16 +292,16 @@ export default function ForArtists() {
       <section className="py-24">
         <div className="container max-w-3xl mx-auto px-4 text-center space-y-6">
           <Palette className="w-12 h-12 text-primary mx-auto" />
-          <h2 className="text-4xl font-bold">Ready to win more cover-up projects?</h2>
+          <h2 className="text-4xl font-bold">Ready to win more tattoo projects?</h2>
           <p className="text-xl text-muted-foreground">
-            Join Ink Connect and connect with clients who are actively requesting cover-up and rework work.
+            Join Ink Connect and connect with clients who are actively requesting custom tattoos.
           </p>
           <Button
             size="lg"
             className="w-full text-lg px-12 py-6 shadow-lg shadow-primary/20 sm:w-auto"
             onClick={() => setLocation("/artist/register")}
           >
-            Join as a cover-up artist
+            Join as a tattoo artist
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <p className="text-sm text-muted-foreground">
