@@ -14,6 +14,7 @@
 import crypto from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "./logger";
+import { isSecureRequest } from "./cookies";
 
 const CSRF_COOKIE_NAME = "__csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
@@ -76,7 +77,7 @@ export function csrfProtectionMiddleware(
     // Set as httpOnly cookie (cannot be read by JavaScript, blocks XSS exfiltration)
     res.cookie(CSRF_COOKIE_NAME, tokenInCookie, {
       httpOnly: true,
-      secure: req.protocol === "https",
+      secure: isSecureRequest(req),
       sameSite: "strict", // P1-1 fix: use strict instead of none
       path: "/",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
@@ -129,7 +130,7 @@ export function csrfTokenMiddleware(
   if (!req.cookies?.[CSRF_COOKIE_NAME]) {
     res.cookie(CSRF_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: req.protocol === "https",
+      secure: isSecureRequest(req),
       sameSite: "strict",
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,

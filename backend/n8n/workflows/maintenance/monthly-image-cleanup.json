@@ -1,0 +1,156 @@
+{
+  "name": "Monthly Portfolio Image Cleanup",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "name": "trigger_schedule_monthly",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [220, 280],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 2 1 * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "api_supabase_list_storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 280],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/storage/v1/object/list/portfolio-images' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { prefix: '', limit: 1000, offset: 0, sortBy: { column: 'created_at', order: 'asc' } } }}"
+      }
+    },
+    {
+      "name": "api_supabase_fetch_keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 280],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/portfolioImages?select=imageKey&limit=10000' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "compute_orphaned_files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 280],
+      "parameters": {
+        "jsCode": "const storageFiles = $node['api_supabase_list_storage'].json;\nconst dbRows = $node['api_supabase_fetch_keys'].json;\nif (!Array.isArray(storageFiles) || !Array.isArray(dbRows)) {\n  return [{ json: { orphans: [], count: 0, warning: 'Invalid input arrays; skipped deletion' } }];\n}\nconst dbKeys = new Set(dbRows.map((r) => r.imageKey).filter(Boolean));\nconst oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;\nconst orphans = storageFiles.filter((file) => !dbKeys.has(file.name) && new Date(file.created_at).getTime() < oneDayAgo);\nreturn [{ json: { orphans, count: orphans.length } }];"
+      }
+    },
+    {
+      "name": "check_has_orphans",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1180, 280],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.count }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "check_dry_run_mode",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1420, 220],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $env.DRY_RUN || 'false' }}",
+              "operation": "equal",
+              "value2": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "api_supabase_delete_storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1660, 320],
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $env.SUPABASE_URL + '/storage/v1/object/portfolio-images' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { prefixes: $json.orphans.map((f) => f.name) } }}"
+      }
+    },
+    {
+      "name": "send_cleanup_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1900, 240],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'Ink Connect System <system@inkconnect.app>', to: $env.ADMIN_ALERT_EMAIL, subject: 'Monthly Storage Cleanup Report', html: `<h2>Portfolio Image Cleanup Report</h2><p><strong>Orphans found:</strong> ${$json.count ?? 0}</p><p><strong>Mode:</strong> ${($env.DRY_RUN || 'false') === 'true' ? 'DRY RUN - would have deleted files only' : 'LIVE DELETE'}</p>` } }}"
+      }
+    }
+  ],
+  "connections": {
+    "trigger_schedule_monthly": { "main": [[{ "node": "api_supabase_list_storage", "type": "main", "index": 0 }]] },
+    "api_supabase_list_storage": { "main": [[{ "node": "api_supabase_fetch_keys", "type": "main", "index": 0 }]] },
+    "api_supabase_fetch_keys": { "main": [[{ "node": "compute_orphaned_files", "type": "main", "index": 0 }]] },
+    "compute_orphaned_files": { "main": [[{ "node": "check_has_orphans", "type": "main", "index": 0 }]] },
+    "check_has_orphans": { "main": [[{ "node": "check_dry_run_mode", "type": "main", "index": 0 }], [{ "node": "send_cleanup_report", "type": "main", "index": 0 }]] },
+    "check_dry_run_mode": { "main": [[{ "node": "send_cleanup_report", "type": "main", "index": 0 }], [{ "node": "api_supabase_delete_storage", "type": "main", "index": 0 }]] },
+    "api_supabase_delete_storage": { "main": [[{ "node": "send_cleanup_report", "type": "main", "index": 0 }]] }
+  }
+}

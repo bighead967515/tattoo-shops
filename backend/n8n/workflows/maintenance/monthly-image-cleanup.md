@@ -31,14 +31,14 @@ RESEND_API_KEY           — Resend API key (for report email)
 
 ### 1. Cron Trigger
 ```
-node_name: cron_monthly_cleanup
+node_name: trigger_schedule_monthly
 type: Cron
 expression: 0 2 1 * *
 ```
 
 ### 2. Fetch All Storage Keys (paginated)
 ```
-node_name: storage_list_portfolio_images
+node_name: api_supabase_list_storage
 type: HTTP Request (Supabase Storage)
 method: POST
 url: {{ $env.SUPABASE_URL }}/storage/v1/object/list/portfolio-images
@@ -58,7 +58,7 @@ body:
 
 ### 3. Fetch All Known Keys from DB
 ```
-node_name: db_fetch_known_keys
+node_name: api_supabase_fetch_keys
 type: HTTP Request (Supabase REST)
 method: GET
 url: {{ $env.SUPABASE_URL }}/rest/v1/portfolioImages?select=imageKey&limit=10000
@@ -76,10 +76,15 @@ type: Code
 ```
 
 ```javascript
-const storageFiles = $node["storage_list_portfolio_images"].json;
-const dbKeys = new Set(
-  $node["db_fetch_known_keys"].json.map((r) => r.imageKey)
-);
+const rawStorage = $node["api_supabase_list_storage"].json;
+const rawDbRows = $node["api_supabase_fetch_keys"].json;
+
+if (!Array.isArray(rawStorage) || !Array.isArray(rawDbRows)) {
+  throw new Error("Invalid cleanup inputs: storage or DB key response is not an array");
+}
+
+const storageFiles = rawStorage;
+const dbKeys = new Set(rawDbRows.map((r) => r.imageKey).filter(Boolean));
 
 // Only consider files older than 24h to avoid deleting in-flight uploads
 const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -91,6 +96,13 @@ const orphans = storageFiles.filter((file) => {
 });
 
 return { orphans, count: orphans.length };
+```
+
+**Safe-fail variant** (if you prefer not to throw):
+```javascript
+if (!Array.isArray(rawStorage) || !Array.isArray(rawDbRows)) {
+  return { orphans: [], count: 0, warning: "Invalid input arrays; skipped deletion" };
+}
 ```
 
 ### 5. Guard: Skip if Nothing to Delete
@@ -105,7 +117,16 @@ condition: {{ $json.count > 0 }}
 
 ### 6. Delete Orphaned Files (Batch)
 ```
-node_name: storage_delete_orphans
+node_name: check_dry_run_mode
+type: IF
+condition: {{ $env.DRY_RUN === 'true' }}
+```
+
+- **True** → skip deletion and continue to report (include text: `DRY RUN - would have deleted {{ $json.count }} files`)
+- **False** → continue to delete node below
+
+```
+node_name: api_supabase_delete_storage
 type: HTTP Request (Supabase Storage)
 method: DELETE
 url: {{ $env.SUPABASE_URL }}/storage/v1/object/portfolio-images
@@ -134,18 +155,32 @@ body:
     <h2>Portfolio Image Cleanup Report</h2>
     <p><strong>Run date</strong>: {{ new Date().toISOString() }}</p>
     <p><strong>Orphaned files deleted</strong>: {{ $json.count }}</p>
-    <p><strong>Files reviewed in storage</strong>: {{ $node["storage_list_portfolio_images"].json.length }}</p>
-    <p><strong>Known DB keys</strong>: {{ $node["db_fetch_known_keys"].json.length }}</p>
+    <p><strong>Files reviewed in storage</strong>: {{ $node["api_supabase_list_storage"].json.length }}</p>
+    <p><strong>Known DB keys</strong>: {{ $node["api_supabase_fetch_keys"].json.length }}</p>
+    <p><strong>Mode</strong>: {{ $env.DRY_RUN === 'true' ? 'DRY RUN - would have deleted files only' : 'LIVE DELETE' }}</p>
     <hr>
     <p>No action required unless the deletion count is unexpectedly high (>100 files deleted in one run should be investigated).</p>
 ```
 
 ## Error Handling
 
-- If storage list fails → abort, send error alert to admin
-- If DB fetch fails → abort, send error alert (never delete without the reference set)
-- If delete batch fails → log failed keys, retry individual deletes, report partial success
-- Alert threshold: if `count > 100`, send a high-priority alert before deleting (possible data integrity issue)
+- Wrap each external call in try/catch: `storage.list`, `db.fetchReferences`, `deleteBatch`, `individualDelete`.
+- Normalize failures to:
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code": "STORAGE_DELETE_FAILED",
+      "message": "...",
+      "statusCode": 500,
+      "context": { "workflow": "Monthly Portfolio Image Cleanup", "step": "deleteBatch" }
+    }
+  }
+  ```
+- Log errors to Supabase `errorLogs` via helper node/function like `logErrorToSupabase`.
+- Send critical alerts to `#n8n-errors` via `sendSlackAlert` for auth/validation failures and retry exhaustion.
+- Retry transient operations with exponential backoff: 1s, 2s, 4s, 8s (max 3 retries).
+- On repeated delete failures, record failed keys and report partial success through existing `sendErrorAlert` / `sendAdminAlert` flow.
 
 ## Safety Guarantees
 
@@ -161,3 +196,32 @@ body:
 3. Verify the orphaned file is identified and deleted
 4. Verify the report email arrives with correct counts
 5. Verify a real portfolio image (with DB row) is NOT deleted
+
+## Import-ready n8n JSON (skeleton)
+
+Use this import-safe skeleton to keep renamed nodes and DRY_RUN routing consistent.
+
+```json
+{
+  "name": "Monthly Portfolio Image Cleanup",
+  "nodes": [
+    { "name": "trigger_schedule_monthly", "type": "n8n-nodes-base.cron", "typeVersion": 1, "position": [220, 260] },
+    { "name": "api_supabase_list_storage", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [460, 260] },
+    { "name": "api_supabase_fetch_keys", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [700, 260] },
+    { "name": "compute_orphaned_files", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [940, 260] },
+    { "name": "check_has_orphans", "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [1180, 260] },
+    { "name": "check_dry_run_mode", "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [1420, 260] },
+    { "name": "api_supabase_delete_storage", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [1660, 340] },
+    { "name": "send_cleanup_report", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "position": [1900, 260] }
+  ],
+  "connections": {
+    "trigger_schedule_monthly": { "main": [[{ "node": "api_supabase_list_storage", "type": "main", "index": 0 }]] },
+    "api_supabase_list_storage": { "main": [[{ "node": "api_supabase_fetch_keys", "type": "main", "index": 0 }]] },
+    "api_supabase_fetch_keys": { "main": [[{ "node": "compute_orphaned_files", "type": "main", "index": 0 }]] },
+    "compute_orphaned_files": { "main": [[{ "node": "check_has_orphans", "type": "main", "index": 0 }]] },
+    "check_has_orphans": { "main": [[{ "node": "check_dry_run_mode", "type": "main", "index": 0 }], [{ "node": "send_cleanup_report", "type": "main", "index": 0 }]] },
+    "check_dry_run_mode": { "main": [[{ "node": "send_cleanup_report", "type": "main", "index": 0 }], [{ "node": "api_supabase_delete_storage", "type": "main", "index": 0 }]] },
+    "api_supabase_delete_storage": { "main": [[{ "node": "send_cleanup_report", "type": "main", "index": 0 }]] }
+  }
+}
+```

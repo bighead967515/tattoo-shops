@@ -268,7 +268,10 @@ export default function ArtistDashboard() {
           const hasPortfolio = portfolioCount >= 3;
           const hasBio = !!(artist.bio && artist.bio.trim().length > 20);
           const hasInstagram = !!artist.instagram;
-          const hasSubscription = !!(artist.subscriptionTier && artist.subscriptionTier !== "artist_free");
+          const hasSubscription = !!(
+            user.subscriptionTier &&
+            user.subscriptionTier !== "artist_free"
+          );
           const steps = [
             { id: "portfolio", label: "Upload 3+ portfolio photos", done: hasPortfolio, cta: "Add Photos", tab: "portfolio" },
             { id: "bio", label: "Write a bio (20+ characters)", done: hasBio, cta: "Edit Profile", tab: "settings" },
@@ -329,7 +332,7 @@ export default function ArtistDashboard() {
 
         {/* Lost Revenue Widget for Pay-as-you-go Artists */}
         {(() => {
-          const tier = (artist.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+          const tier = (user.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
           if (tier !== "artist_paygo") return null;
 
           const acceptedBidsRevenue = myBids?.filter((b) => b.status === "accepted").reduce((acc, bid) => acc + (bid.priceEstimate ?? 0), 0) ?? 0;
@@ -606,7 +609,7 @@ export default function ArtistDashboard() {
           {/* Requests Tab */}
           <TabsContent value="requests" className="space-y-4">
             <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
-            {artist.subscriptionTier === "artist_free" ? (
+            {user.subscriptionTier === "artist_free" ? (
               <UpgradePrompt
                 feature="View & Bid on Requests"
                 description="Upgrade to a paid plan to view and bid on new tattoo requests from clients."
@@ -798,7 +801,7 @@ export default function ArtistDashboard() {
           <TabsContent value="billing" className="space-y-6">
             <h2 className="text-2xl font-semibold">Subscription & Billing</h2>
             {(() => {
-              const tier = (artist.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+              const tier = (user.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
               const limits = getArtistTierLimits(tier);
               const isFree = tier === "artist_free";
               const isPayg = tier === "artist_paygo";

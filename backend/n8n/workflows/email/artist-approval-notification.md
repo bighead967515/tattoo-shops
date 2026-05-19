@@ -34,7 +34,7 @@ This n8n workflow:
 
 ### 1. Webhook Trigger
 ```
-node_name: webhook_artist_approval
+node_name: trigger_webhook_artist_approval
 type: Webhook
 method: POST
 path: /artist-approval
@@ -42,7 +42,7 @@ path: /artist-approval
 
 ### 2. Fetch Artist Profile
 ```
-node_name: db_fetch_artist
+node_name: api_supabase_fetch_artist
 type: Supabase REST API
 method: GET
 url: https://{{ $env.SUPABASE_URL }}/rest/v1/artists?id=eq.{{ $json.payload.artistId }}&select=*
@@ -63,7 +63,7 @@ headers:
 
 ### 3. Fetch User Email
 ```
-node_name: db_fetch_user_email
+node_name: api_supabase_fetch_user
 type: Supabase REST API
 method: GET
 url: https://{{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $json[0].userId }}&select=email,name
@@ -103,6 +103,10 @@ code:
     </p>
     
     <p>Questions? <a href="https://support.inkconnect.co">Contact support</a></p>
+    <hr>
+    <p style="font-size:12px;color:#666;">
+      If you no longer wish to receive these emails, <a href="{{ $env.PUBLIC_BASE_URL }}/unsubscribe?email={{ $json[0].email }}">Unsubscribe</a>.
+    </p>
   `
   return { subject, htmlBody }
 ```
@@ -122,13 +126,17 @@ code:
     <p><strong>Reason:</strong> {{ $json.payload.rejectionReason || "Profile does not meet our guidelines" }}</p>
     
     <p>You may reapply once you've addressed these concerns. For assistance, <a href="https://support.inkconnect.co">contact our support team</a>.</p>
+    <hr>
+    <p style="font-size:12px;color:#666;">
+      If you no longer wish to receive these emails, <a href="{{ $env.PUBLIC_BASE_URL }}/unsubscribe?email={{ $json[0].email }}">Unsubscribe</a>.
+    </p>
   `
   return { subject, htmlBody }
 ```
 
 ### 6. Send Email
 ```
-node_name: email_send_approval_notification
+node_name: send_email_artist
 type: HTTP Request
 method: POST
 url: https://api.resend.com/emails
@@ -177,13 +185,32 @@ body:
 ### 8. Error Handler
 ```
 node_name: error_handle_approval
-type: Conditional
+type: Code + Conditional
 catch: true
 
 conditions:
-  - if previous node had error
+  - wrap external calls in try/catch (Supabase REST + Resend + Slack)
+  - apply exponential backoff for transient failures: 1s, 2s, 4s, 8s (max 3 retries)
+  - normalize all failures to:
+    {
+      "success": false,
+      "error": {
+        "code": "EXTERNAL_API_ERROR",
+        "message": "...",
+        "statusCode": 500,
+        "context": {
+          "workflow": "Artist Approval Notification",
+          "node": "error_handle_approval",
+          "artistId": {{ $json.payload.artistId }},
+          "attempt": 3,
+          "timestamp": "{{ new Date().toISOString() }}"
+        }
+      }
+    }
+  - log success path for each external call for traceability
+  - if critical (4xx/auth/validation) OR retries exhausted:
     → log_error node
-    → send_alert_email
+    → send_alert_email (Slack alert to #n8n-errors)
     → return error response
 ```
 
@@ -192,15 +219,20 @@ conditions:
 node_name: log_error
 type: Supabase REST API
 method: POST
-url: https://{{ $env.SUPABASE_URL }}/rest/v1/workflow_logs
+url: https://{{ $env.SUPABASE_URL }}/rest/v1/errorLogs
 
 body:
 {
   "workflowName": "Artist Approval Notification",
   "eventType": "artist_approval_email_failed",
   "artistId": {{ $json.payload.artistId }},
-  "errorMessage": "{{ $error.message }}",
-  "errorStack": "{{ $error.stack }}",
+  "success": false,
+  "error": {
+    "code": "{{ $json.error.code }}",
+    "message": "{{ $json.error.message }}",
+    "statusCode": {{ $json.error.statusCode }},
+    "context": {{ $json.error.context }}
+  },
   "timestamp": "now()",
   "severity": "error"
 }
@@ -249,6 +281,34 @@ curl -X POST http://localhost:5678/webhook/artist-approval \
     "approved": false,
     "rejectionReason": "Missing valid business license"
   }'
+```
+
+## Import-ready n8n JSON (skeleton)
+
+Use this as a copy-paste-safe base in n8n. It reflects the renamed node ids and connections.
+
+```json
+{
+  "name": "Artist Approval Notification",
+  "nodes": [
+    { "name": "trigger_webhook_artist_approval", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "parameters": { "path": "artist-approval", "httpMethod": "POST" }, "position": [240, 300] },
+    { "name": "api_supabase_fetch_artist", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "parameters": { "method": "GET", "url": "={{ $env.SUPABASE_URL + '/rest/v1/artists?id=eq.' + $json.body.artistId + '&select=*' }}" }, "position": [500, 300] },
+    { "name": "api_supabase_fetch_user", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "parameters": { "method": "GET", "url": "={{ $env.SUPABASE_URL + '/rest/v1/users?id=eq.' + $json[0].userId + '&select=email,name' }}" }, "position": [760, 300] },
+    { "name": "send_email_artist", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "parameters": { "method": "POST", "url": "https://api.resend.com/emails" }, "position": [1020, 300] },
+    { "name": "db_log_notification", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "parameters": { "method": "PATCH", "url": "={{ $env.SUPABASE_URL + '/rest/v1/artists?id=eq.' + $json.body.artistId }}" }, "position": [1280, 300] },
+    { "name": "error_handle_approval", "type": "n8n-nodes-base.code", "typeVersion": 2, "parameters": { "jsCode": "return items;" }, "position": [1020, 520] },
+    { "name": "log_error", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4, "parameters": { "method": "POST", "url": "={{ $env.SUPABASE_URL + '/rest/v1/errorLogs' }}" }, "position": [1280, 520] },
+    { "name": "send_alert_email", "type": "n8n-nodes-base.slack", "typeVersion": 2, "parameters": { "channel": "#n8n-errors" }, "position": [1540, 520] }
+  ],
+  "connections": {
+    "trigger_webhook_artist_approval": { "main": [[{ "node": "api_supabase_fetch_artist", "type": "main", "index": 0 }]] },
+    "api_supabase_fetch_artist": { "main": [[{ "node": "api_supabase_fetch_user", "type": "main", "index": 0 }]] },
+    "api_supabase_fetch_user": { "main": [[{ "node": "send_email_artist", "type": "main", "index": 0 }]] },
+    "send_email_artist": { "main": [[{ "node": "db_log_notification", "type": "main", "index": 0 }], [{ "node": "error_handle_approval", "type": "main", "index": 0 }]] },
+    "error_handle_approval": { "main": [[{ "node": "log_error", "type": "main", "index": 0 }]] },
+    "log_error": { "main": [[{ "node": "send_alert_email", "type": "main", "index": 0 }]] }
+  }
+}
 ```
 
 ## Integration with Backend

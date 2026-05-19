@@ -338,6 +338,11 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const newArtist = await db.createArtist({
           ...input,
+          shopName: sanitizeInput(input.shopName, 255),
+          bio: input.bio ? sanitizeInput(input.bio, 2000) : undefined,
+          specialties: input.specialties
+            ? sanitizeInput(input.specialties, 500)
+            : undefined,
           userId: ctx.user.id,
         });
 

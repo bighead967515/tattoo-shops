@@ -7,6 +7,7 @@ import { CheckCircle2, Crown, Loader2, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ARTIST_TIER_LIMITS, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { type ArtistCanonicalTier } from "@shared/tierCompat";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const TIER_NAMES: Record<string, string> = {
   artist_paygo: ARTIST_TIER_LIMITS.artist_paygo.name,
@@ -22,19 +23,20 @@ export default function SubscriptionSuccess() {
   const tierName = TIER_NAMES[tier] ?? "your new plan";
 
   const [ready, setReady] = useState(false);
+  const { user } = useAuth();
 
-  // Poll the artist profile until the webhook has updated the tier
-  const { data: artist, refetch } = trpc.artists.getByUserId.useQuery(undefined, {
+  // Poll canonical user record until webhook updates subscription tier.
+  trpc.auth.me.useQuery(undefined, {
     refetchInterval: ready ? false : 3000,
   });
 
   useEffect(() => {
-    if (!artist) return;
-    const currentTier = artist.subscriptionTier ?? "artist_free";
+    if (!user) return;
+    const currentTier = user.subscriptionTier ?? "artist_free";
     if (currentTier === tier) {
       setReady(true);
     }
-  }, [artist, tier]);
+  }, [user, tier]);
 
   return (
     <div className="min-h-screen bg-background">

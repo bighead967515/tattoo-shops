@@ -3,23 +3,180 @@ name: Post-Deploy Health Check
 on:
   push:
     branches:
-      - main
+      - staging
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deployment target"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      confirm_production:
+        description: "Type PROMOTE to confirm production deploy"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 * * * *"
 
 jobs:
-  healthcheck:
+  deploy-staging:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    environment: staging
+    timeout-minutes: 20
     steps:
-      - name: Wait for Render deploy
-        run: sleep 180
-
-      - name: Health check
+      - name: Wait for staging deploy readiness
         env:
-          APP_URL: ${{ secrets.APP_URL || 'https://inkconnect.app' }}
+          APP_URL: ${{ secrets.STAGING_APP_URL || secrets.APP_URL || 'https://inkconnect.app' }}
+          OVERALL_TIMEOUT_SECONDS: "900"
+          REQUEST_TIMEOUT_SECONDS: "10"
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health")
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Post-deploy health check failed — HTTP $STATUS on ${APP_URL}/api/health"
+          set -euo pipefail
+          start_ts=$(date +%s)
+          attempt=1
+          status="000"
+          while true; do
+            now=$(date +%s)
+            elapsed=$((now - start_ts))
+            if [ "$elapsed" -ge "$OVERALL_TIMEOUT_SECONDS" ]; then
+              echo "::error::Staging readiness timed out after ${elapsed}s. Final HTTP status: ${status}"
+              exit 1
+            fi
+
+            status=$(curl --max-time "$REQUEST_TIMEOUT_SECONDS" -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health" || echo "000")
+            echo "Attempt ${attempt}: ${APP_URL}/api/health => HTTP ${status}"
+            if [ "$status" = "200" ]; then
+              echo "Staging is healthy after ${elapsed}s"
+              break
+            fi
+
+            sleep_seconds=$(( attempt < 10 ? attempt * 5 : 30 ))
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+
+  validate-staging-after-deploy:
+    if: needs.deploy-staging.result == 'success'
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
+    steps:
+      - name: Staging stability check (scheduled window)
+        env:
+          APP_URL: ${{ secrets.STAGING_APP_URL || secrets.APP_URL || 'https://inkconnect.app' }}
+        run: |
+          set -euo pipefail
+          status=$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health" || echo "000")
+          echo "Scheduled staging validation probe => HTTP ${status}"
+          if [ "$status" != "200" ]; then
+            echo "::error::Staging health check failed during validation window."
             exit 1
           fi
-          echo "Post-deploy health check passed — HTTP $STATUS"
+          echo "Staging validation probe passed."
+
+  validate-staging-scheduled:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
+    steps:
+      - name: Scheduled 24h stability probe
+        env:
+          APP_URL: ${{ secrets.STAGING_APP_URL || secrets.APP_URL || 'https://inkconnect.app' }}
+        run: |
+          set -euo pipefail
+          status=$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health" || echo "000")
+          echo "Scheduled staging probe => HTTP ${status}"
+          if [ "$status" != "200" ]; then
+            echo "::error::Staging health check failed during scheduled validation."
+            exit 1
+          fi
+          echo "Scheduled staging probe passed."
+
+  deploy-production:
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.target == 'production' &&
+      github.event.inputs.confirm_production == 'PROMOTE'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 90
+    outputs:
+      threshold_exceeded: ${{ steps.monitor.outputs.threshold_exceeded }}
+    steps:
+      - name: Wait for production deploy readiness
+        env:
+          APP_URL: ${{ secrets.PRODUCTION_APP_URL || secrets.APP_URL || 'https://inkconnect.app' }}
+          OVERALL_TIMEOUT_SECONDS: "900"
+          REQUEST_TIMEOUT_SECONDS: "10"
+        run: |
+          set -euo pipefail
+          start_ts=$(date +%s)
+          attempt=1
+          status="000"
+          while true; do
+            now=$(date +%s)
+            elapsed=$((now - start_ts))
+            if [ "$elapsed" -ge "$OVERALL_TIMEOUT_SECONDS" ]; then
+              echo "::error::Production readiness timed out after ${elapsed}s. Final HTTP status: ${status}"
+              exit 1
+            fi
+
+            status=$(curl --max-time "$REQUEST_TIMEOUT_SECONDS" -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health" || echo "000")
+            echo "Attempt ${attempt}: ${APP_URL}/api/health => HTTP ${status}"
+            if [ "$status" = "200" ]; then
+              echo "Production is healthy after ${elapsed}s"
+              break
+            fi
+
+            sleep_seconds=$(( attempt < 10 ? attempt * 5 : 30 ))
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+
+      - name: Monitor production for 1 hour
+        id: monitor
+        env:
+          APP_URL: ${{ secrets.PRODUCTION_APP_URL || secrets.APP_URL || 'https://inkconnect.app' }}
+        run: |
+          set -euo pipefail
+          failures=0
+          for i in $(seq 1 12); do
+            status=$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" "${APP_URL}/api/health" || echo "000")
+            echo "Monitor check ${i}/12 => HTTP ${status}"
+            if [ "$status" != "200" ]; then
+              failures=$((failures + 1))
+            fi
+            sleep 300
+          done
+
+          if [ "$failures" -gt 2 ]; then
+            echo "threshold_exceeded=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Production health threshold exceeded (${failures} failures in 1 hour)."
+          else
+            echo "threshold_exceeded=false" >> "$GITHUB_OUTPUT"
+            echo "Production monitoring passed with ${failures} failures."
+          fi
+
+  rollback-production:
+    if: needs.deploy-production.outputs.threshold_exceeded == 'true'
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger rollback hook when configured
+        env:
+          RENDER_ROLLBACK_HOOK: ${{ secrets.RENDER_ROLLBACK_HOOK }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_ROLLBACK_HOOK:-}" ]; then
+            echo "::error::No rollback hook configured. Perform manual rollback now."
+            exit 1
+          fi
+          curl --max-time 15 -fsS -X POST "$RENDER_ROLLBACK_HOOK"
+          echo "Rollback hook triggered successfully."

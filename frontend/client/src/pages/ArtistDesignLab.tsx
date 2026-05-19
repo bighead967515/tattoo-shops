@@ -130,7 +130,7 @@ function ArtistDesignLab() {
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/artist/dashboard">
+          <Link href="/artist-dashboard">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Dashboard

@@ -41,7 +41,7 @@ export const TIER_LIMITS: Record<
     canBook: true,
   },
   
-  // Elite: $99/mo, 3% fee, unlimited bids, unlimited AI, sponsored listing.
+  // Elite: $99/mo, 3% fee, unlimited bids, high AI allowance, sponsored listing.
   artist_elite: {
     portfolioMax: Number.MAX_SAFE_INTEGER,
     aiCredits: 999,

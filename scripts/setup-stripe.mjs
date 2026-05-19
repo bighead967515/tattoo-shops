@@ -1,14 +1,14 @@
 import 'dotenv/config';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
 async function main() {
   console.log('Starting Stripe setup...');
   
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('STRIPE_SECRET_KEY is not set in your .env file!');
   }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   // 1. Artist Pro
   console.log('Creating Artist Pro tier...');

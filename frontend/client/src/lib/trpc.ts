@@ -24,17 +24,39 @@ async function ensureCsrfToken(): Promise<string | null> {
 
   if (typeof window === "undefined") return null;
 
+  let lastError: unknown = null;
+
   // Bootstrap token from a safe GET endpoint. The backend emits X-CSRF-Token on all responses.
-  const response = await window.fetch("/api/health", {
-    method: "GET",
-    credentials: "include",
-  });
-  const token = response.headers.get("X-CSRF-Token");
-  if (token) {
-    storeCsrfToken(token);
-    return token;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await window.fetch("/api/health", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`CSRF bootstrap failed with status ${response.status}`);
+      }
+
+      const token = response.headers.get("X-CSRF-Token");
+      if (token) {
+        storeCsrfToken(token);
+        return token;
+      }
+
+      // Healthy response but no token is treated as an absent token, not a transport failure.
+      return null;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** (attempt - 1)));
+      }
+    }
   }
-  return null;
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Unable to bootstrap CSRF token");
 }
 
 export const trpcClient = trpc.createClient({
