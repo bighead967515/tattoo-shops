@@ -221,10 +221,6 @@ STRIPE_ARTIST_ICON_PRICE_ID_MONTH=price_...      # Founding Artist $19/mo locked
 STRIPE_ARTIST_ICON_PRICE_ID_YEAR=price_...       # Founding Artist yearly equivalent
 STRIPE_FOUNDING_ARTIST_PRICE_ID=price_...        # Base price for Founding Artist trial (same as amateur month)
 
-# Client subscription prices (create in Stripe Dashboard, then set here)
-STRIPE_CLIENT_PLUS_PRICE_ID=price_...            # $9/mo Enthusiast plan
-STRIPE_CLIENT_ELITE_PRICE_ID=price_...           # $19/mo Elite Ink plan
-
 RESEND_API_KEY=re_...                  # Resend API key for transactional email
 GROQ_API_KEY=gsk_...                   # Groq API key for discovery, prompt refinement, bid drafting, moderation
 HUGGINGFACE_API_KEY=hf_...             # Hugging Face API key for image generation, captioning, OCR

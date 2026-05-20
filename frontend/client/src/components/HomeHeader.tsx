@@ -18,6 +18,7 @@ const navLinks = [
   { href: "/artists", label: "Browse Artists" },
   { href: "/#how-it-works", label: "How It Works", isAnchor: true },
   { href: "/for-artists", label: "For Artists" },
+  { href: "/estimate", label: "Price Estimator" },
 ];
 
 export default function HomeHeader() {

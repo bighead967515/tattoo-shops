@@ -21,7 +21,7 @@ import {
   getPublicUrl,
 } from "./_core/supabaseStorage";
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
-import { createArtistSubscriptionCheckout, createFoundingArtistCheckout } from "./stripe";
+import { createArtistSubscriptionCheckout, createTokenPackCheckout } from "./stripe";
 import { artists, users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
@@ -159,8 +159,8 @@ export const appRouter = router({
         const priceIdMap: Record<string, string | undefined> = {
           artist_pro_month: ENV.stripeArtistProPriceIdMonth,
           artist_pro_year:  ENV.stripeArtistProPriceIdYear,
-          artist_elite_month:    ENV.stripeArtistIconPriceIdMonth,
-          artist_elite_year:     ENV.stripeArtistIconPriceIdYear,
+          artist_elite_month: ENV.stripeArtistElitePriceIdMonth,
+          artist_elite_year:  ENV.stripeArtistElitePriceIdYear,
         };
         const priceId = priceIdMap[`${input.tier}_${input.interval}`];
 
@@ -195,66 +195,6 @@ export const appRouter = router({
         return { checkoutUrl: session.url };
       }),
 
-    /**
-     * Start the Founding Artist checkout:
-     * - 180-day free trial then $19/mo locked rate
-     * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
-     */
-    startFoundingCheckout: protectedProcedure
-      .input(
-        z.object({
-          successUrl: z.string().url(),
-          cancelUrl: z.string().url(),
-        }),
-      )
-      .mutation(async ({ ctx, input }) => {
-        const database = await getDb();
-        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-
-        const [artist] = await database
-          .select({ id: artists.id })
-          .from(artists)
-          .where(eq(artists.userId, ctx.user.id))
-          .limit(1);
-
-        if (!artist) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You must have an artist profile before joining the Founding Artist offer.",
-          });
-        }
-
-        const [user] = await database
-          .select({ email: users.email, stripeCustomerId: users.stripeCustomerId })
-          .from(users)
-          .where(eq(users.id, ctx.user.id))
-          .limit(1);
-
-        const priceId = ENV.stripeFoundingArtistPriceId;
-        if (!priceId) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "Founding Artist price is not configured.",
-          });
-        }
-
-        const session = await createFoundingArtistCheckout({
-          priceId,
-          customerEmail: user?.email ?? "",
-          stripeCustomerId: user?.stripeCustomerId ?? undefined,
-          metadata: {
-            userId: String(ctx.user.id),
-            artistId: String(artist.id),
-            tier: "artist_pro",
-            interval: "month",
-            isFoundingArtist: "true",
-          },
-          successUrl: input.successUrl,
-          cancelUrl: input.cancelUrl,
-        });
-
-        return { checkoutUrl: session.url };
-      }),
 
     search: publicProcedure
       .input(
@@ -455,6 +395,153 @@ export const appRouter = router({
         .where(eq(artists.id, artist.id));
 
       return { success: true, tier: "artist_pro" as const };
+    }),
+
+    /**
+     * Purchase a bid token pack (artist_paygo only).
+     * Packs of 5, 10, or 20 bid tokens — each token allows one bid submission.
+     */
+    purchaseBidTokenPack: protectedProcedure
+      .input(
+        z.object({
+          packSize: z.enum(["5", "10", "20"]),
+          successUrl: z.string().url(),
+          cancelUrl: z.string().url(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Only artist_paygo tier can purchase bid token packs
+        const canonicalTier = ctx.user.subscriptionTier ?? "artist_free";
+        if (canonicalTier !== "artist_paygo") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Bid token packs are only available for pay-as-you-go artists.",
+          });
+        }
+
+        const [artist] = await database
+          .select({ id: artists.id })
+          .from(artists)
+          .where(eq(artists.userId, ctx.user.id))
+          .limit(1);
+
+        if (!artist) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Artist profile not found." });
+        }
+
+        const priceIdMap: Record<string, string | undefined> = {
+          "5":  ENV.stripeArtistBidToken5PriceId,
+          "10": ENV.stripeArtistBidToken10PriceId,
+          "20": ENV.stripeArtistBidToken20PriceId,
+        };
+        const priceId = priceIdMap[input.packSize];
+
+        if (!priceId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Stripe price for bid token pack (${input.packSize}) is not configured.`,
+          });
+        }
+
+        const [userRow] = await database
+          .select({ email: users.email, stripeCustomerId: users.stripeCustomerId })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+
+        const session = await createTokenPackCheckout({
+          packType: "bid",
+          packSize: parseInt(input.packSize, 10),
+          artistEmail: userRow?.email ?? "",
+          stripeCustomerId: userRow?.stripeCustomerId ?? undefined,
+          priceId,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+          metadata: {
+            userId: String(ctx.user.id),
+            artistId: String(artist.id),
+          },
+        });
+
+        return { checkoutUrl: session.url };
+      }),
+
+    /**
+     * Purchase a chat token pack (5 tokens) to unlock in-app messaging with clients.
+     */
+    purchaseChatTokenPack: protectedProcedure
+      .input(
+        z.object({
+          successUrl: z.string().url(),
+          cancelUrl: z.string().url(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        const [artist] = await database
+          .select({ id: artists.id })
+          .from(artists)
+          .where(eq(artists.userId, ctx.user.id))
+          .limit(1);
+
+        if (!artist) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Artist profile not found." });
+        }
+
+        const priceId = ENV.stripeArtistChatTokenPackPriceId;
+        if (!priceId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Stripe price for chat token pack is not configured.",
+          });
+        }
+
+        const [userRow] = await database
+          .select({ email: users.email, stripeCustomerId: users.stripeCustomerId })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+
+        const session = await createTokenPackCheckout({
+          packType: "chat",
+          packSize: 5,
+          artistEmail: userRow?.email ?? "",
+          stripeCustomerId: userRow?.stripeCustomerId ?? undefined,
+          priceId,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+          metadata: {
+            userId: String(ctx.user.id),
+            artistId: String(artist.id),
+          },
+        });
+
+        return { checkoutUrl: session.url };
+      }),
+
+    /**
+     * Get the current bid and chat token balances for the logged-in artist.
+     */
+    getTokenBalances: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [artist] = await database
+        .select({ bidTokens: artists.bidTokens, chatTokens: artists.chatTokens })
+        .from(artists)
+        .where(eq(artists.userId, ctx.user.id))
+        .limit(1);
+
+      if (!artist) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artist profile not found." });
+      }
+
+      return { bidTokens: artist.bidTokens, chatTokens: artist.chatTokens };
     }),
   }),
 

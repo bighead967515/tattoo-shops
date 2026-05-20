@@ -39,6 +39,7 @@ import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import ArtistRegister from "./pages/ArtistRegister";
 import CoverUps from "./pages/CoverUps";
 import RequestFlow from "./pages/RequestFlow";
+import PriceEstimator from "./pages/PriceEstimator";
 
 function Router() {
   return (
@@ -83,6 +84,8 @@ function Router() {
       {/* Admin routes */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/moderation" component={AdminModeration} />
+      {/* Price Estimator — public tool */}
+      <Route path="/estimate" component={PriceEstimator} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -112,6 +115,7 @@ function usesPageHeader(path: string) {
     path === "/artist/design-lab" ||
     path === "/artist/billing" ||
     path === "/artist/billing/success" ||
+    path === "/estimate" ||
     path === "/404"
   );
 }

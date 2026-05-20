@@ -310,14 +310,10 @@ export default function NewRequest() {
     desiredTimeframe: "",
   });
   const [addOns, setAddOns] = useState<RequestAddonSelection>({
-    priorityPlacement: false,
-    preBookingChat: false,
-    aiPriceEstimate: false,
-    incognitoMode: false,
-    conceptArtist: false,
-    perfectMatchRouter: false,
-    painAnalysis: false,
-    vipBundle: false,
+    priorityListing: false,
+    inAppChat: false,
+    aiDesign: false,
+    blindBids: false,
   });
 
   const [uploadedImages, setUploadedImages] = useState<
@@ -887,104 +883,83 @@ export default function NewRequest() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 relative z-10">
-              {/* VIP Bundle Highlight */}
-              <label className={`flex items-start justify-between gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${addOns.vipBundle ? 'border-primary bg-primary/10 shadow-md shadow-primary/20' : 'border-border/60 hover:border-primary/50 hover:bg-primary/5'}`}>
-                <div className="flex-1">
-                  <p className="text-base font-bold text-primary flex items-center gap-2">
-                    VIP Ink Bundle <Badge variant="default" className="text-[10px] h-4 py-0">BEST VALUE</Badge>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get Priority Placement, AI Price Estimate, Pre-Booking Chat, and Perfect Match Router. Usually $21.96.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-base font-bold">{formatUsd(REQUEST_ADDON_PRICING.vipBundleCents)}</span>
-                  <input
-                    type="checkbox"
-                    checked={addOns.vipBundle}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setAddOns((prev) => ({
-                        ...prev,
-                        vipBundle: checked,
-                        // Clear others if VIP selected, or just leave them but VIP overrides price
-                        ...(checked ? { priorityPlacement: false, aiPriceEstimate: false, preBookingChat: false, perfectMatchRouter: false } : {})
-                      }));
-                    }}
-                    className="w-5 h-5 accent-primary rounded"
-                  />
-                </div>
-              </label>
-
               <div className="grid gap-3 sm:grid-cols-2">
-                {/* Priority Placement */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.priorityPlacement && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">Priority Placement</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Top of the artist feed for 48 hrs.</p>
+                {/* Priority Listing */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-4 cursor-pointer transition-colors ${addOns.priorityListing ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/60 hover:border-primary/40 hover:bg-card/50'}`}>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      Priority Listing
+                      {addOns.priorityListing && <Badge className="text-[9px] h-3.5 px-1 py-0 bg-primary/20 text-primary hover:bg-primary/20 border-none">Active</Badge>}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Boost your request to the top of the artist board for 7 days.</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.priorityPlacementCents)}</span>
+                  <div className="flex flex-col items-end justify-between h-full min-h-[50px] gap-2">
+                    <span className="text-sm font-bold text-primary">{formatUsd(REQUEST_ADDON_PRICING.priorityListingCents)}</span>
                     <input
                       type="checkbox"
-                      checked={addOns.priorityPlacement || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, priorityPlacement: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                      checked={addOns.priorityListing}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, priorityListing: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded cursor-pointer"
                     />
                   </div>
                 </label>
 
-                {/* AI Price Estimate */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.aiPriceEstimate && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">AI Price Estimate</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Instant accurate cost analysis.</p>
+                {/* In-App Chat */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-4 cursor-pointer transition-colors ${addOns.inAppChat ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/60 hover:border-primary/40 hover:bg-card/50'}`}>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      In-App Chat
+                      {addOns.inAppChat && <Badge className="text-[9px] h-3.5 px-1 py-0 bg-primary/20 text-primary hover:bg-primary/20 border-none">Active</Badge>}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Unlock chat with all bidding artists before booking a slot.</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.aiPriceEstimateCents)}</span>
+                  <div className="flex flex-col items-end justify-between h-full min-h-[50px] gap-2">
+                    <span className="text-sm font-bold text-primary">{formatUsd(REQUEST_ADDON_PRICING.inAppChatCents)}</span>
                     <input
                       type="checkbox"
-                      checked={addOns.aiPriceEstimate || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, aiPriceEstimate: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                      checked={addOns.inAppChat}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, inAppChat: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded cursor-pointer"
                     />
                   </div>
                 </label>
 
-                {/* Pre-Booking Chat */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.preBookingChat && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">Pre-Booking Chat</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Message artists before you book.</p>
+                {/* AI Concept Design */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-4 cursor-pointer transition-colors ${addOns.aiDesign ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/60 hover:border-primary/40 hover:bg-card/50'}`}>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      AI Concept Design
+                      {addOns.aiDesign && <Badge className="text-[9px] h-3.5 px-1 py-0 bg-primary/20 text-primary hover:bg-primary/20 border-none">Active</Badge>}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Generate instant custom AI concept artwork for your tattoo request.</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.preBookingChatCents)}</span>
+                  <div className="flex flex-col items-end justify-between h-full min-h-[50px] gap-2">
+                    <span className="text-sm font-bold text-primary">{formatUsd(REQUEST_ADDON_PRICING.aiDesignCents)}</span>
                     <input
                       type="checkbox"
-                      checked={addOns.preBookingChat || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, preBookingChat: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                      checked={addOns.aiDesign}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, aiDesign: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded cursor-pointer"
                     />
                   </div>
                 </label>
 
-                {/* Perfect Match Router */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.perfectMatchRouter && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">Perfect Match</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Direct push to 3 ideal artists.</p>
+                {/* Blind Bids */}
+                <label className={`flex items-start justify-between gap-3 rounded-lg border p-4 cursor-pointer transition-colors ${addOns.blindBids ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/60 hover:border-primary/40 hover:bg-card/50'}`}>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      Blind Bids
+                      {addOns.blindBids && <Badge className="text-[9px] h-3.5 px-1 py-0 bg-primary/20 text-primary hover:bg-primary/20 border-none">Active</Badge>}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Hide competing bid amounts so you receive independent honest prices.</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.perfectMatchRouterCents)}</span>
+                  <div className="flex flex-col items-end justify-between h-full min-h-[50px] gap-2">
+                    <span className="text-sm font-bold text-primary">{formatUsd(REQUEST_ADDON_PRICING.blindBidsCents)}</span>
                     <input
                       type="checkbox"
-                      checked={addOns.perfectMatchRouter || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, perfectMatchRouter: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
+                      checked={addOns.blindBids}
+                      onChange={(e) => setAddOns((prev) => ({ ...prev, blindBids: e.target.checked }))}
+                      className="w-4 h-4 accent-primary rounded cursor-pointer"
                     />
                   </div>
                 </label>

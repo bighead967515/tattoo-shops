@@ -60,20 +60,6 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 8. Copy webhook signing secret to `.env`:
    - `STRIPE_WEBHOOK_SECRET` - (starts with `whsec_`)
 
-#### Client Subscription Products (Enthusiast & Elite)
-
-9. Go to Products in the Stripe Dashboard
-10. **Create "Enthusiast" product** ($9/mo):
-    - Name: `Enthusiast`
-    - Price: `$9.00 / month` (recurring)
-    - Copy the **Price ID** (starts with `price_`) to `.env`:
-      - `STRIPE_CLIENT_PLUS_PRICE_ID`
-11. **Create "Elite Ink" product** ($19/mo):
-    - Name: `Elite Ink`
-    - Price: `$19.00 / month` (recurring)
-    - Copy the **Price ID** to `.env`:
-      - `STRIPE_CLIENT_ELITE_PRICE_ID`
-
 **Cost**: 2.9% + 30¢ per successful transaction
 
 **Test Cards**:

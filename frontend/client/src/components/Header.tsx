@@ -59,6 +59,12 @@ export default function Header() {
             >
               For Artists
             </Link>
+            <Link
+              href="/estimate"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              Price Estimator
+            </Link>
           </nav>
         </div>
 

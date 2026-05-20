@@ -21,19 +21,13 @@ var init_env = __esm({
       NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
       STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
       STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
-      // Artist subscription Stripe Price IDs — REQUIRED. Must be set explicitly per environment.
-      // Create in Stripe Dashboard and set as env vars. Hardcoded defaults risk wrong-environment billing.
-      STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH is required"),
-      STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR is required"),
+      // Artist subscription Stripe Price IDs — only Pro and Elite have paid tiers.
+      // artist_free and artist_paygo have no Stripe price (free to join, fee taken per booking).
       STRIPE_ARTIST_PRO_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_MONTH is required"),
       STRIPE_ARTIST_PRO_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_YEAR is required"),
-      STRIPE_ARTIST_ICON_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_MONTH is required"),
-      STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
-      // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
-      STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
-      // Client subscription Stripe Price IDs — REQUIRED for checkout. Set after creating Products in the Stripe Dashboard.
-      STRIPE_CLIENT_PLUS_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_PLUS_PRICE_ID is required"),
-      STRIPE_CLIENT_ELITE_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_ELITE_PRICE_ID is required"),
+      STRIPE_ARTIST_ELITE_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_ELITE_PRICE_ID_MONTH is required"),
+      STRIPE_ARTIST_ELITE_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ELITE_PRICE_ID_YEAR is required"),
+      // Clients are always free — no client subscription price IDs needed.
       RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
       SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
       SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -53,7 +47,17 @@ var init_env = __esm({
       N8N_WEBHOOK_SECRET: z.string().optional().describe("Bearer token for n8n webhook authentication"),
       // Onboarding and verification webhook URLs
       N8N_ONBOARDING_WEBHOOK_URL: z.string().url().optional().describe("n8n onboarding webhook base URL (e.g., https://n8n.example.com)"),
-      N8N_VERIFICATION_WEBHOOK_URL: z.string().url().optional().describe("n8n verification webhook base URL (e.g., https://n8n.example.com)")
+      N8N_VERIFICATION_WEBHOOK_URL: z.string().url().optional().describe("n8n verification webhook base URL (e.g., https://n8n.example.com)"),
+      // Stripe addon price IDs (optional — feature-flagged behind presence check)
+      STRIPE_ADDON_PRIORITY_LISTING_PRICE_ID: z.string().optional(),
+      STRIPE_ADDON_IN_APP_CHAT_PRICE_ID: z.string().optional(),
+      STRIPE_ADDON_AI_DESIGN_PRICE_ID: z.string().optional(),
+      STRIPE_ADDON_BLIND_BIDS_PRICE_ID: z.string().optional(),
+      // Stripe artist token pack price IDs (optional)
+      STRIPE_ARTIST_BID_TOKEN_5_PRICE_ID: z.string().optional(),
+      STRIPE_ARTIST_BID_TOKEN_10_PRICE_ID: z.string().optional(),
+      STRIPE_ARTIST_BID_TOKEN_20_PRICE_ID: z.string().optional(),
+      STRIPE_ARTIST_CHAT_TOKEN_PACK_PRICE_ID: z.string().optional()
     });
     parsed = envSchema.safeParse(process.env);
     if (!parsed.success) {
@@ -70,17 +74,11 @@ var init_env = __esm({
       isProduction: parsed.data.NODE_ENV === "production",
       stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
       stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
-      // Artist tier price IDs
-      stripeArtistAmateurPriceIdMonth: parsed.data.STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH,
-      stripeArtistAmateurPriceIdYear: parsed.data.STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR,
+      // Artist tier price IDs (only Pro and Elite have paid subscriptions)
       stripeArtistProPriceIdMonth: parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_MONTH,
       stripeArtistProPriceIdYear: parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_YEAR,
-      stripeArtistIconPriceIdMonth: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
-      stripeArtistIconPriceIdYear: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
-      stripeFoundingArtistPriceId: parsed.data.STRIPE_FOUNDING_ARTIST_PRICE_ID,
-      // Client tier price IDs
-      stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
-      stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,
+      stripeArtistElitePriceIdMonth: parsed.data.STRIPE_ARTIST_ELITE_PRICE_ID_MONTH,
+      stripeArtistElitePriceIdYear: parsed.data.STRIPE_ARTIST_ELITE_PRICE_ID_YEAR,
       resendApiKey: parsed.data.RESEND_API_KEY,
       supabaseUrl: parsed.data.SUPABASE_URL,
       supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,
@@ -100,29 +98,31 @@ var init_env = __esm({
       n8nWebhookUrl: parsed.data.N8N_WEBHOOK_URL,
       n8nWebhookSecret: parsed.data.N8N_WEBHOOK_SECRET,
       n8nOnboardingWebhookUrl: parsed.data.N8N_ONBOARDING_WEBHOOK_URL,
-      n8nVerificationWebhookUrl: parsed.data.N8N_VERIFICATION_WEBHOOK_URL
+      n8nVerificationWebhookUrl: parsed.data.N8N_VERIFICATION_WEBHOOK_URL,
+      // Stripe addon price IDs
+      stripeAddonPriorityListingPriceId: parsed.data.STRIPE_ADDON_PRIORITY_LISTING_PRICE_ID,
+      stripeAddonInAppChatPriceId: parsed.data.STRIPE_ADDON_IN_APP_CHAT_PRICE_ID,
+      stripeAddonAiDesignPriceId: parsed.data.STRIPE_ADDON_AI_DESIGN_PRICE_ID,
+      stripeAddonBlindBidsPriceId: parsed.data.STRIPE_ADDON_BLIND_BIDS_PRICE_ID,
+      // Stripe artist token pack price IDs
+      stripeArtistBidToken5PriceId: parsed.data.STRIPE_ARTIST_BID_TOKEN_5_PRICE_ID,
+      stripeArtistBidToken10PriceId: parsed.data.STRIPE_ARTIST_BID_TOKEN_10_PRICE_ID,
+      stripeArtistBidToken20PriceId: parsed.data.STRIPE_ARTIST_BID_TOKEN_20_PRICE_ID,
+      stripeArtistChatTokenPackPriceId: parsed.data.STRIPE_ARTIST_CHAT_TOKEN_PACK_PRICE_ID
     };
     if (ENV.isProduction) {
       const testModeStripeIds = [
-        "price_1TOraXQRJTQEheTOvLHhTihz",
-        // Test IDs from default
-        "price_1TOraXQRJTQEheTOVr8zI9O4",
         "price_1TOraYQRJTQEheTO3k4MS3PR",
         "price_1TOraYQRJTQEheTOHNQL82m3",
         "price_1TOraZQRJTQEheTOofBdpJwM",
         "price_1TOraaQRJTQEheTOwDiBtF35"
       ];
       const priceIds = [
-        ENV.stripeArtistAmateurPriceIdMonth,
-        ENV.stripeArtistAmateurPriceIdYear,
         ENV.stripeArtistProPriceIdMonth,
         ENV.stripeArtistProPriceIdYear,
-        ENV.stripeArtistIconPriceIdMonth,
-        ENV.stripeArtistIconPriceIdYear,
-        ENV.stripeFoundingArtistPriceId,
-        ENV.stripeClientPlusPriceId,
-        ENV.stripeClientElitePriceId
-      ];
+        ENV.stripeArtistElitePriceIdMonth,
+        ENV.stripeArtistElitePriceIdYear
+      ].filter((id) => Boolean(id));
       const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));
       if (testIdUsed) {
         console.warn("\u26A0\uFE0F  WARNING: Production environment contains test Stripe Price IDs. This may cause unexpected billing.");
@@ -147,7 +147,7 @@ import {
   unique,
   jsonb
 } from "drizzle-orm/pg-core";
-var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages;
+var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, chatUnlocks;
 var init_schema = __esm({
   "backend/drizzle/schema.ts"() {
     "use strict";
@@ -518,6 +518,10 @@ var init_schema = __esm({
           length: 255
         }),
         addOnPaidAt: timestamp("addOnPaidAt"),
+        priorityExpiresAt: timestamp("priorityExpiresAt"),
+        // set when priorityListing paid, expires 7 days later
+        blindBids: boolean("blindBids").default(false).notNull(),
+        // true = competing artists can't see each other's bid amounts
         status: requestStatusEnum("status").default("open").notNull(),
         selectedBidId: integer("selectedBidId"),
         // Will be set when client accepts a bid
@@ -574,6 +578,8 @@ var init_schema = __esm({
          * = priceEstimate * platformFeeRateBps / 10000
          */
         platformFeeAmountCents: integer("platformFeeAmountCents"),
+        chatUnlockedByArtist: boolean("chatUnlockedByArtist").default(false).notNull(),
+        // true if artist spent a token to unlock chat
         createdAt: timestamp("createdAt").defaultNow().notNull(),
         updatedAt: timestamp("updatedAt").defaultNow().notNull()
       },
@@ -595,6 +601,20 @@ var init_schema = __esm({
       isRead: boolean("isRead").default(false),
       createdAt: timestamp("createdAt").defaultNow().notNull()
     });
+    chatUnlocks = pgTable(
+      "chatUnlocks",
+      {
+        id: serial("id").primaryKey(),
+        requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
+        artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
+        clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
+        tokensSpent: integer("tokensSpent").default(1).notNull(),
+        unlockedAt: timestamp("unlockedAt").defaultNow().notNull()
+      },
+      (table) => ({
+        uniqueArtistRequest: unique().on(table.artistId, table.requestId)
+      })
+    );
   }
 });
 
@@ -775,8 +795,8 @@ async function withTransaction(callback) {
   if (!db || !_sqlClient) {
     throw new Error("Database not available for transactions");
   }
-  return _sqlClient.begin(async (sql4) => {
-    const txDb = drizzle(sql4);
+  return _sqlClient.begin(async (sql5) => {
+    const txDb = drizzle(sql5);
     return callback(txDb);
   });
 }
@@ -1288,9 +1308,7 @@ var SubscriptionTiers = z2.enum([
   "artist_paygo",
   "artist_pro",
   "artist_elite",
-  "client_free",
-  "client_plus",
-  "client_elite"
+  "client_free"
 ]);
 var TIER_LIMITS = {
   // Free: strictly a directory listing.
@@ -1303,15 +1321,14 @@ var TIER_LIMITS = {
     aiCredits: 50,
     canBook: true
   },
-  // Elite: $99/mo, 3% fee, unlimited bids, unlimited AI, sponsored listing.
+  // Elite: $99/mo, 3% fee, unlimited bids, high AI allowance, sponsored listing.
   artist_elite: {
     portfolioMax: Number.MAX_SAFE_INTEGER,
     aiCredits: 999,
     canBook: true
   },
-  client_free: { portfolioMax: 0, aiCredits: 0, canBook: true },
-  client_plus: { portfolioMax: 0, aiCredits: 10, canBook: true },
-  client_elite: { portfolioMax: 0, aiCredits: Number.MAX_SAFE_INTEGER, canBook: true }
+  // Clients are always free — no paid tiers.
+  client_free: { portfolioMax: 0, aiCredits: 0, canBook: true }
 };
 
 // backend/server/_core/cookies.ts
@@ -1434,7 +1451,7 @@ function csrfProtectionMiddleware(req, res, next) {
     tokenInCookie = generateCsrfToken();
     res.cookie(CSRF_COOKIE_NAME, tokenInCookie, {
       httpOnly: true,
-      secure: req.protocol === "https",
+      secure: isSecureRequest(req),
       sameSite: "strict",
       // P1-1 fix: use strict instead of none
       path: "/",
@@ -1474,7 +1491,7 @@ function csrfTokenMiddleware(req, res, next) {
   if (!req.cookies?.[CSRF_COOKIE_NAME]) {
     res.cookie(CSRF_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: req.protocol === "https",
+      secure: isSecureRequest(req),
       sameSite: "strict",
       path: "/",
       maxAge: 24 * 60 * 60 * 1e3
@@ -1582,46 +1599,13 @@ function getArtistTierLimits(tier) {
 }
 var CLIENT_TIER_LIMITS = {
   client_free: {
-    name: "Collector",
-    requestsPerMonth: 1,
+    name: "Free",
+    requestsPerMonth: Number.MAX_SAFE_INTEGER,
+    // Unlimited requests
     aiGenerationsPerMonth: 0,
-    directChatWithArtists: false,
+    directChatWithArtists: true,
     priorityRequestBoard: false,
     depositFeeWaived: false
-  },
-  client_plus: {
-    name: "Enthusiast",
-    requestsPerMonth: 10,
-    aiGenerationsPerMonth: 10,
-    directChatWithArtists: false,
-    priorityRequestBoard: true,
-    depositFeeWaived: false
-  },
-  client_elite: {
-    name: "Elite Ink",
-    requestsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    directChatWithArtists: true,
-    priorityRequestBoard: true,
-    depositFeeWaived: true
-  }
-};
-var CLIENT_TIER_PRICING = {
-  client_free: {
-    monthly: 0,
-    stripePriceIdMonth: null
-  },
-  client_plus: {
-    monthly: 900,
-    // $9.00
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID")
-  },
-  client_elite: {
-    monthly: 1900,
-    // $19.00
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID")
   }
 };
 function getClientTierLimits(tier) {
@@ -2309,19 +2293,15 @@ async function createCheckoutSession({
 }
 function stripePriceToArtistTier(priceId) {
   const {
-    stripeArtistAmateurPriceIdMonth,
-    stripeArtistAmateurPriceIdYear,
     stripeArtistProPriceIdMonth,
     stripeArtistProPriceIdYear,
-    stripeArtistIconPriceIdMonth,
-    stripeArtistIconPriceIdYear
+    stripeArtistElitePriceIdMonth,
+    stripeArtistElitePriceIdYear
   } = ENV;
   if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
     return "artist_pro";
-  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
+  if (priceId === stripeArtistElitePriceIdMonth || priceId === stripeArtistElitePriceIdYear)
     return "artist_elite";
-  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
-    return "artist_paygo";
   return null;
 }
 async function createArtistSubscriptionCheckout({
@@ -2347,33 +2327,6 @@ async function createArtistSubscriptionCheckout({
     return session;
   });
 }
-async function createFoundingArtistCheckout({
-  priceId,
-  customerEmail,
-  stripeCustomerId,
-  metadata,
-  successUrl,
-  cancelUrl
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
-      metadata: { ...metadata, isFoundingArtist: "true" },
-      subscription_data: {
-        trial_period_days: 180,
-        metadata: { ...metadata, isFoundingArtist: "true" }
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: false
-      // Founding offer IS the promo — no stacking
-    });
-    return session;
-  });
-}
 async function constructWebhookEvent(payload, signature) {
   if (!ENV.stripeWebhookSecret) {
     throw new Error("STRIPE_WEBHOOK_SECRET is required");
@@ -2383,6 +2336,84 @@ async function constructWebhookEvent(payload, signature) {
     signature,
     ENV.stripeWebhookSecret
   );
+}
+async function createAddonCheckout({
+  requestId,
+  clientEmail,
+  stripeCustomerId,
+  addons,
+  successUrl,
+  cancelUrl,
+  metadata
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: clientEmail },
+      line_items: addons.map((addon) => ({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `Request Add-on: ${addon}`
+          },
+          unit_amount: (() => {
+            switch (addon) {
+              case "priorityListing":
+                return 299;
+              case "inAppChat":
+                return 199;
+              case "aiDesign":
+                return 299;
+              case "blindBids":
+                return 399;
+              default:
+                return 0;
+            }
+          })()
+        },
+        quantity: 1
+      })),
+      metadata: {
+        ...metadata,
+        type: "addon_purchase",
+        requestId: String(requestId),
+        addons: JSON.stringify(addons)
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true
+    });
+    return session;
+  });
+}
+async function createTokenPackCheckout({
+  packType,
+  packSize,
+  artistEmail,
+  stripeCustomerId,
+  priceId,
+  successUrl,
+  cancelUrl,
+  metadata
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [{ price: priceId, quantity: 1 }],
+      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: artistEmail },
+      metadata: {
+        ...metadata,
+        type: "token_pack",
+        packType,
+        packSize: String(packSize)
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl
+    });
+    return session;
+  });
 }
 
 // backend/server/clientRouters.ts
@@ -2409,15 +2440,14 @@ init_onboarding();
 
 // backend/shared/requestAddons.ts
 var REQUEST_ADDON_PRICING = {
-  priorityPlacementCents: 499,
-  preBookingChatCents: 999,
-  aiPriceEstimateCents: 299,
-  incognitoModeCents: 299,
-  conceptArtistCents: 499,
-  perfectMatchRouterCents: 399,
-  painAnalysisCents: 99,
-  vipBundleCents: 1999
-  // Discounted bundle of all
+  priorityListingCents: 299,
+  // 7-day boost to top of feed
+  inAppChatCents: 199,
+  // unlocks in-app chat for all bids on this request
+  aiDesignCents: 299,
+  // AI concept art generated for the request
+  blindBidsCents: 399
+  // hides bid amounts from competing artists
 };
 var REQUEST_ADDON_PAYMENT_STATUSES = {
   NOT_REQUESTED: "not_requested",
@@ -2425,18 +2455,27 @@ var REQUEST_ADDON_PAYMENT_STATUSES = {
   PAID: "paid",
   FAILED: "failed"
 };
-function calculateRequestAddonTotalCents(selection) {
-  if (selection.vipBundle) {
-    return REQUEST_ADDON_PRICING.vipBundleCents;
-  }
+function calculateRequestAddonTotalCents(addons) {
+  const list = Array.isArray(addons) ? addons : Object.keys(addons).filter(
+    (k) => addons[k]
+  );
   let total = 0;
-  if (selection.priorityPlacement) total += REQUEST_ADDON_PRICING.priorityPlacementCents;
-  if (selection.preBookingChat) total += REQUEST_ADDON_PRICING.preBookingChatCents;
-  if (selection.aiPriceEstimate) total += REQUEST_ADDON_PRICING.aiPriceEstimateCents;
-  if (selection.incognitoMode) total += REQUEST_ADDON_PRICING.incognitoModeCents;
-  if (selection.conceptArtist) total += REQUEST_ADDON_PRICING.conceptArtistCents;
-  if (selection.perfectMatchRouter) total += REQUEST_ADDON_PRICING.perfectMatchRouterCents;
-  if (selection.painAnalysis) total += REQUEST_ADDON_PRICING.painAnalysisCents;
+  for (const addon of list) {
+    switch (addon) {
+      case "priorityListing":
+        total += REQUEST_ADDON_PRICING.priorityListingCents;
+        break;
+      case "inAppChat":
+        total += REQUEST_ADDON_PRICING.inAppChatCents;
+        break;
+      case "aiDesign":
+        total += REQUEST_ADDON_PRICING.aiDesignCents;
+        break;
+      case "blindBids":
+        total += REQUEST_ADDON_PRICING.blindBidsCents;
+        break;
+    }
+  }
   return total;
 }
 
@@ -2529,47 +2568,6 @@ var clientsRouter = router({
       });
     }
     return updated;
-  }),
-  /**
-   * Create a Stripe Checkout Session for a client subscription upgrade.
-   * Returns the Checkout URL to redirect the user to.
-   */
-  createSubscriptionCheckout: protectedProcedure.input(
-    z3.object({
-      tier: z3.enum(["client_plus", "client_elite"]),
-      successUrl: z3.string().url(),
-      cancelUrl: z3.string().url()
-    })
-  ).mutation(async ({ ctx, input }) => {
-    const db = await requireDb();
-    const [clientProfile] = await db.select().from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
-    if (!clientProfile) {
-      throw new TRPCError2({
-        code: "FORBIDDEN",
-        message: "Complete client onboarding before upgrading your plan."
-      });
-    }
-    const priceId = input.tier === "client_plus" ? ENV.stripeClientPlusPriceId : ENV.stripeClientElitePriceId;
-    if (!priceId) {
-      throw new TRPCError2({
-        code: "PRECONDITION_FAILED",
-        message: `Stripe price for ${input.tier} is not configured. Please contact support.`
-      });
-    }
-    const [user] = await db.select().from(users).where(eq2(users.id, ctx.user.id)).limit(1);
-    const session = await createArtistSubscriptionCheckout({
-      priceId,
-      customerEmail: user?.email ?? "",
-      stripeCustomerId: user?.stripeCustomerId ?? void 0,
-      metadata: {
-        userId: String(ctx.user.id),
-        clientId: String(clientProfile.id),
-        tier: input.tier
-      },
-      successUrl: input.successUrl,
-      cancelUrl: input.cancelUrl
-    });
-    return { checkoutUrl: session.url };
   })
 });
 var requestsRouter = router({
@@ -2614,7 +2612,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(and2(...whereConditions)).orderBy(
       desc2(
-        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityListing"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
@@ -2674,7 +2672,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(and2(...whereConditions)).orderBy(
       desc2(
-        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityListing"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
@@ -2701,7 +2699,7 @@ var requestsRouter = router({
           )`.as("bidCount")
     }).from(tattooRequests).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(tattooRequests.status, "open")).orderBy(
       desc2(
-        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityPlacement"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
+        sql2`CASE WHEN "tattooRequests"."selectedAddons" @> '"priorityListing"'::jsonb AND "tattooRequests"."addOnPaymentStatus" = 'paid' THEN 1 ELSE 0 END`
       ),
       desc2(tattooRequests.createdAt)
     ).limit(8);
@@ -2775,14 +2773,10 @@ var requestsRouter = router({
       willingToTravel: z3.boolean().default(false),
       desiredTimeframe: z3.string().max(100).optional(),
       addOns: z3.object({
-        priorityPlacement: z3.boolean().default(false),
-        preBookingChat: z3.boolean().default(false),
-        aiPriceEstimate: z3.boolean().default(false),
-        incognitoMode: z3.boolean().default(false),
-        conceptArtist: z3.boolean().default(false),
-        perfectMatchRouter: z3.boolean().default(false),
-        painAnalysis: z3.boolean().default(false),
-        vipBundle: z3.boolean().default(false)
+        priorityListing: z3.boolean().default(false),
+        inAppChat: z3.boolean().default(false),
+        aiDesign: z3.boolean().default(false),
+        blindBids: z3.boolean().default(false)
       }).optional(),
       guestEmail: z3.string().email().max(255).optional()
       // guests can optionally leave contact info
@@ -2790,17 +2784,12 @@ var requestsRouter = router({
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const { guestEmail, addOns, ...requestInput } = input;
-    const normalizedAddOns = {
-      priorityPlacement: addOns?.priorityPlacement ?? false,
-      preBookingChat: addOns?.preBookingChat ?? false,
-      aiPriceEstimate: addOns?.aiPriceEstimate ?? false,
-      incognitoMode: addOns?.incognitoMode ?? false,
-      conceptArtist: addOns?.conceptArtist ?? false,
-      perfectMatchRouter: addOns?.perfectMatchRouter ?? false,
-      painAnalysis: addOns?.painAnalysis ?? false,
-      vipBundle: addOns?.vipBundle ?? false
-    };
-    const addOnTotalCents = calculateRequestAddonTotalCents(normalizedAddOns);
+    const addonArray = [];
+    if (addOns?.priorityListing) addonArray.push("priorityListing");
+    if (addOns?.inAppChat) addonArray.push("inAppChat");
+    if (addOns?.aiDesign) addonArray.push("aiDesign");
+    if (addOns?.blindBids) addonArray.push("blindBids");
+    const addOnTotalCents = calculateRequestAddonTotalCents(addonArray);
     let clientId = null;
     let userEmail = "";
     if (ctx.user) {
@@ -2809,7 +2798,7 @@ var requestsRouter = router({
       const [userRow] = await db.select({ email: users.email }).from(users).where(eq2(users.id, ctx.user.id)).limit(1);
       userEmail = userRow?.email ?? "";
     }
-    const addOnArray = Object.entries(normalizedAddOns).filter(([_, value]) => value).map(([key]) => key);
+    const addOnArray = addonArray.map((key) => key);
     const [newRequest] = await db.insert(tattooRequests).values({
       clientId,
       guestEmail: clientId ? null : guestEmail ?? null,
@@ -2979,6 +2968,91 @@ var requestsRouter = router({
       });
     }
     return updated;
+  }),
+  /**
+   * Purchase add-ons for an existing tattoo request.
+   * Creates a Stripe Checkout session for the selected addons and returns the checkout URL.
+   */
+  purchaseAddon: protectedProcedure.input(
+    z3.object({
+      requestId: z3.number(),
+      addons: z3.array(z3.enum(["priorityListing", "inAppChat", "aiDesign", "blindBids"])),
+      successUrl: z3.string().url(),
+      cancelUrl: z3.string().url()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    if (input.addons.length === 0) {
+      throw new TRPCError2({
+        code: "BAD_REQUEST",
+        message: "At least one addon must be selected."
+      });
+    }
+    const [client] = await db.select().from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
+    if (!client) {
+      throw new TRPCError2({ code: "FORBIDDEN", message: "Only clients can purchase add-ons." });
+    }
+    const [request] = await db.select().from(tattooRequests).where(and2(eq2(tattooRequests.id, input.requestId), eq2(tattooRequests.clientId, client.id))).limit(1);
+    if (!request) {
+      throw new TRPCError2({ code: "NOT_FOUND", message: "Request not found or you don't own it." });
+    }
+    const [userRow] = await db.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq2(users.id, ctx.user.id)).limit(1);
+    const clientEmail = userRow?.email ?? "";
+    if (!clientEmail) {
+      throw new TRPCError2({ code: "BAD_REQUEST", message: "User email is required to purchase add-ons." });
+    }
+    const session = await createAddonCheckout({
+      requestId: input.requestId,
+      clientEmail,
+      stripeCustomerId: userRow?.stripeCustomerId ?? void 0,
+      addons: input.addons,
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+      metadata: {
+        userId: String(ctx.user.id),
+        clientId: String(client.id)
+      }
+    });
+    await db.update(tattooRequests).set({ addOnStripeCheckoutSessionId: session.id, addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.CHECKOUT_PENDING, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(tattooRequests.id, input.requestId));
+    return { checkoutUrl: session.url };
+  }),
+  /**
+   * Unlock in-app chat for a specific bid using 1 chatToken.
+   * Only artists can call this; verifies token balance before deducting.
+   */
+  unlockChatWithToken: protectedProcedure.input(
+    z3.object({
+      requestId: z3.number(),
+      bidId: z3.number()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const [artist] = await db.select().from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
+    if (!artist) {
+      throw new TRPCError2({ code: "FORBIDDEN", message: "Only artists can unlock chat." });
+    }
+    if (artist.chatTokens < 1) {
+      throw new TRPCError2({ code: "FORBIDDEN", message: "Not enough chat tokens" });
+    }
+    const [request] = await db.select({ clientId: tattooRequests.clientId }).from(tattooRequests).where(eq2(tattooRequests.id, input.requestId)).limit(1);
+    if (!request || !request.clientId) {
+      throw new TRPCError2({ code: "NOT_FOUND", message: "Request not found." });
+    }
+    const [bid] = await db.select({ id: bids.id }).from(bids).where(and2(eq2(bids.id, input.bidId), eq2(bids.artistId, artist.id))).limit(1);
+    if (!bid) {
+      throw new TRPCError2({ code: "NOT_FOUND", message: "Bid not found or you don't own it." });
+    }
+    await db.transaction(async (tx) => {
+      await tx.insert(chatUnlocks).values({
+        requestId: input.requestId,
+        artistId: artist.id,
+        clientId: request.clientId,
+        tokensSpent: 1
+      }).onConflictDoNothing();
+      await tx.update(artists).set({ chatTokens: sql2`${artists.chatTokens} - 1`, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(artists.id, artist.id));
+      await tx.update(bids).set({ chatUnlockedByArtist: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq2(bids.id, input.bidId));
+    });
+    return { success: true };
   })
 });
 var bidsRouter = router({
@@ -3123,6 +3197,14 @@ var bidsRouter = router({
         });
       }
     }
+    if (canonicalTier === "artist_paygo") {
+      if (artist.bidTokens < 1) {
+        throw new TRPCError2({
+          code: "FORBIDDEN",
+          message: "You need bid tokens to submit a bid. Purchase a pack to continue."
+        });
+      }
+    }
     const [request] = await db.select().from(tattooRequests).where(eq2(tattooRequests.id, input.requestId)).limit(1);
     if (!request) {
       throw new TRPCError2({
@@ -3165,6 +3247,9 @@ var bidsRouter = router({
         bidsThisMonth: sql2`${artists.bidsThisMonth} + 1`,
         bidsUsed: sql2`${artists.bidsUsed} + 1`
       }).where(eq2(artists.id, artist.id));
+    }
+    if (canonicalTier === "artist_paygo") {
+      await db.update(artists).set({ bidTokens: sql2`${artists.bidTokens} - 1` }).where(eq2(artists.id, artist.id));
     }
     return newBid;
   }),
@@ -4011,8 +4096,8 @@ var appRouter = router({
       const priceIdMap = {
         artist_pro_month: ENV.stripeArtistProPriceIdMonth,
         artist_pro_year: ENV.stripeArtistProPriceIdYear,
-        artist_elite_month: ENV.stripeArtistIconPriceIdMonth,
-        artist_elite_year: ENV.stripeArtistIconPriceIdYear
+        artist_elite_month: ENV.stripeArtistElitePriceIdMonth,
+        artist_elite_year: ENV.stripeArtistElitePriceIdYear
       };
       const priceId = priceIdMap[`${input.tier}_${input.interval}`];
       if (!priceId) {
@@ -4031,50 +4116,6 @@ var appRouter = router({
           artistId: String(artist.id),
           tier: input.tier,
           interval: input.interval
-        },
-        successUrl: input.successUrl,
-        cancelUrl: input.cancelUrl
-      });
-      return { checkoutUrl: session.url };
-    }),
-    /**
-     * Start the Founding Artist checkout:
-     * - 180-day free trial then $19/mo locked rate
-     * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
-     */
-    startFoundingCheckout: protectedProcedure.input(
-      z7.object({
-        successUrl: z7.string().url(),
-        cancelUrl: z7.string().url()
-      })
-    ).mutation(async ({ ctx, input }) => {
-      const database = await getDb();
-      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
-      if (!artist) {
-        throw new TRPCError6({
-          code: "FORBIDDEN",
-          message: "You must have an artist profile before joining the Founding Artist offer."
-        });
-      }
-      const [user] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
-      const priceId = ENV.stripeFoundingArtistPriceId;
-      if (!priceId) {
-        throw new TRPCError6({
-          code: "PRECONDITION_FAILED",
-          message: "Founding Artist price is not configured."
-        });
-      }
-      const session = await createFoundingArtistCheckout({
-        priceId,
-        customerEmail: user?.email ?? "",
-        stripeCustomerId: user?.stripeCustomerId ?? void 0,
-        metadata: {
-          userId: String(ctx.user.id),
-          artistId: String(artist.id),
-          tier: "artist_pro",
-          interval: "month",
-          isFoundingArtist: "true"
         },
         successUrl: input.successUrl,
         cancelUrl: input.cancelUrl
@@ -4146,6 +4187,9 @@ var appRouter = router({
     ).mutation(async ({ ctx, input }) => {
       const newArtist = await createArtist({
         ...input,
+        shopName: sanitizeInput(input.shopName, 255),
+        bio: input.bio ? sanitizeInput(input.bio, 2e3) : void 0,
+        specialties: input.specialties ? sanitizeInput(input.specialties, 500) : void 0,
         userId: ctx.user.id
       });
       if (ENV.n8nOnboardingWebhookUrl) {
@@ -4229,6 +4273,108 @@ var appRouter = router({
       await database.update(users).set({ subscriptionTier: "artist_pro" }).where(eq5(users.id, ctx.user.id));
       await database.update(artists).set({ subscriptionTier: "artist_pro" }).where(eq5(artists.id, artist.id));
       return { success: true, tier: "artist_pro" };
+    }),
+    /**
+     * Purchase a bid token pack (artist_paygo only).
+     * Packs of 5, 10, or 20 bid tokens — each token allows one bid submission.
+     */
+    purchaseBidTokenPack: protectedProcedure.input(
+      z7.object({
+        packSize: z7.enum(["5", "10", "20"]),
+        successUrl: z7.string().url(),
+        cancelUrl: z7.string().url()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const canonicalTier = ctx.user.subscriptionTier ?? "artist_free";
+      if (canonicalTier !== "artist_paygo") {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "Bid token packs are only available for pay-as-you-go artists."
+        });
+      }
+      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (!artist) {
+        throw new TRPCError6({ code: "FORBIDDEN", message: "Artist profile not found." });
+      }
+      const priceIdMap = {
+        "5": ENV.stripeArtistBidToken5PriceId,
+        "10": ENV.stripeArtistBidToken10PriceId,
+        "20": ENV.stripeArtistBidToken20PriceId
+      };
+      const priceId = priceIdMap[input.packSize];
+      if (!priceId) {
+        throw new TRPCError6({
+          code: "PRECONDITION_FAILED",
+          message: `Stripe price for bid token pack (${input.packSize}) is not configured.`
+        });
+      }
+      const [userRow] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
+      const session = await createTokenPackCheckout({
+        packType: "bid",
+        packSize: parseInt(input.packSize, 10),
+        artistEmail: userRow?.email ?? "",
+        stripeCustomerId: userRow?.stripeCustomerId ?? void 0,
+        priceId,
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
+        metadata: {
+          userId: String(ctx.user.id),
+          artistId: String(artist.id)
+        }
+      });
+      return { checkoutUrl: session.url };
+    }),
+    /**
+     * Purchase a chat token pack (5 tokens) to unlock in-app messaging with clients.
+     */
+    purchaseChatTokenPack: protectedProcedure.input(
+      z7.object({
+        successUrl: z7.string().url(),
+        cancelUrl: z7.string().url()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (!artist) {
+        throw new TRPCError6({ code: "FORBIDDEN", message: "Artist profile not found." });
+      }
+      const priceId = ENV.stripeArtistChatTokenPackPriceId;
+      if (!priceId) {
+        throw new TRPCError6({
+          code: "PRECONDITION_FAILED",
+          message: "Stripe price for chat token pack is not configured."
+        });
+      }
+      const [userRow] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
+      const session = await createTokenPackCheckout({
+        packType: "chat",
+        packSize: 5,
+        artistEmail: userRow?.email ?? "",
+        stripeCustomerId: userRow?.stripeCustomerId ?? void 0,
+        priceId,
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
+        metadata: {
+          userId: String(ctx.user.id),
+          artistId: String(artist.id)
+        }
+      });
+      return { checkoutUrl: session.url };
+    }),
+    /**
+     * Get the current bid and chat token balances for the logged-in artist.
+     */
+    getTokenBalances: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [artist] = await database.select({ bidTokens: artists.bidTokens, chatTokens: artists.chatTokens }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (!artist) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Artist profile not found." });
+      }
+      return { bidTokens: artist.bidTokens, chatTokens: artist.chatTokens };
     })
   }),
   portfolio: router({
@@ -4701,7 +4847,7 @@ init_db();
 init_db();
 init_schema();
 init_logger();
-import { eq as eq8 } from "drizzle-orm";
+import { eq as eq8, sql as sql4 } from "drizzle-orm";
 
 // backend/server/webhookQueue.ts
 init_db();
@@ -4892,7 +5038,6 @@ function startQueueProcessor(processor, intervalMs = 6e4) {
 }
 
 // backend/server/webhookHandler.ts
-init_schema();
 var processorStarted = false;
 function initWebhookProcessor() {
   if (processorStarted) return;
@@ -4906,8 +5051,12 @@ async function processWebhookEvent(eventType, event) {
   switch (eventType) {
     case "checkout.session.completed": {
       const session = event.data.object;
-      if (session.metadata?.paymentType === "request_addons") {
+      if (session.metadata?.type === "addon_purchase" || session.metadata?.paymentType === "request_addons") {
         await handleRequestAddonCheckoutCompleted(session);
+        break;
+      }
+      if (session.metadata?.type === "token_pack") {
+        await handleTokenPackCheckoutCompleted(session);
         break;
       }
       if (session.mode === "subscription") {
@@ -4969,7 +5118,7 @@ async function processWebhookEvent(eventType, event) {
       break;
     }
     // ============================================
-    // CLIENT SUBSCRIPTION LIFECYCLE
+    // SUBSCRIPTION LIFECYCLE
     // ============================================
     case "customer.subscription.created":
     case "customer.subscription.updated": {
@@ -4995,22 +5144,84 @@ async function handleRequestAddonCheckoutCompleted(session) {
     });
     return;
   }
+  const rawAddons = session.metadata?.addons;
+  let purchasedAddons = [];
+  if (rawAddons) {
+    try {
+      const parsed2 = JSON.parse(rawAddons);
+      if (Array.isArray(parsed2)) {
+        purchasedAddons = parsed2.filter((a) => typeof a === "string");
+      }
+    } catch {
+      logger.warn("Failed to parse addons JSON from webhook metadata", { rawAddons, sessionId: session.id });
+    }
+  }
   const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
   const database = await getDb();
   if (!database) {
     throw new Error("Database not available for request add-on webhook");
   }
-  await database.update(tattooRequests).set({
+  const updatePayload = {
     addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.PAID,
     addOnStripePaymentIntentId: paymentIntentId ?? null,
     addOnPaidAt: /* @__PURE__ */ new Date(),
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq8(tattooRequests.id, requestId));
+  };
+  if (purchasedAddons.length > 0) {
+    updatePayload.selectedAddons = purchasedAddons;
+  }
+  if (purchasedAddons.includes("priorityListing")) {
+    const expiresAt = /* @__PURE__ */ new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    updatePayload.priorityExpiresAt = expiresAt;
+  }
+  if (purchasedAddons.includes("blindBids")) {
+    updatePayload.blindBids = true;
+  }
+  await database.update(tattooRequests).set(updatePayload).where(eq8(tattooRequests.id, requestId));
   logger.info("Request add-on payment marked paid", {
     requestId,
     sessionId: session.id,
-    paymentIntentId
+    paymentIntentId,
+    addons: purchasedAddons
   });
+}
+async function handleTokenPackCheckoutCompleted(session) {
+  const packType = session.metadata?.packType;
+  const rawPackSize = session.metadata?.packSize;
+  const rawArtistId = session.metadata?.artistId;
+  if (!packType || !rawPackSize || !rawArtistId) {
+    logger.warn("Token pack checkout missing required metadata", {
+      sessionId: session.id,
+      packType,
+      rawPackSize,
+      rawArtistId
+    });
+    return;
+  }
+  const packSize = parseInt(rawPackSize, 10);
+  const artistId = parseInt(rawArtistId, 10);
+  if (isNaN(packSize) || packSize <= 0 || isNaN(artistId) || artistId <= 0) {
+    logger.warn("Token pack checkout has invalid packSize or artistId", {
+      sessionId: session.id,
+      packSize,
+      artistId
+    });
+    return;
+  }
+  const database = await getDb();
+  if (!database) {
+    throw new Error("Database not available for token pack webhook");
+  }
+  if (packType === "bid") {
+    await database.update(artists).set({ bidTokens: sql4`${artists.bidTokens} + ${packSize}`, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(artists.id, artistId));
+    logger.info("Artist bid tokens incremented", { artistId, packSize });
+  } else if (packType === "chat") {
+    await database.update(artists).set({ chatTokens: sql4`${artists.chatTokens} + ${packSize}`, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(artists.id, artistId));
+    logger.info("Artist chat tokens incremented", { artistId, packSize });
+  } else {
+    logger.warn("Unknown token pack type", { packType, sessionId: session.id });
+  }
 }
 function parseUserIdFromMetadata(metadata) {
   const raw = metadata?.userId;
@@ -5400,13 +5611,13 @@ app.get("/api/health", async (_req, res) => {
     const db = await Promise.resolve().then(() => (init_db(), db_exports)).then((m) => m.getDb());
     let dbStatus = "disconnected";
     if (db) {
-      const { sql: sql4 } = await import("drizzle-orm");
-      await db.execute(sql4`SELECT 1`);
+      const { sql: sql5 } = await import("drizzle-orm");
+      await db.execute(sql5`SELECT 1`);
       dbStatus = "connected";
     }
     const webhookStats = await getWebhookQueueStats();
     const storageReady = ENV.isProduction ? true : true;
-    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth && ENV.stripeClientPlusPriceId ? true : false;
+    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistProPriceIdMonth && ENV.stripeArtistElitePriceIdMonth ? true : false;
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
     res.json({
       status: overallStatus,

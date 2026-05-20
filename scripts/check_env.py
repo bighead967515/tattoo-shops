@@ -123,14 +123,6 @@ VARIABLES = [
          description="Artist Icon yearly Price ID (default in env.ts)",
          prefix="price_", min_len=10),
 
-    dict(name="STRIPE_CLIENT_PLUS_PRICE_ID",          required=False,
-         description="Client Plus Price ID (not yet used)",
-         prefix="price_", min_len=10),
-
-    dict(name="STRIPE_CLIENT_ELITE_PRICE_ID",         required=False,
-         description="Client Elite Price ID (not yet used)",
-         prefix="price_", min_len=10),
-
     # ── Email ─────────────────────────────────────────────────────────────────
     dict(name="RESEND_API_KEY",         required=True,
          description="Resend transactional email API key",

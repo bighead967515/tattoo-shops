@@ -18,6 +18,7 @@ import {
   HelpCircle,
   ChevronDown,
   Settings2,
+  Sparkles,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -47,12 +48,14 @@ export default function Sidebar() {
         { href: "/artists", label: "Browse Artists", icon: Users },
         { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
         { href: "/for-artists", label: "For Artists", icon: Palette },
+        { href: "/estimate", label: "Price Estimator", icon: Sparkles },
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       ]
     : [
         { href: "/artists", label: "Browse Artists", icon: Users },
         { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
         { href: "/for-artists", label: "For Artists", icon: Palette },
+        { href: "/estimate", label: "Price Estimator", icon: Sparkles },
         { href: "/login", label: "Sign In", icon: LogIn },
       ];
 

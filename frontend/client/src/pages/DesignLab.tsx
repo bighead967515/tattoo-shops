@@ -170,19 +170,16 @@ function DesignLab() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold mb-1">
-                    Unlock AI Tattoo Generation
+                    AI Generation Is Currently Unavailable
                   </h3>
                   <p className="text-muted-foreground text-sm">
-                    Upgrade to <strong>Enthusiast</strong> ($9/mo for 10
-                    generations) or <strong>Elite Ink</strong> ($19/mo for
-                    unlimited) to turn your ideas into tattoo designs instantly.
+                    AI design generation is currently disabled for client
+                    accounts. You can still post requests and receive bids from
+                    artists.
                   </p>
                 </div>
-                <Link href="/pricing">
-                  <Button>
-                    <Crown className="h-4 w-4 mr-2" />
-                    Upgrade Now
-                  </Button>
+                <Link href="/client/dashboard">
+                  <Button variant="outline">Back to Dashboard</Button>
                 </Link>
               </CardContent>
             </Card>

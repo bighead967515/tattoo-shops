@@ -520,43 +520,35 @@ export default function RequestDetail() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  {request.selectedAddons?.includes("vipBundle") && (
+                  {request.selectedAddons?.includes("priorityListing") && (
                     <div className="flex items-center justify-between">
-                      <span>VIP Ink Bundle</span>
+                      <span>Priority Listing</span>
                       <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.vipBundleCents)}
+                        {formatUsd(REQUEST_ADDON_PRICING.priorityListingCents)}
                       </span>
                     </div>
                   )}
-                  {request.selectedAddons?.includes("priorityPlacement") && !request.selectedAddons?.includes("vipBundle") && (
+                  {request.selectedAddons?.includes("inAppChat") && (
                     <div className="flex items-center justify-between">
-                      <span>Priority Placement</span>
+                      <span>In-App Chat</span>
                       <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.priorityPlacementCents)}
+                        {formatUsd(REQUEST_ADDON_PRICING.inAppChatCents)}
                       </span>
                     </div>
                   )}
-                  {request.selectedAddons?.includes("aiPriceEstimate") && !request.selectedAddons?.includes("vipBundle") && (
+                  {request.selectedAddons?.includes("aiDesign") && (
                     <div className="flex items-center justify-between">
-                      <span>AI Price Estimate</span>
+                      <span>AI Concept Design</span>
                       <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.aiPriceEstimateCents)}
+                        {formatUsd(REQUEST_ADDON_PRICING.aiDesignCents)}
                       </span>
                     </div>
                   )}
-                  {request.selectedAddons?.includes("preBookingChat") && !request.selectedAddons?.includes("vipBundle") && (
+                  {request.selectedAddons?.includes("blindBids") && (
                     <div className="flex items-center justify-between">
-                      <span>Pre-Booking Chat</span>
+                      <span>Blind Bids</span>
                       <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.preBookingChatCents)}
-                      </span>
-                    </div>
-                  )}
-                  {request.selectedAddons?.includes("perfectMatchRouter") && !request.selectedAddons?.includes("vipBundle") && (
-                    <div className="flex items-center justify-between">
-                      <span>Perfect Match Router</span>
-                      <span className="font-medium">
-                        {formatUsd(REQUEST_ADDON_PRICING.perfectMatchRouterCents)}
+                        {formatUsd(REQUEST_ADDON_PRICING.blindBidsCents)}
                       </span>
                     </div>
                   )}
@@ -962,7 +954,7 @@ export default function RequestDetail() {
           {isFreeClientOwner && (
             <UpgradePrompt
               feature="Text & Font Tools"
-              description="Upgrade to Client Plus or Elite to style request text and add image text overlays."
+              description="Text styling and image text overlays are not enabled for client accounts right now."
             />
           )}
 

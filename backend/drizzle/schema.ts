@@ -439,6 +439,8 @@ export const tattooRequests = pgTable(
       length: 255,
     }),
     addOnPaidAt: timestamp("addOnPaidAt"),
+    priorityExpiresAt: timestamp("priorityExpiresAt"), // set when priorityListing paid, expires 7 days later
+    blindBids: boolean("blindBids").default(false).notNull(), // true = competing artists can't see each other's bid amounts
     status: requestStatusEnum("status").default("open").notNull(),
     selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
     viewCount: integer("viewCount").default(0),
@@ -511,6 +513,7 @@ export const bids = pgTable(
      * = priceEstimate * platformFeeRateBps / 10000
      */
     platformFeeAmountCents: integer("platformFeeAmountCents"),
+    chatUnlockedByArtist: boolean("chatUnlockedByArtist").default(false).notNull(), // true if artist spent a token to unlock chat
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
@@ -542,3 +545,30 @@ export const requestMessages = pgTable("requestMessages", {
 
 export type RequestMessage = typeof requestMessages.$inferSelect;
 export type InsertRequestMessage = typeof requestMessages.$inferInsert;
+
+/**
+ * Tracks when an artist spends a chat token to unlock in-app messaging with a client
+ */
+export const chatUnlocks = pgTable(
+  'chatUnlocks',
+  {
+    id: serial('id').primaryKey(),
+    requestId: integer('requestId')
+      .notNull()
+      .references(() => tattooRequests.id, { onDelete: 'cascade' }),
+    artistId: integer('artistId')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    clientId: integer('clientId')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    tokensSpent: integer('tokensSpent').default(1).notNull(),
+    unlockedAt: timestamp('unlockedAt').defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueArtistRequest: unique().on(table.artistId, table.requestId),
+  }),
+);
+
+export type ChatUnlock = typeof chatUnlocks.$inferSelect;
+export type InsertChatUnlock = typeof chatUnlocks.$inferInsert;

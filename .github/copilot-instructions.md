@@ -442,7 +442,6 @@ All tables are defined in `backend/drizzle/schema.ts`. This is the source of tru
 - `clients.getMyProfile` (protected query)
 - `clients.createProfile` (protected mutation) — sets role to "client"
 - `clients.updateProfile` (protected mutation)
-- `clients.createSubscriptionCheckout` (protected mutation) — Stripe checkout
 
 **requests** — Tattoo requests
 

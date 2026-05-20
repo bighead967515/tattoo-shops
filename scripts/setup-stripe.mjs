@@ -67,33 +67,7 @@ async function main() {
     recurring: { interval: 'year' },
   });
 
-  // 4. Client Enthusiast
-  console.log('Creating Client Enthusiast tier...');
-  const plusProduct = await stripe.products.create({
-    name: 'Client Enthusiast',
-    description: '10 AI generations, 10 tattoo requests, priority board access.',
-  });
-  const plusMonth = await stripe.prices.create({
-    product: plusProduct.id,
-    unit_amount: 900,
-    currency: 'usd',
-    recurring: { interval: 'month' },
-  });
-
-  // 5. Client Elite Ink
-  console.log('Creating Client Elite Ink tier...');
-  const eliteProduct = await stripe.products.create({
-    name: 'Client Elite Ink',
-    description: 'Unlimited AI, unlimited requests, direct chat, deposit fee waived.',
-  });
-  const eliteMonth = await stripe.prices.create({
-    product: eliteProduct.id,
-    unit_amount: 1900,
-    currency: 'usd',
-    recurring: { interval: 'month' },
-  });
-
-  // 6. Webhook Endpoint
+  // 4. Webhook Endpoint
   console.log('Creating Webhook Endpoint...');
   const webhook = await stripe.webhookEndpoints.create({
     url: 'https://your-render-app-url.onrender.com/api/stripe/webhook',
@@ -118,8 +92,6 @@ async function main() {
   console.log(`STRIPE_ARTIST_PRO_PRICE_ID_YEAR=${paygYear.id}`);
   console.log(`STRIPE_ARTIST_ICON_PRICE_ID_MONTH=${iconMonth.id}`);
   console.log(`STRIPE_ARTIST_ICON_PRICE_ID_YEAR=${iconYear.id}`);
-  console.log(`STRIPE_CLIENT_PLUS_PRICE_ID=${plusMonth.id}`);
-  console.log(`STRIPE_CLIENT_ELITE_PRICE_ID=${eliteMonth.id}`);
   console.log(`STRIPE_WEBHOOK_SECRET=${webhook.secret}`);
   
   console.log('\n⚠️ IMPORTANT NEXT STEP:');

@@ -1,12 +1,8 @@
 export const REQUEST_ADDON_PRICING = {
-  priorityPlacementCents: 499,
-  preBookingChatCents: 999,
-  aiPriceEstimateCents: 299,
-  incognitoModeCents: 299,
-  conceptArtistCents: 499,
-  perfectMatchRouterCents: 399,
-  painAnalysisCents: 99,
-  vipBundleCents: 1999, // Discounted bundle of all
+  priorityListingCents: 299,  // 7-day boost to top of feed
+  inAppChatCents: 199,        // unlocks in-app chat for all bids on this request
+  aiDesignCents: 299,         // AI concept art generated for the request
+  blindBidsCents: 399,        // hides bid amounts from competing artists
 } as const;
 
 export const REQUEST_ADDON_PAYMENT_STATUSES = {
@@ -19,30 +15,45 @@ export const REQUEST_ADDON_PAYMENT_STATUSES = {
 export type RequestAddonPaymentStatus =
   (typeof REQUEST_ADDON_PAYMENT_STATUSES)[keyof typeof REQUEST_ADDON_PAYMENT_STATUSES];
 
+export type RequestAddon =
+  | "priorityListing"
+  | "inAppChat"
+  | "aiDesign"
+  | "blindBids";
+
+// Legacy type kept for any code still referencing it during migration
 export type RequestAddonSelection = {
-  priorityPlacement: boolean;
-  preBookingChat: boolean;
-  aiPriceEstimate: boolean;
-  incognitoMode: boolean;
-  conceptArtist: boolean;
-  perfectMatchRouter: boolean;
-  painAnalysis: boolean;
-  vipBundle: boolean;
+  priorityListing: boolean;
+  inAppChat: boolean;
+  aiDesign: boolean;
+  blindBids: boolean;
 };
 
-export function calculateRequestAddonTotalCents(selection: RequestAddonSelection): number {
-  if (selection.vipBundle) {
-    return REQUEST_ADDON_PRICING.vipBundleCents;
-  }
+export function calculateRequestAddonTotalCents(
+  addons: RequestAddon[] | RequestAddonSelection | Partial<RequestAddonSelection>
+): number {
+  const list: RequestAddon[] = Array.isArray(addons)
+    ? addons
+    : (Object.keys(addons) as (keyof RequestAddonSelection)[]).filter(
+        (k) => addons[k]
+      ) as RequestAddon[];
 
   let total = 0;
-  if (selection.priorityPlacement) total += REQUEST_ADDON_PRICING.priorityPlacementCents;
-  if (selection.preBookingChat) total += REQUEST_ADDON_PRICING.preBookingChatCents;
-  if (selection.aiPriceEstimate) total += REQUEST_ADDON_PRICING.aiPriceEstimateCents;
-  if (selection.incognitoMode) total += REQUEST_ADDON_PRICING.incognitoModeCents;
-  if (selection.conceptArtist) total += REQUEST_ADDON_PRICING.conceptArtistCents;
-  if (selection.perfectMatchRouter) total += REQUEST_ADDON_PRICING.perfectMatchRouterCents;
-  if (selection.painAnalysis) total += REQUEST_ADDON_PRICING.painAnalysisCents;
-  
+  for (const addon of list) {
+    switch (addon) {
+      case "priorityListing":
+        total += REQUEST_ADDON_PRICING.priorityListingCents;
+        break;
+      case "inAppChat":
+        total += REQUEST_ADDON_PRICING.inAppChatCents;
+        break;
+      case "aiDesign":
+        total += REQUEST_ADDON_PRICING.aiDesignCents;
+        break;
+      case "blindBids":
+        total += REQUEST_ADDON_PRICING.blindBidsCents;
+        break;
+    }
+  }
   return total;
 }

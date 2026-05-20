@@ -14,6 +14,7 @@ import {
   Star,
   Award,
   Wallet,
+  Sparkles,
 } from "lucide-react";
 
 const audienceLanes = [
@@ -296,6 +297,42 @@ export default function Home() {
                 <p className="text-muted-foreground">{answer}</p>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── AI Price Estimator CTA Banner ── */}
+      <section className="border-y">
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-violet-500/8 to-primary/10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(112,255,112,0.08),_transparent_70%)]" />
+          <div className="container relative py-14">
+            <div className="mx-auto max-w-3xl text-center">
+              <div className="mb-4 flex justify-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 border border-primary/30">
+                  <Sparkles className="h-7 w-7 text-primary animate-pulse" />
+                </div>
+              </div>
+              <h2 className="mb-3 text-3xl font-bold md:text-4xl">
+                Not sure what your tattoo will cost?
+              </h2>
+              <p className="mb-8 text-lg text-muted-foreground">
+                Get a free instant estimate powered by AI — no account needed
+              </p>
+              <Button
+                size="lg"
+                className="gap-2 px-8 shadow-[0_0_20px_rgba(112,255,112,0.35)] hover:shadow-[0_0_30px_rgba(112,255,112,0.6)] transition-all duration-300"
+                onClick={() => setLocation("/estimate")}
+                id="home-estimator-cta"
+              >
+                <Sparkles className="h-4 w-4" />
+                Get a Free Estimate
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Takes 30 seconds · Free · No sign-up required
+              </p>
+            </div>
           </div>
         </div>
       </section>

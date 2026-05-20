@@ -175,8 +175,8 @@ app.get("/api/health", async (_req, res) => {
     // Check Stripe connectivity (basic: just verify API key is set)
     const stripeReady =
       ENV.stripeSecretKey &&
-      ENV.stripeArtistAmateurPriceIdMonth &&
-      ENV.stripeClientPlusPriceId
+      ENV.stripeArtistProPriceIdMonth &&
+      ENV.stripeArtistElitePriceIdMonth
         ? true
         : false;
 

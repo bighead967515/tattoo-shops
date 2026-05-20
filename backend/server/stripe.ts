@@ -67,18 +67,15 @@ export async function createCheckoutSession({
 export function stripePriceToArtistTier(
   priceId: string,
 ): "artist_paygo" | "artist_pro" | "artist_elite" | null {
-  const { 
-    stripeArtistAmateurPriceIdMonth, stripeArtistAmateurPriceIdYear,
-    stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
-    stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
+  const {
+    stripeArtistProPriceIdMonth,   stripeArtistProPriceIdYear,
+    stripeArtistElitePriceIdMonth, stripeArtistElitePriceIdYear,
   } = ENV;
 
   if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
     return "artist_pro";
-  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
+  if (priceId === stripeArtistElitePriceIdMonth || priceId === stripeArtistElitePriceIdYear)
     return "artist_elite";
-  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
-    return "artist_paygo";
 
   return null;
 }
@@ -174,4 +171,108 @@ export async function constructWebhookEvent(
     signature,
     ENV.stripeWebhookSecret,
   );
+}
+
+/**
+ * Create a Stripe Checkout Session for client add-on purchases on a tattoo request.
+ * Metadata includes type: 'addon_purchase', requestId, and addons as a JSON array string.
+ */
+export async function createAddonCheckout({
+  requestId,
+  clientEmail,
+  stripeCustomerId,
+  addons,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  requestId: number;
+  clientEmail: string;
+  stripeCustomerId?: string;
+  addons: string[];
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      ...(stripeCustomerId
+        ? { customer: stripeCustomerId }
+        : { customer_email: clientEmail }),
+      line_items: addons.map((addon) => ({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `Request Add-on: ${addon}`,
+          },
+          unit_amount: (() => {
+            switch (addon) {
+              case "priorityListing": return 299;
+              case "inAppChat":       return 199;
+              case "aiDesign":        return 299;
+              case "blindBids":       return 399;
+              default:                return 0;
+            }
+          })(),
+        },
+        quantity: 1,
+      })),
+      metadata: {
+        ...metadata,
+        type: "addon_purchase",
+        requestId: String(requestId),
+        addons: JSON.stringify(addons),
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true,
+    });
+    return session;
+  });
+}
+
+/**
+ * Create a Stripe Checkout Session for an artist token pack purchase.
+ * Metadata includes type: 'token_pack', packType, packSize, and artistId.
+ */
+export async function createTokenPackCheckout({
+  packType,
+  packSize,
+  artistEmail,
+  stripeCustomerId,
+  priceId,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  packType: "bid" | "chat";
+  packSize: number;
+  artistEmail: string;
+  stripeCustomerId?: string;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [{ price: priceId, quantity: 1 }],
+      ...(stripeCustomerId
+        ? { customer: stripeCustomerId }
+        : { customer_email: artistEmail }),
+      metadata: {
+        ...metadata,
+        type: "token_pack",
+        packType,
+        packSize: String(packSize),
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    });
+    return session;
+  });
 }

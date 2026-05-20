@@ -3,8 +3,8 @@ import Stripe from "stripe";
 import { constructWebhookEvent, stripePriceToArtistTier } from "./stripe";
 import * as db from "./db";
 import { getDb } from "./db";
-import { clients, users, tattooRequests } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { clients, users, tattooRequests, artists } from "../drizzle/schema";
+import { eq, sql } from "drizzle-orm";
 import { logger } from "./_core/logger";
 import {
   queueWebhookForRetry,
@@ -12,7 +12,6 @@ import {
   getQueueStats,
 } from "./webhookQueue";
 
-import { artists } from "../drizzle/schema";
 import { REQUEST_ADDON_PAYMENT_STATUSES } from "@shared/requestAddons";
 
 // Flag to track if processor is started
@@ -45,12 +44,17 @@ async function processWebhookEvent(
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      if (session.metadata?.paymentType === "request_addons") {
+      if (session.metadata?.type === "addon_purchase" || session.metadata?.paymentType === "request_addons") {
         await handleRequestAddonCheckoutCompleted(session);
         break;
       }
 
-      // Client subscription checkout completion path
+      if (session.metadata?.type === "token_pack") {
+        await handleTokenPackCheckoutCompleted(session);
+        break;
+      }
+
+      // Subscription checkout completion path
       if (session.mode === "subscription") {
         await handleSubscriptionCheckoutCompleted(session);
         break;
@@ -133,7 +137,7 @@ async function processWebhookEvent(
     }
 
     // ============================================
-    // CLIENT SUBSCRIPTION LIFECYCLE
+    // SUBSCRIPTION LIFECYCLE
     // ============================================
 
     case "customer.subscription.created":
@@ -167,6 +171,20 @@ async function handleRequestAddonCheckoutCompleted(
     return;
   }
 
+  // Parse the purchased addons list if present
+  const rawAddons = session.metadata?.addons;
+  let purchasedAddons: string[] = [];
+  if (rawAddons) {
+    try {
+      const parsed = JSON.parse(rawAddons) as unknown;
+      if (Array.isArray(parsed)) {
+        purchasedAddons = parsed.filter((a): a is string => typeof a === "string");
+      }
+    } catch {
+      logger.warn("Failed to parse addons JSON from webhook metadata", { rawAddons, sessionId: session.id });
+    }
+  }
+
   const paymentIntentId =
     typeof session.payment_intent === "string"
       ? session.payment_intent
@@ -177,21 +195,102 @@ async function handleRequestAddonCheckoutCompleted(
     throw new Error("Database not available for request add-on webhook");
   }
 
+  // Build the update payload
+  const updatePayload: {
+    addOnPaymentStatus: typeof REQUEST_ADDON_PAYMENT_STATUSES[keyof typeof REQUEST_ADDON_PAYMENT_STATUSES];
+    addOnStripePaymentIntentId: string | null;
+    addOnPaidAt: Date;
+    selectedAddons?: string[];
+    priorityExpiresAt?: Date | null;
+    blindBids?: boolean;
+    updatedAt: Date;
+  } = {
+    addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.PAID,
+    addOnStripePaymentIntentId: paymentIntentId ?? null,
+    addOnPaidAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  if (purchasedAddons.length > 0) {
+    updatePayload.selectedAddons = purchasedAddons;
+  }
+
+  if (purchasedAddons.includes("priorityListing")) {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    updatePayload.priorityExpiresAt = expiresAt;
+  }
+
+  if (purchasedAddons.includes("blindBids")) {
+    updatePayload.blindBids = true;
+  }
+
   await database
     .update(tattooRequests)
-    .set({
-      addOnPaymentStatus: REQUEST_ADDON_PAYMENT_STATUSES.PAID,
-      addOnStripePaymentIntentId: paymentIntentId ?? null,
-      addOnPaidAt: new Date(),
-      updatedAt: new Date(),
-    })
+    .set(updatePayload)
     .where(eq(tattooRequests.id, requestId));
 
   logger.info("Request add-on payment marked paid", {
     requestId,
     sessionId: session.id,
     paymentIntentId,
+    addons: purchasedAddons,
   });
+}
+
+/**
+ * Handle artist token pack checkout completion.
+ * Increments bidTokens or chatTokens on the artist record atomically.
+ */
+async function handleTokenPackCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const packType = session.metadata?.packType as "bid" | "chat" | undefined;
+  const rawPackSize = session.metadata?.packSize;
+  const rawArtistId = session.metadata?.artistId;
+
+  if (!packType || !rawPackSize || !rawArtistId) {
+    logger.warn("Token pack checkout missing required metadata", {
+      sessionId: session.id,
+      packType,
+      rawPackSize,
+      rawArtistId,
+    });
+    return;
+  }
+
+  const packSize = parseInt(rawPackSize, 10);
+  const artistId = parseInt(rawArtistId, 10);
+
+  if (isNaN(packSize) || packSize <= 0 || isNaN(artistId) || artistId <= 0) {
+    logger.warn("Token pack checkout has invalid packSize or artistId", {
+      sessionId: session.id,
+      packSize,
+      artistId,
+    });
+    return;
+  }
+
+  const database = await getDb();
+  if (!database) {
+    throw new Error("Database not available for token pack webhook");
+  }
+
+  if (packType === "bid") {
+    await database
+      .update(artists)
+      .set({ bidTokens: sql`${artists.bidTokens} + ${packSize}`, updatedAt: new Date() })
+      .where(eq(artists.id, artistId));
+    logger.info("Artist bid tokens incremented", { artistId, packSize });
+  } else if (packType === "chat") {
+    await database
+      .update(artists)
+      .set({ chatTokens: sql`${artists.chatTokens} + ${packSize}`, updatedAt: new Date() })
+      .where(eq(artists.id, artistId));
+    logger.info("Artist chat tokens incremented", { artistId, packSize });
+  } else {
+    logger.warn("Unknown token pack type", { packType, sessionId: session.id });
+  }
 }
 
 function parseUserIdFromMetadata(
@@ -280,7 +379,6 @@ async function handleSubscriptionCheckoutCompleted(
     const userUpdate: {
       stripeCustomerId?: string;
       stripeSubscriptionId?: string;
-      subscriptionTier?: "client_plus" | "client_elite";
       updatedAt: Date;
     } = { updatedAt: new Date() };
 
