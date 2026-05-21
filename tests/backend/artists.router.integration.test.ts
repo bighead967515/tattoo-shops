@@ -34,6 +34,10 @@ function seedRequiredEnv() {
   process.env.SUPABASE_ANON_KEY = "anon_key";
   process.env.GROQ_API_KEY = "groq_api_key";
   process.env.HUGGINGFACE_API_KEY = "hf_api_key";
+  process.env.STRIPE_ARTIST_PRO_PRICE_ID_MONTH = "price_pro_month";
+  process.env.STRIPE_ARTIST_PRO_PRICE_ID_YEAR = "price_pro_year";
+  process.env.STRIPE_ARTIST_ELITE_PRICE_ID_MONTH = "price_elite_month";
+  process.env.STRIPE_ARTIST_ELITE_PRICE_ID_YEAR = "price_elite_year";
 }
 
 let appRouter: (typeof import("../../backend/server/routers"))["appRouter"];

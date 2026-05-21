@@ -2,7 +2,6 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockConstructWebhookEvent,
-  mockStripePriceToClientTier,
   mockStripePriceToArtistTier,
   mockGetBookingById,
   mockWithTransaction,
@@ -14,7 +13,6 @@ const {
   logger,
 } = vi.hoisted(() => ({
   mockConstructWebhookEvent: vi.fn(),
-  mockStripePriceToClientTier: vi.fn(),
   mockStripePriceToArtistTier: vi.fn(),
   mockGetBookingById: vi.fn(),
   mockWithTransaction: vi.fn(),
@@ -33,7 +31,6 @@ const {
 
 vi.mock("../../backend/server/stripe", () => ({
   constructWebhookEvent: mockConstructWebhookEvent,
-  stripePriceToClientTier: mockStripePriceToClientTier,
   stripePriceToArtistTier: mockStripePriceToArtistTier,
 }));
 
@@ -172,7 +169,7 @@ describe("webhook tier-sync and safety integration", () => {
     vi.clearAllMocks();
   });
 
-  it("syncs client tier upgrade on subscription updated events", async () => {
+  it("syncs artist tier upgrade on subscription updated events", async () => {
     const event = {
       id: "evt_live_1",
       type: "customer.subscription.updated",
@@ -182,7 +179,7 @@ describe("webhook tier-sync and safety integration", () => {
           customer: "cus_123",
           status: "active",
           items: {
-            data: [{ price: { id: "price_plus" } }],
+            data: [{ price: { id: "price_pro" } }],
           },
         },
       },
@@ -194,7 +191,7 @@ describe("webhook tier-sync and safety integration", () => {
     });
 
     mockConstructWebhookEvent.mockResolvedValue(event);
-    mockStripePriceToClientTier.mockReturnValue("client_plus");
+    mockStripePriceToArtistTier.mockReturnValue("artist_pro");
     mockGetDb.mockResolvedValue(database);
 
     const req = createReq();
@@ -206,17 +203,13 @@ describe("webhook tier-sync and safety integration", () => {
     expect(database.transaction).toHaveBeenCalledTimes(1);
 
     expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).subscriptionTier === "client_plus",
-    )).toBe(true);
-
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).aiCredits === 10,
+      (call.setPayload as Record<string, unknown>).subscriptionTier === "artist_pro",
     )).toBe(true);
 
     expect(mockQueueWebhookForRetry).not.toHaveBeenCalled();
   });
 
-  it("downgrades client tier and credits on subscription deleted events", async () => {
+  it("downgrades artist tier on subscription deleted events", async () => {
     const event = {
       id: "evt_live_2",
       type: "customer.subscription.deleted",
@@ -232,7 +225,40 @@ describe("webhook tier-sync and safety integration", () => {
     const { database, updateCalls } = createDbForSubscription({
       id: 21,
       stripeCustomerId: "cus_456",
-    });
+    }, true); // isArtist = true
+
+    mockConstructWebhookEvent.mockResolvedValue(event);
+    mockGetDb.mockResolvedValue(database);
+
+    const req = createReq();
+    const res = createRes();
+
+    await handleStripeWebhook(req as any, res as any);
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+
+    expect(updateCalls.some((call) =>
+      (call.setPayload as Record<string, unknown>).subscriptionTier === "artist_free",
+    )).toBe(true);
+  });
+
+  it("downgrades client tier on subscription deleted events", async () => {
+    const event = {
+      id: "evt_live_2_client",
+      type: "customer.subscription.deleted",
+      data: {
+        object: {
+          id: "sub_789",
+          customer: "cus_789",
+          items: { data: [] },
+        },
+      },
+    };
+
+    const { database, updateCalls } = createDbForSubscription({
+      id: 22,
+      stripeCustomerId: "cus_789",
+    }, false); // isArtist = false
 
     mockConstructWebhookEvent.mockResolvedValue(event);
     mockGetDb.mockResolvedValue(database);
@@ -322,14 +348,14 @@ describe("webhook tier-sync and safety integration", () => {
           customer: "cus_fail",
           status: "active",
           items: {
-            data: [{ price: { id: "price_plus" } }],
+            data: [{ price: { id: "price_pro" } }],
           },
         },
       },
     };
 
     mockConstructWebhookEvent.mockResolvedValue(event);
-    mockStripePriceToClientTier.mockReturnValue("client_plus");
+    mockStripePriceToArtistTier.mockReturnValue("artist_pro");
     mockGetDb.mockResolvedValue(null);
 
     const req = createReq();
@@ -342,7 +368,7 @@ describe("webhook tier-sync and safety integration", () => {
       "evt_live_5",
       "customer.subscription.updated",
       event,
-      expect.stringContaining("Database not available for subscription webhook"),
+      expect.stringContaining("Database not available for artist subscription webhook"),
     );
 
     expect(res.json).toHaveBeenCalledWith({ received: true, queued: true });
@@ -394,7 +420,7 @@ describe("webhook tier-sync and safety integration", () => {
           customer: "cus_123",
           status: "past_due",
           items: {
-            data: [{ price: { id: "price_plus" } }],
+            data: [{ price: { id: "price_pro" } }],
           },
         },
       },
@@ -406,7 +432,7 @@ describe("webhook tier-sync and safety integration", () => {
     });
 
     mockConstructWebhookEvent.mockResolvedValue(event);
-    mockStripePriceToClientTier.mockReturnValue("client_plus");
+    mockStripePriceToArtistTier.mockReturnValue("artist_pro");
     mockGetDb.mockResolvedValue(database);
 
     const req = createReq();
@@ -430,7 +456,7 @@ describe("webhook tier-sync and safety integration", () => {
           subscription: "sub_new_1",
           metadata: {
             userId: "42",
-            tier: "client_plus",
+            tier: "artist_pro",
           },
         },
       },
@@ -454,9 +480,6 @@ describe("webhook tier-sync and safety integration", () => {
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(updateCalls.some((call) =>
       (call.setPayload as Record<string, unknown>).stripeCustomerId === "cus_new_1",
-    )).toBe(true);
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).subscriptionTier === "client_plus",
     )).toBe(true);
   });
 });
