@@ -19,9 +19,9 @@ const envSchema = z.object({
   STRIPE_ARTIST_ICON_PRICE_ID_YEAR:     z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
   // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
   STRIPE_FOUNDING_ARTIST_PRICE_ID:      z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
-  // Client subscription Stripe Price IDs — REQUIRED for checkout. Set after creating Products in the Stripe Dashboard.
-  STRIPE_CLIENT_PLUS_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_PLUS_PRICE_ID is required"),
-  STRIPE_CLIENT_ELITE_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_ELITE_PRICE_ID is required"),
+  // Client subscription Stripe Price IDs — optional (no paid client tiers currently).
+  STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
+  STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
   RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
