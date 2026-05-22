@@ -1,23 +1,16 @@
 {
-  "artist_amateur": {
-    "product_id": "prod_UNcq9FGe8BQnuR",
-    "price_id_monthly": "price_1TOraXQRJTQEheTOvLHhTihz",
-    "price_id_yearly": "price_1TOraXQRJTQEheTOVr8zI9O4",
-    "monthly_cents": 900,
-    "yearly_cents": 9000
-  },
   "artist_pro": {
-    "product_id": "prod_UNcqpgBYyDd11W",
-    "price_id_monthly": "price_1TOraYQRJTQEheTO3k4MS3PR",
-    "price_id_yearly": "price_1TOraYQRJTQEheTOHNQL82m3",
+    "product_id": "prod_UODmOM3W3YahgN",
+    "price_id_monthly": "price_1TPRL5QRJTQEheTOSH3mNyqG",
+    "price_id_yearly": "price_1TPRL5QRJTQEheTOSfZmYLxK",
+    "monthly_cents": 2900,
+    "yearly_cents": 23200
+  },
+  "artist_elite": {
+    "product_id": "prod_UODm0W67oeNij8",
+    "price_id_monthly": "price_1TPRL7QRJTQEheTO4JP4apjA",
+    "price_id_yearly": "price_1TPRL8QRJTQEheTOrzqCXrTj",
     "monthly_cents": 1900,
     "yearly_cents": 19000
-  },
-  "artist_icon": {
-    "product_id": "prod_UNcqwXDDwxpOFq",
-    "price_id_monthly": "price_1TOraZQRJTQEheTOofBdpJwM",
-    "price_id_yearly": "price_1TOraaQRJTQEheTOwDiBtF35",
-    "monthly_cents": 3900,
-    "yearly_cents": 39000
   }
 }
