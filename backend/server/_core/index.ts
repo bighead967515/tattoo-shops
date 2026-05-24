@@ -176,7 +176,7 @@ app.get("/api/health", async (_req, res) => {
     const stripeReady =
       ENV.stripeSecretKey &&
       ENV.stripeArtistProPriceIdMonth &&
-      ENV.stripeArtistElitePriceIdMonth
+      ENV.stripeArtistIconPriceIdMonth
         ? true
         : false;
 

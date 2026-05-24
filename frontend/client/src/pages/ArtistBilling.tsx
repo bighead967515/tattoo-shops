@@ -26,7 +26,7 @@ interface PlanDef {
   monthlyPrice: number; // cents
   yearlyPrice: number;  // cents
   transactionFee: string | null;
-  stripeTierArg: "artist_pro" | "artist_elite" | null;
+  stripeTierArg: "artist_pro" | "artist_elite" | null; // canonical tiers accepted by createSubscriptionCheckout
   badge: string | null;
   isMostPopular: boolean;
   isElite: boolean;

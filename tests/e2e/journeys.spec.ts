@@ -12,7 +12,7 @@ async function gotoFast(page: Parameters<typeof test>[0]["page"], path: string) 
 
   await page.goto(`${BASE_URL}${path}`, {
     waitUntil: "commit",
-    timeout: 60000,
+    timeout: 45000,
   });
 }
 

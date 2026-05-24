@@ -30,7 +30,11 @@ export default defineConfig({
     baseURL: appBaseUrl,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    actionTimeout: 20000,
+    navigationTimeout: 45000,
   },
+
+  timeout: 60000,
 
   projects: [
     {
@@ -46,8 +50,8 @@ export default defineConfig({
           "cross-env NODE_ENV=test node -r dotenv/config dist/index.js dotenv_config_path=.env",
         url: `${appBaseUrl}/api/health`,
         timeout: 120000,
-        reuseExistingServer: false,
-        stdout: "ignore",
+        reuseExistingServer: true,
+        stdout: "pipe",
         stderr: "pipe",
       }
     : undefined,

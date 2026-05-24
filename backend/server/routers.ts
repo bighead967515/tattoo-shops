@@ -130,7 +130,7 @@ export const appRouter = router({
     createSubscriptionCheckout: protectedProcedure
       .input(
         z.object({
-          tier: z.enum(["artist_amateur", "artist_icon"]),
+          tier: z.enum(["artist_pro", "artist_elite"]),
           interval: z.enum(["month", "year"]).default("month"),
           successUrl: z.string().url(),
           cancelUrl: z.string().url(),
@@ -156,10 +156,10 @@ export const appRouter = router({
 
         // Resolve the correct Stripe Price ID
         const priceIdMap: Record<string, string | undefined> = {
-          artist_amateur_month: ENV.stripeArtistAmateurPriceIdMonth,
-          artist_amateur_year:  ENV.stripeArtistAmateurPriceIdYear,
-          artist_icon_month:    ENV.stripeArtistIconPriceIdMonth,
-          artist_icon_year:     ENV.stripeArtistIconPriceIdYear,
+          artist_pro_month:    ENV.stripeArtistAmateurPriceIdMonth,
+          artist_pro_year:     ENV.stripeArtistAmateurPriceIdYear,
+          artist_elite_month:  ENV.stripeArtistIconPriceIdMonth,
+          artist_elite_year:   ENV.stripeArtistIconPriceIdYear,
         };
         const priceId = priceIdMap[`${input.tier}_${input.interval}`];
 
@@ -325,11 +325,16 @@ export const appRouter = router({
       .input(
         z.object({
           shopName: z.string(),
-          ...otherFields
+          bio: z.string().optional(),
+          specialties: z.string().optional(),
+          experience: z.number().optional(),
+          city: z.string().optional(),
+          state: z.string().optional(),
+          instagram: z.string().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        const newArtist = await db.createArtist(input);
+        const newArtist = await db.createArtist({ ...input, userId: ctx.user.id });
 
         if (ENV.n8nOnboardingWebhookUrl) {
           fetch(ENV.n8nOnboardingWebhookUrl, {

@@ -68,13 +68,16 @@ export function stripePriceToArtistTier(
   priceId: string,
 ): "artist_paygo" | "artist_pro" | "artist_elite" | null {
   const {
-    stripeArtistProPriceIdMonth,   stripeArtistProPriceIdYear,
-    stripeArtistElitePriceIdMonth, stripeArtistElitePriceIdYear,
+    stripeArtistAmateurPriceIdMonth, stripeArtistAmateurPriceIdYear,
+    stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
+    stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
   } = ENV;
 
-  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
     return "artist_pro";
-  if (priceId === stripeArtistElitePriceIdMonth || priceId === stripeArtistElitePriceIdYear)
+  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+    return "artist_paygo";
+  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
     return "artist_elite";
 
   return null;

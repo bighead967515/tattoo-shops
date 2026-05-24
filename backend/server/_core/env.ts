@@ -116,7 +116,7 @@ if (ENV.isProduction) {
     ENV.stripeClientElitePriceId,
   ];
   
-  const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));
+  const testIdUsed = priceIds.filter((id): id is string => id !== undefined).some((id) => testModeStripeIds.includes(id));
   if (testIdUsed) {
     console.warn("⚠️  WARNING: Production environment contains test Stripe Price IDs. This may cause unexpected billing.");
   }

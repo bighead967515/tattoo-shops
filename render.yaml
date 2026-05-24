@@ -30,6 +30,20 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH
+        sync: false
+      - key: STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR
+        sync: false
+      - key: STRIPE_ARTIST_PRO_PRICE_ID_MONTH
+        sync: false
+      - key: STRIPE_ARTIST_PRO_PRICE_ID_YEAR
+        sync: false
+      - key: STRIPE_ARTIST_ICON_PRICE_ID_MONTH
+        sync: false
+      - key: STRIPE_ARTIST_ICON_PRICE_ID_YEAR
+        sync: false
+      - key: STRIPE_FOUNDING_ARTIST_PRICE_ID
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: GROQ_API_KEY

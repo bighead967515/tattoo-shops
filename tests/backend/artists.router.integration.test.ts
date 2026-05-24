@@ -34,10 +34,13 @@ function seedRequiredEnv() {
   process.env.SUPABASE_ANON_KEY = "anon_key";
   process.env.GROQ_API_KEY = "groq_api_key";
   process.env.HUGGINGFACE_API_KEY = "hf_api_key";
+  process.env.STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH = "price_amateur_month";
+  process.env.STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR = "price_amateur_year";
   process.env.STRIPE_ARTIST_PRO_PRICE_ID_MONTH = "price_pro_month";
   process.env.STRIPE_ARTIST_PRO_PRICE_ID_YEAR = "price_pro_year";
-  process.env.STRIPE_ARTIST_ELITE_PRICE_ID_MONTH = "price_elite_month";
-  process.env.STRIPE_ARTIST_ELITE_PRICE_ID_YEAR = "price_elite_year";
+  process.env.STRIPE_ARTIST_ICON_PRICE_ID_MONTH = "price_icon_month";
+  process.env.STRIPE_ARTIST_ICON_PRICE_ID_YEAR = "price_icon_year";
+  process.env.STRIPE_FOUNDING_ARTIST_PRICE_ID = "price_founding";
 }
 
 let appRouter: (typeof import("../../backend/server/routers"))["appRouter"];

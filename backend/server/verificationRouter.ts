@@ -12,6 +12,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { verifyLicenseDocument } from "./geminiSafety";
 import { logger } from "./_core/logger";
+import { ENV } from "./_core/env";
 import path from "path";
 
 async function requireDb() {

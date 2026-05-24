@@ -21,13 +21,19 @@ var init_env = __esm({
       NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
       STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
       STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
-      // Artist subscription Stripe Price IDs — only Pro and Elite have paid tiers.
-      // artist_free and artist_paygo have no Stripe price (free to join, fee taken per booking).
+      // Artist subscription Stripe Price IDs — REQUIRED. Must be set explicitly per environment.
+      // Create in Stripe Dashboard and set as env vars. Hardcoded defaults risk wrong-environment billing.
+      STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH is required"),
+      STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR is required"),
       STRIPE_ARTIST_PRO_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_MONTH is required"),
       STRIPE_ARTIST_PRO_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_PRO_PRICE_ID_YEAR is required"),
-      STRIPE_ARTIST_ELITE_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_ELITE_PRICE_ID_MONTH is required"),
-      STRIPE_ARTIST_ELITE_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ELITE_PRICE_ID_YEAR is required"),
-      // Clients are always free — no client subscription price IDs needed.
+      STRIPE_ARTIST_ICON_PRICE_ID_MONTH: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_MONTH is required"),
+      STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
+      // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
+      STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
+      // Client subscription Stripe Price IDs — optional (no paid client tiers currently).
+      STRIPE_CLIENT_PLUS_PRICE_ID: z.string().optional(),
+      STRIPE_CLIENT_ELITE_PRICE_ID: z.string().optional(),
       RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
       SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
       SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -47,17 +53,7 @@ var init_env = __esm({
       N8N_WEBHOOK_SECRET: z.string().optional().describe("Bearer token for n8n webhook authentication"),
       // Onboarding and verification webhook URLs
       N8N_ONBOARDING_WEBHOOK_URL: z.string().url().optional().describe("n8n onboarding webhook base URL (e.g., https://n8n.example.com)"),
-      N8N_VERIFICATION_WEBHOOK_URL: z.string().url().optional().describe("n8n verification webhook base URL (e.g., https://n8n.example.com)"),
-      // Stripe addon price IDs (optional — feature-flagged behind presence check)
-      STRIPE_ADDON_PRIORITY_LISTING_PRICE_ID: z.string().optional(),
-      STRIPE_ADDON_IN_APP_CHAT_PRICE_ID: z.string().optional(),
-      STRIPE_ADDON_AI_DESIGN_PRICE_ID: z.string().optional(),
-      STRIPE_ADDON_BLIND_BIDS_PRICE_ID: z.string().optional(),
-      // Stripe artist token pack price IDs (optional)
-      STRIPE_ARTIST_BID_TOKEN_5_PRICE_ID: z.string().optional(),
-      STRIPE_ARTIST_BID_TOKEN_10_PRICE_ID: z.string().optional(),
-      STRIPE_ARTIST_BID_TOKEN_20_PRICE_ID: z.string().optional(),
-      STRIPE_ARTIST_CHAT_TOKEN_PACK_PRICE_ID: z.string().optional()
+      N8N_VERIFICATION_WEBHOOK_URL: z.string().url().optional().describe("n8n verification webhook base URL (e.g., https://n8n.example.com)")
     });
     parsed = envSchema.safeParse(process.env);
     if (!parsed.success) {
@@ -74,11 +70,17 @@ var init_env = __esm({
       isProduction: parsed.data.NODE_ENV === "production",
       stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
       stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
-      // Artist tier price IDs (only Pro and Elite have paid subscriptions)
+      // Artist tier price IDs
+      stripeArtistAmateurPriceIdMonth: parsed.data.STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH,
+      stripeArtistAmateurPriceIdYear: parsed.data.STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR,
       stripeArtistProPriceIdMonth: parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_MONTH,
       stripeArtistProPriceIdYear: parsed.data.STRIPE_ARTIST_PRO_PRICE_ID_YEAR,
-      stripeArtistElitePriceIdMonth: parsed.data.STRIPE_ARTIST_ELITE_PRICE_ID_MONTH,
-      stripeArtistElitePriceIdYear: parsed.data.STRIPE_ARTIST_ELITE_PRICE_ID_YEAR,
+      stripeArtistIconPriceIdMonth: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
+      stripeArtistIconPriceIdYear: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
+      stripeFoundingArtistPriceId: parsed.data.STRIPE_FOUNDING_ARTIST_PRICE_ID,
+      // Client tier price IDs
+      stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
+      stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,
       resendApiKey: parsed.data.RESEND_API_KEY,
       supabaseUrl: parsed.data.SUPABASE_URL,
       supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,
@@ -98,32 +100,30 @@ var init_env = __esm({
       n8nWebhookUrl: parsed.data.N8N_WEBHOOK_URL,
       n8nWebhookSecret: parsed.data.N8N_WEBHOOK_SECRET,
       n8nOnboardingWebhookUrl: parsed.data.N8N_ONBOARDING_WEBHOOK_URL,
-      n8nVerificationWebhookUrl: parsed.data.N8N_VERIFICATION_WEBHOOK_URL,
-      // Stripe addon price IDs
-      stripeAddonPriorityListingPriceId: parsed.data.STRIPE_ADDON_PRIORITY_LISTING_PRICE_ID,
-      stripeAddonInAppChatPriceId: parsed.data.STRIPE_ADDON_IN_APP_CHAT_PRICE_ID,
-      stripeAddonAiDesignPriceId: parsed.data.STRIPE_ADDON_AI_DESIGN_PRICE_ID,
-      stripeAddonBlindBidsPriceId: parsed.data.STRIPE_ADDON_BLIND_BIDS_PRICE_ID,
-      // Stripe artist token pack price IDs
-      stripeArtistBidToken5PriceId: parsed.data.STRIPE_ARTIST_BID_TOKEN_5_PRICE_ID,
-      stripeArtistBidToken10PriceId: parsed.data.STRIPE_ARTIST_BID_TOKEN_10_PRICE_ID,
-      stripeArtistBidToken20PriceId: parsed.data.STRIPE_ARTIST_BID_TOKEN_20_PRICE_ID,
-      stripeArtistChatTokenPackPriceId: parsed.data.STRIPE_ARTIST_CHAT_TOKEN_PACK_PRICE_ID
+      n8nVerificationWebhookUrl: parsed.data.N8N_VERIFICATION_WEBHOOK_URL
     };
     if (ENV.isProduction) {
       const testModeStripeIds = [
+        "price_1TOraXQRJTQEheTOvLHhTihz",
+        // Test IDs from default
+        "price_1TOraXQRJTQEheTOVr8zI9O4",
         "price_1TOraYQRJTQEheTO3k4MS3PR",
         "price_1TOraYQRJTQEheTOHNQL82m3",
         "price_1TOraZQRJTQEheTOofBdpJwM",
         "price_1TOraaQRJTQEheTOwDiBtF35"
       ];
       const priceIds = [
+        ENV.stripeArtistAmateurPriceIdMonth,
+        ENV.stripeArtistAmateurPriceIdYear,
         ENV.stripeArtistProPriceIdMonth,
         ENV.stripeArtistProPriceIdYear,
-        ENV.stripeArtistElitePriceIdMonth,
-        ENV.stripeArtistElitePriceIdYear
-      ].filter((id) => Boolean(id));
-      const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));
+        ENV.stripeArtistIconPriceIdMonth,
+        ENV.stripeArtistIconPriceIdYear,
+        ENV.stripeFoundingArtistPriceId,
+        ENV.stripeClientPlusPriceId,
+        ENV.stripeClientElitePriceId
+      ];
+      const testIdUsed = priceIds.filter((id) => id !== void 0).some((id) => testModeStripeIds.includes(id));
       if (testIdUsed) {
         console.warn("\u26A0\uFE0F  WARNING: Production environment contains test Stripe Price IDs. This may cause unexpected billing.");
       }
@@ -1501,117 +1501,6 @@ function csrfTokenMiddleware(req, res, next) {
   next();
 }
 
-// backend/shared/tierLimits.ts
-function readRuntimeEnv(key) {
-  if (typeof process !== "undefined" && process.env) {
-    if (process.env[key] !== void 0) return process.env[key];
-  }
-  if (typeof import.meta !== "undefined" && import.meta.env) {
-    const viteKey = `VITE_${key}`;
-    if (import.meta.env[viteKey] !== void 0) {
-      return import.meta.env[viteKey];
-    }
-  }
-  return null;
-}
-var ARTIST_TIER_LIMITS = {
-  artist_free: {
-    name: "Directory Profile",
-    portfolioPhotos: 10,
-    canBid: false,
-    freeBidsPerMonth: 0,
-    transactionFeePercent: 0,
-    // Cannot book
-    aiGenerationsPerMonth: 0,
-    chatTokensPerMonth: 0,
-    sponsoredListing: false,
-    verifiedBadge: true
-  },
-  artist_paygo: {
-    name: "Pay-as-you-go",
-    portfolioPhotos: 20,
-    canBid: true,
-    freeBidsPerMonth: 5,
-    transactionFeePercent: 15,
-    aiGenerationsPerMonth: 0,
-    chatTokensPerMonth: 0,
-    sponsoredListing: false,
-    verifiedBadge: true
-  },
-  artist_pro: {
-    name: "Pro Studio",
-    portfolioPhotos: Number.MAX_SAFE_INTEGER,
-    canBid: true,
-    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
-    transactionFeePercent: 5,
-    aiGenerationsPerMonth: 50,
-    chatTokensPerMonth: 0,
-    // Still must buy extra if client didn't pay
-    sponsoredListing: false,
-    verifiedBadge: true
-  },
-  artist_elite: {
-    name: "Elite Icon",
-    portfolioPhotos: Number.MAX_SAFE_INTEGER,
-    canBid: true,
-    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
-    transactionFeePercent: 3,
-    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
-    chatTokensPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited free chats
-    sponsoredListing: true,
-    verifiedBadge: true
-    // "Elite Sponsored" badge applied via UI
-  }
-};
-var ARTIST_TIER_PRICING = {
-  artist_free: {
-    monthly: 0,
-    yearly: 0,
-    stripePriceIdMonth: null,
-    stripePriceIdYear: null
-  },
-  artist_paygo: {
-    monthly: 0,
-    yearly: 0,
-    stripePriceIdMonth: null,
-    stripePriceIdYear: null
-  },
-  artist_pro: {
-    monthly: 4900,
-    // $49.00/mo
-    yearly: 49e3,
-    // $490.00/yr (2 months free)
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_MONTH"),
-    stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_YEAR")
-  },
-  artist_elite: {
-    monthly: 9900,
-    // $99.00/mo
-    yearly: 99e3,
-    // $990.00/yr (2 months free)
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_MONTH"),
-    stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_YEAR")
-  }
-};
-function getArtistTierLimits(tier) {
-  return ARTIST_TIER_LIMITS[tier] || ARTIST_TIER_LIMITS.artist_free;
-}
-var CLIENT_TIER_LIMITS = {
-  client_free: {
-    name: "Free",
-    requestsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited requests
-    aiGenerationsPerMonth: 0,
-    directChatWithArtists: true,
-    priorityRequestBoard: false,
-    depositFeeWaived: false
-  }
-};
-function getClientTierLimits(tier) {
-  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
-}
-
 // backend/server/routers.ts
 import { TRPCError as TRPCError6 } from "@trpc/server";
 init_logger();
@@ -2293,14 +2182,18 @@ async function createCheckoutSession({
 }
 function stripePriceToArtistTier(priceId) {
   const {
+    stripeArtistAmateurPriceIdMonth,
+    stripeArtistAmateurPriceIdYear,
     stripeArtistProPriceIdMonth,
     stripeArtistProPriceIdYear,
-    stripeArtistElitePriceIdMonth,
-    stripeArtistElitePriceIdYear
+    stripeArtistIconPriceIdMonth,
+    stripeArtistIconPriceIdYear
   } = ENV;
-  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
     return "artist_pro";
-  if (priceId === stripeArtistElitePriceIdMonth || priceId === stripeArtistElitePriceIdYear)
+  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+    return "artist_paygo";
+  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
     return "artist_elite";
   return null;
 }
@@ -2323,6 +2216,33 @@ async function createArtistSubscriptionCheckout({
       success_url: successUrl,
       cancel_url: cancelUrl,
       allow_promotion_codes: true
+    });
+    return session;
+  });
+}
+async function createFoundingArtistCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
+      metadata: { ...metadata, isFoundingArtist: "true" },
+      subscription_data: {
+        trial_period_days: 180,
+        metadata: { ...metadata, isFoundingArtist: "true" }
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: false
+      // Founding offer IS the promo — no stacking
     });
     return session;
   });
@@ -2387,37 +2307,120 @@ async function createAddonCheckout({
     return session;
   });
 }
-async function createTokenPackCheckout({
-  packType,
-  packSize,
-  artistEmail,
-  stripeCustomerId,
-  priceId,
-  successUrl,
-  cancelUrl,
-  metadata
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-      line_items: [{ price: priceId, quantity: 1 }],
-      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: artistEmail },
-      metadata: {
-        ...metadata,
-        type: "token_pack",
-        packType,
-        packSize: String(packSize)
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl
-    });
-    return session;
-  });
-}
 
 // backend/server/clientRouters.ts
 init_env();
+
+// backend/shared/tierLimits.ts
+function readRuntimeEnv(key) {
+  if (typeof process !== "undefined" && process.env) {
+    if (process.env[key] !== void 0) return process.env[key];
+  }
+  if (typeof import.meta !== "undefined" && import.meta.env) {
+    const viteKey = `VITE_${key}`;
+    if (import.meta.env[viteKey] !== void 0) {
+      return import.meta.env[viteKey];
+    }
+  }
+  return null;
+}
+var ARTIST_TIER_LIMITS = {
+  artist_free: {
+    name: "Directory Profile",
+    portfolioPhotos: 10,
+    canBid: false,
+    freeBidsPerMonth: 0,
+    transactionFeePercent: 0,
+    // Cannot book
+    aiGenerationsPerMonth: 0,
+    chatTokensPerMonth: 0,
+    sponsoredListing: false,
+    verifiedBadge: true
+  },
+  artist_paygo: {
+    name: "Pay-as-you-go",
+    portfolioPhotos: 20,
+    canBid: true,
+    freeBidsPerMonth: 5,
+    transactionFeePercent: 15,
+    aiGenerationsPerMonth: 0,
+    chatTokensPerMonth: 0,
+    sponsoredListing: false,
+    verifiedBadge: true
+  },
+  artist_pro: {
+    name: "Pro Studio",
+    portfolioPhotos: Number.MAX_SAFE_INTEGER,
+    canBid: true,
+    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
+    transactionFeePercent: 5,
+    aiGenerationsPerMonth: 50,
+    chatTokensPerMonth: 0,
+    // Still must buy extra if client didn't pay
+    sponsoredListing: false,
+    verifiedBadge: true
+  },
+  artist_elite: {
+    name: "Elite Icon",
+    portfolioPhotos: Number.MAX_SAFE_INTEGER,
+    canBid: true,
+    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
+    transactionFeePercent: 3,
+    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
+    chatTokensPerMonth: Number.MAX_SAFE_INTEGER,
+    // Unlimited free chats
+    sponsoredListing: true,
+    verifiedBadge: true
+    // "Elite Sponsored" badge applied via UI
+  }
+};
+var ARTIST_TIER_PRICING = {
+  artist_free: {
+    monthly: 0,
+    yearly: 0,
+    stripePriceIdMonth: null,
+    stripePriceIdYear: null
+  },
+  artist_paygo: {
+    monthly: 0,
+    yearly: 0,
+    stripePriceIdMonth: null,
+    stripePriceIdYear: null
+  },
+  artist_pro: {
+    monthly: 4900,
+    // $49.00/mo
+    yearly: 49e3,
+    // $490.00/yr (2 months free)
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_MONTH"),
+    stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_YEAR")
+  },
+  artist_elite: {
+    monthly: 9900,
+    // $99.00/mo
+    yearly: 99e3,
+    // $990.00/yr (2 months free)
+    stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_MONTH"),
+    stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_YEAR")
+  }
+};
+function getArtistTierLimits(tier) {
+  return ARTIST_TIER_LIMITS[tier] || ARTIST_TIER_LIMITS.artist_free;
+}
+var CLIENT_TIER_LIMITS = {
+  client_free: {
+    name: "Free",
+    requestsPerMonth: Number.MAX_SAFE_INTEGER,
+    // Unlimited requests
+    aiGenerationsPerMonth: 0,
+    directChatWithArtists: true,
+    priorityRequestBoard: false,
+    depositFeeWaived: false
+  }
+};
+function getClientTierLimits(tier) {
+  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
+}
 
 // backend/shared/tierCompat.ts
 var AI_BID_ASSISTANT_TIERS = [
@@ -3321,11 +3324,11 @@ import { eq as eq5 } from "drizzle-orm";
 
 // backend/server/verificationRouter.ts
 import { z as z4 } from "zod";
-init_env();
 init_db();
 init_db();
 init_schema();
 import { eq as eq3 } from "drizzle-orm";
+init_env();
 import { TRPCError as TRPCError3 } from "@trpc/server";
 import path2 from "path";
 async function requireDb2() {
@@ -4094,10 +4097,10 @@ var appRouter = router({
         });
       }
       const priceIdMap = {
-        artist_pro_month: ENV.stripeArtistProPriceIdMonth,
-        artist_pro_year: ENV.stripeArtistProPriceIdYear,
-        artist_elite_month: ENV.stripeArtistElitePriceIdMonth,
-        artist_elite_year: ENV.stripeArtistElitePriceIdYear
+        artist_pro_month: ENV.stripeArtistAmateurPriceIdMonth,
+        artist_pro_year: ENV.stripeArtistAmateurPriceIdYear,
+        artist_elite_month: ENV.stripeArtistIconPriceIdMonth,
+        artist_elite_year: ENV.stripeArtistIconPriceIdYear
       };
       const priceId = priceIdMap[`${input.tier}_${input.interval}`];
       if (!priceId) {
@@ -4116,6 +4119,50 @@ var appRouter = router({
           artistId: String(artist.id),
           tier: input.tier,
           interval: input.interval
+        },
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl
+      });
+      return { checkoutUrl: session.url };
+    }),
+    /**
+     * Start the Founding Artist checkout:
+     * - 180-day free trial then $19/mo locked rate
+     * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
+     */
+    startFoundingCheckout: protectedProcedure.input(
+      z7.object({
+        successUrl: z7.string().url(),
+        cancelUrl: z7.string().url()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (!artist) {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "You must have an artist profile before joining the Founding Artist offer."
+        });
+      }
+      const [user] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
+      const priceId = ENV.stripeFoundingArtistPriceId;
+      if (!priceId) {
+        throw new TRPCError6({
+          code: "PRECONDITION_FAILED",
+          message: "Founding Artist price is not configured."
+        });
+      }
+      const session = await createFoundingArtistCheckout({
+        priceId,
+        customerEmail: user?.email ?? "",
+        stripeCustomerId: user?.stripeCustomerId ?? void 0,
+        metadata: {
+          userId: String(ctx.user.id),
+          artistId: String(artist.id),
+          tier: "artist_amateur",
+          interval: "month",
+          isFoundingArtist: "true"
         },
         successUrl: input.successUrl,
         cancelUrl: input.cancelUrl
@@ -4177,21 +4224,14 @@ var appRouter = router({
       z7.object({
         shopName: z7.string(),
         bio: z7.string().optional(),
-        experience: z7.number().int().positive().optional(),
-        city: z7.string().default(""),
-        state: z7.string().default(""),
-        styles: z7.string().optional(),
         specialties: z7.string().optional(),
+        experience: z7.number().optional(),
+        city: z7.string().optional(),
+        state: z7.string().optional(),
         instagram: z7.string().optional()
       })
     ).mutation(async ({ ctx, input }) => {
-      const newArtist = await createArtist({
-        ...input,
-        shopName: sanitizeInput(input.shopName, 255),
-        bio: input.bio ? sanitizeInput(input.bio, 2e3) : void 0,
-        specialties: input.specialties ? sanitizeInput(input.specialties, 500) : void 0,
-        userId: ctx.user.id
-      });
+      const newArtist = await createArtist({ ...input, userId: ctx.user.id });
       if (ENV.n8nOnboardingWebhookUrl) {
         fetch(ENV.n8nOnboardingWebhookUrl, {
           method: "POST",
@@ -4273,108 +4313,6 @@ var appRouter = router({
       await database.update(users).set({ subscriptionTier: "artist_pro" }).where(eq5(users.id, ctx.user.id));
       await database.update(artists).set({ subscriptionTier: "artist_pro" }).where(eq5(artists.id, artist.id));
       return { success: true, tier: "artist_pro" };
-    }),
-    /**
-     * Purchase a bid token pack (artist_paygo only).
-     * Packs of 5, 10, or 20 bid tokens — each token allows one bid submission.
-     */
-    purchaseBidTokenPack: protectedProcedure.input(
-      z7.object({
-        packSize: z7.enum(["5", "10", "20"]),
-        successUrl: z7.string().url(),
-        cancelUrl: z7.string().url()
-      })
-    ).mutation(async ({ ctx, input }) => {
-      const database = await getDb();
-      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const canonicalTier = ctx.user.subscriptionTier ?? "artist_free";
-      if (canonicalTier !== "artist_paygo") {
-        throw new TRPCError6({
-          code: "FORBIDDEN",
-          message: "Bid token packs are only available for pay-as-you-go artists."
-        });
-      }
-      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
-      if (!artist) {
-        throw new TRPCError6({ code: "FORBIDDEN", message: "Artist profile not found." });
-      }
-      const priceIdMap = {
-        "5": ENV.stripeArtistBidToken5PriceId,
-        "10": ENV.stripeArtistBidToken10PriceId,
-        "20": ENV.stripeArtistBidToken20PriceId
-      };
-      const priceId = priceIdMap[input.packSize];
-      if (!priceId) {
-        throw new TRPCError6({
-          code: "PRECONDITION_FAILED",
-          message: `Stripe price for bid token pack (${input.packSize}) is not configured.`
-        });
-      }
-      const [userRow] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
-      const session = await createTokenPackCheckout({
-        packType: "bid",
-        packSize: parseInt(input.packSize, 10),
-        artistEmail: userRow?.email ?? "",
-        stripeCustomerId: userRow?.stripeCustomerId ?? void 0,
-        priceId,
-        successUrl: input.successUrl,
-        cancelUrl: input.cancelUrl,
-        metadata: {
-          userId: String(ctx.user.id),
-          artistId: String(artist.id)
-        }
-      });
-      return { checkoutUrl: session.url };
-    }),
-    /**
-     * Purchase a chat token pack (5 tokens) to unlock in-app messaging with clients.
-     */
-    purchaseChatTokenPack: protectedProcedure.input(
-      z7.object({
-        successUrl: z7.string().url(),
-        cancelUrl: z7.string().url()
-      })
-    ).mutation(async ({ ctx, input }) => {
-      const database = await getDb();
-      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
-      if (!artist) {
-        throw new TRPCError6({ code: "FORBIDDEN", message: "Artist profile not found." });
-      }
-      const priceId = ENV.stripeArtistChatTokenPackPriceId;
-      if (!priceId) {
-        throw new TRPCError6({
-          code: "PRECONDITION_FAILED",
-          message: "Stripe price for chat token pack is not configured."
-        });
-      }
-      const [userRow] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
-      const session = await createTokenPackCheckout({
-        packType: "chat",
-        packSize: 5,
-        artistEmail: userRow?.email ?? "",
-        stripeCustomerId: userRow?.stripeCustomerId ?? void 0,
-        priceId,
-        successUrl: input.successUrl,
-        cancelUrl: input.cancelUrl,
-        metadata: {
-          userId: String(ctx.user.id),
-          artistId: String(artist.id)
-        }
-      });
-      return { checkoutUrl: session.url };
-    }),
-    /**
-     * Get the current bid and chat token balances for the logged-in artist.
-     */
-    getTokenBalances: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const [artist] = await database.select({ bidTokens: artists.bidTokens, chatTokens: artists.chatTokens }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
-      if (!artist) {
-        throw new TRPCError6({ code: "NOT_FOUND", message: "Artist profile not found." });
-      }
-      return { bidTokens: artist.bidTokens, chatTokens: artist.chatTokens };
     })
   }),
   portfolio: router({
@@ -4389,7 +4327,7 @@ var appRouter = router({
       })
     ).mutation(async ({ ctx, input }) => {
       const tier = ctx.user?.subscriptionTier ?? "artist_free";
-      const limit = getArtistTierLimits(tier).portfolioPhotos;
+      const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
       const currentCount = await getPortfolioCountByArtistId(
         input.artistId
       );
@@ -4412,7 +4350,7 @@ var appRouter = router({
       })
     ).mutation(async ({ ctx, input }) => {
       const tier = ctx.user?.subscriptionTier ?? "artist_free";
-      const limit = getArtistTierLimits(tier).portfolioPhotos;
+      const limit = TIER_LIMITS[tier]?.portfolioMax ?? 0;
       const currentCount = await getPortfolioCountByArtistId(
         input.artistId
       );
@@ -5617,7 +5555,7 @@ app.get("/api/health", async (_req, res) => {
     }
     const webhookStats = await getWebhookQueueStats();
     const storageReady = ENV.isProduction ? true : true;
-    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistProPriceIdMonth && ENV.stripeArtistElitePriceIdMonth ? true : false;
+    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistProPriceIdMonth && ENV.stripeArtistIconPriceIdMonth ? true : false;
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
     res.json({
       status: overallStatus,
