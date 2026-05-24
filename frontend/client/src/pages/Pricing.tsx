@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Check, X, Crown, Zap, Palette } from "lucide-react";
 import { Link } from "wouter";
-import { ARTIST_TIER_LIMITS, ARTIST_TIER_PRICING, CLIENT_TIER_LIMITS, CLIENT_TIER_PRICING, type ArtistSubscriptionTier } from "@shared/tierLimits";
+import { ARTIST_TIER_LIMITS, ARTIST_TIER_PRICING, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { cn } from "@/lib/utils";
 
 const artistTierOrder: ArtistSubscriptionTier[] = [
@@ -13,8 +13,6 @@ const artistTierOrder: ArtistSubscriptionTier[] = [
   "artist_pro",
   "artist_elite",
 ];
-
-const clientTierOrder = ["client_free", "client_plus", "client_elite"] as const;
 
 const ARTIST_TIER_DESCRIPTIONS: Record<ArtistSubscriptionTier, string> = {
   artist_free: "A free profile to get discovered.",
@@ -147,75 +145,38 @@ export default function Pricing() {
 
         <Separator className="max-w-5xl mx-auto" />
 
-        {/* Client Tiers */}
+        {/* Client Section */}
         <section className="py-16 container">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold mb-2">Client Plans</h2>
-            <p className="text-muted-foreground">Post requests, compare bids, and book the perfect artist</p>
+            <h2 className="text-3xl font-bold mb-2">For Clients</h2>
+            <p className="text-muted-foreground">Post requests, compare bids, and book the perfect artist — free</p>
           </div>
 
-          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            {clientTierOrder.map((tier) => {
-              const limits = CLIENT_TIER_LIMITS[tier];
-              const pricing = CLIENT_TIER_PRICING[tier];
-              const isMostPopular = tier === "client_plus";
-
-              return (
-                <Card
-                  key={tier}
-                  className={cn(
-                    "p-7 flex flex-col relative",
-                    isMostPopular
-                      ? "border-2 border-primary bg-gradient-to-br from-primary/10 to-background"
-                      : "border-border",
-                  )}
-                >
-                  {isMostPopular && (
-                    <div className="absolute top-0 -translate-y-1/2 w-full flex justify-center">
-                      <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
-                        <Crown className="h-3 w-3" />
-                        MOST POPULAR
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="text-center mb-6">
-                    <h2 className="text-2xl font-bold mb-2">{limits.name}</h2>
-                    <div className="text-4xl font-bold mb-1">
-                      ${pricing.monthly / 100}
-                      <span className="text-xl text-muted-foreground">/mo</span>
-                    </div>
-                  </div>
-
-                  <Button
-                    className="w-full mb-6 group"
-                    variant={isMostPopular ? "default" : "outline"}
-                    asChild
-                  >
-                    <Link href="/client/onboarding">
-                      <Palette className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                      {tier === "client_free" ? "Start Free" : "Get Started"}
-                    </Link>
-                  </Button>
-
-                  <div className="space-y-3 text-sm flex-1">
-                    <FeatureRow
-                      enabled
-                      label={`${limits.requestsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.requestsPerMonth} request${limits.requestsPerMonth === 1 ? "" : "s"}/month`}
-                      highlight={limits.requestsPerMonth === Number.MAX_SAFE_INTEGER}
-                    />
-                    <FeatureRow
-                      enabled={limits.aiGenerationsPerMonth > 0}
-                      label={`${limits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.aiGenerationsPerMonth} AI design generation${limits.aiGenerationsPerMonth !== 1 ? "s" : ""}/month`}
-                      highlight={limits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER}
-                    />
-                    <FeatureRow enabled={limits.priorityRequestBoard} label="Priority on request board" />
-                    <FeatureRow enabled={limits.directChatWithArtists} label="Direct chat with artists" />
-                    <FeatureRow enabled={limits.depositFeeWaived} label="Deposit booking fee waived" />
-                  </div>
-                </Card>
-              );
-            })}
+          <div className="max-w-2xl mx-auto">
+            <Card className="p-8 text-center border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+              <Palette className="h-12 w-12 text-primary mx-auto mb-4" />
+              <h3 className="text-2xl font-bold mb-2">Always Free</h3>
+              <p className="text-muted-foreground mb-6">
+                Creating an account, posting tattoo requests, and browsing artist bids is completely free.
+                Pay only for optional add-ons that enhance your experience.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3 text-sm text-left mb-6">
+                <FeatureRow enabled label="Post tattoo requests" />
+                <FeatureRow enabled label="Receive and compare bids" />
+                <FeatureRow enabled label="Browse all artists" />
+                <FeatureRow enabled label="Secure deposits via Stripe" />
+                <FeatureRow enabled label="Priority placement (add-on)" />
+                <FeatureRow enabled label="AI price estimate (add-on)" />
+                <FeatureRow enabled label="Concept art matching (add-on)" />
+                <FeatureRow enabled label="AI design credits (add-on)" />
+              </div>
+              <Button asChild>
+                <Link href="/client/onboarding">
+                  <Palette className="h-4 w-4 mr-2" />
+                  Get Started Free
+                </Link>
+              </Button>
+            </Card>
           </div>
         </section>
       </main>

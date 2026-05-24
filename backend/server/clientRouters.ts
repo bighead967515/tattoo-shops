@@ -20,7 +20,7 @@ import { logger } from "./_core/logger";
 import path from "path";
 import { sanitizeInput } from "./_core/sanitize";
 import { refineRequestPrompt, draftBidResponse } from "./geminiBidOptimizer";
-import { createCheckoutSession, createArtistSubscriptionCheckout as createSubscriptionCheckout } from "./stripe";
+import { createCheckoutSession } from "./stripe";
 import { ENV } from "./_core/env";
 import {
   CLIENT_TIER_PRICING,
@@ -172,70 +172,6 @@ export const clientsRouter = router({
       return updated;
     }),
 
-  /**
-   * Create a Stripe Checkout Session for a client subscription upgrade.
-   * Returns the Checkout URL to redirect the user to.
-   */
-  createSubscriptionCheckout: protectedProcedure
-    .input(
-      z.object({
-        tier: z.enum(["client_plus", "client_elite"]),
-        successUrl: z.string().url(),
-        cancelUrl: z.string().url(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const db = await requireDb();
-
-      // Verify the user has a client profile
-      const [clientProfile] = await db
-        .select()
-        .from(clients)
-        .where(eq(clients.userId, ctx.user.id))
-        .limit(1);
-
-      if (!clientProfile) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Complete client onboarding before upgrading your plan.",
-        });
-      }
-
-      // Resolve the Stripe Price ID for the requested tier
-      const priceId =
-        input.tier === "client_plus"
-          ? ENV.stripeClientPlusPriceId
-          : ENV.stripeClientElitePriceId;
-
-      if (!priceId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `Stripe price for ${input.tier} is not configured. Please contact support.`,
-        });
-      }
-
-      // Look up the user for stripeCustomerId (may be null for new subscribers)
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, ctx.user.id))
-        .limit(1);
-
-      const session = await createSubscriptionCheckout({
-        priceId,
-        customerEmail: user?.email ?? "",
-        stripeCustomerId: user?.stripeCustomerId ?? undefined,
-        metadata: {
-          userId: String(ctx.user.id),
-          clientId: String(clientProfile.id),
-          tier: input.tier,
-        },
-        successUrl: input.successUrl,
-        cancelUrl: input.cancelUrl,
-      });
-
-      return { checkoutUrl: session.url };
-    }),
 });
 
 // ============================================

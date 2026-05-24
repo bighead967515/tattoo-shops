@@ -33,7 +33,6 @@ import {
   Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { isFreeClientTier } from "@shared/tierCompat";
 
 const STYLE_OPTIONS = [
   { value: "traditional", label: "Traditional (American)" },
@@ -120,7 +119,7 @@ function DesignLab() {
   }
 
   const credits = creditsQuery.data;
-  const isFreeTier = isFreeClientTier(credits?.tier);
+  const hasCredits = (credits?.aiCredits ?? 0) > 0;
   const isGenerating = generateMutation.isPending;
 
   return (
@@ -147,7 +146,7 @@ function DesignLab() {
           </div>
 
           {/* Credits badge */}
-          {credits && !isFreeTier && (
+          {credits && (
             <Badge variant="secondary" className="text-sm px-3 py-1">
               <Zap className="h-3.5 w-3.5 mr-1" />
               {credits.isUnlimited
@@ -157,8 +156,8 @@ function DesignLab() {
           )}
         </div>
 
-        {/* Free tier upsell */}
-        {isFreeTier && (
+        {/* No credits — prompt to purchase */}
+        {credits && !hasCredits && !​credits.isUnlimited && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -170,18 +169,16 @@ function DesignLab() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold mb-1">
-                    Unlock AI Tattoo Generation
+                    Purchase AI Credits to Generate
                   </h3>
                   <p className="text-muted-foreground text-sm">
-                    Upgrade to <strong>Enthusiast</strong> ($9/mo for 10
-                    generations) or <strong>Elite Ink</strong> ($19/mo for
-                    unlimited) to turn your ideas into tattoo designs instantly.
+                    AI credits are available as a one-time purchase. Buy credits to turn your ideas into tattoo designs instantly.
                   </p>
                 </div>
-                <Link href="/pricing">
+                <Link href="/client/dashboard">
                   <Button>
                     <Crown className="h-4 w-4 mr-2" />
-                    Upgrade Now
+                    Buy Credits
                   </Button>
                 </Link>
               </CardContent>
@@ -215,7 +212,7 @@ function DesignLab() {
                     rows={5}
                     maxLength={2000}
                     className="resize-none"
-                    disabled={isFreeTier || isGenerating}
+                    disabled={isGenerating}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     {prompt.length}/2000 characters (minimum 10)
@@ -229,7 +226,7 @@ function DesignLab() {
                   <Select
                     value={style}
                     onValueChange={setStyle}
-                    disabled={isFreeTier || isGenerating}
+                    disabled={isGenerating}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a style (optional)" />
@@ -249,7 +246,6 @@ function DesignLab() {
                   size="lg"
                   onClick={handleGenerate}
                   disabled={
-                    isFreeTier ||
                     isGenerating ||
                     prompt.trim().length < 10 ||
                     (!credits?.isUnlimited && (credits?.aiCredits ?? 0) <= 0)
@@ -260,10 +256,10 @@ function DesignLab() {
                       <Sparkles className="h-4 w-4 mr-2 animate-spin" />
                       Generating Design...
                     </>
-                  ) : isFreeTier ? (
+                  ) : !hasCredits && !credits?.isUnlimited ? (
                     <>
                       <Lock className="h-4 w-4 mr-2" />
-                      Upgrade to Generate
+                      No Credits — Buy to Generate
                     </>
                   ) : (
                     <>
@@ -273,11 +269,9 @@ function DesignLab() {
                   )}
                 </Button>
 
-                {!credits?.isUnlimited && !isFreeTier && credits && (
+                {!credits?.isUnlimited && credits && (
                   <p className="text-xs text-center text-muted-foreground">
-                    {credits.aiCredits} of {credits.maxCredits} generation
-                    {credits.maxCredits !== 1 ? "s" : ""} remaining this billing
-                    period
+                    {credits.aiCredits} credit{credits.aiCredits !== 1 ? "s" : ""} remaining
                   </p>
                 )}
               </CardContent>

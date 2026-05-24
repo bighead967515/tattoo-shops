@@ -55,7 +55,6 @@ import {
 import UpgradePrompt from "@/components/UpgradePrompt";
 import {
   canUseAiBidAssistant,
-  isFreeClientTier,
 } from "@shared/tierCompat";
 import { getArtistTierLimits, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { REQUEST_ADDON_PRICING } from "@shared/requestAddons";
@@ -235,15 +234,7 @@ export default function RequestDetail() {
   const requestClientName = requestClient?.displayName ?? "Unknown client";
   const requestClientInitials = requestClientName.slice(0, 2).toUpperCase();
   const isOwner = requestClient?.userId === user?.id;
-  const ownerTier = (user?.subscriptionTier ??
-    requestClient?.subscriptionTier ??
-    "client_free") as string | null | undefined;
-  const isPaidClientOwner = Boolean(
-    isClient && isOwner && !isFreeClientTier(ownerTier),
-  );
-  const isFreeClientOwner = Boolean(
-    isClient && isOwner && isFreeClientTier(ownerTier),
-  );
+  const isClientOwner = Boolean(isClient && isOwner);
   const hasAlreadyBid = request?.bids.some(
     (b: BidType) => b.artist.userId === user?.id,
   );
@@ -265,7 +256,7 @@ export default function RequestDetail() {
     : Math.max(0, bidsPerMonth - effectiveBidsThisMonth);
   const canBid = bidsPerMonth > 0 && (isUnlimitedBids || bidsRemaining > 0);
 
-  const detailTitleStyle: CSSProperties | undefined = isPaidClientOwner
+  const detailTitleStyle: CSSProperties | undefined = isClientOwner
     ? {
         fontFamily: textFontFamily,
         fontWeight: textFontWeight as CSSProperties["fontWeight"],
@@ -274,7 +265,7 @@ export default function RequestDetail() {
       }
     : undefined;
 
-  const detailBodyStyle: CSSProperties | undefined = isPaidClientOwner
+  const detailBodyStyle: CSSProperties | undefined = isClientOwner
     ? {
         fontFamily: textFontFamily,
         fontWeight: textFontWeight as CSSProperties["fontWeight"],
@@ -369,25 +360,25 @@ export default function RequestDetail() {
                       className={`relative aspect-square overflow-hidden rounded-lg ${
                         image.isMainImage ? "col-span-2 row-span-2" : ""
                       } ${
-                        isPaidClientOwner && selectedImageId === image.id
+                        isClientOwner && selectedImageId === image.id
                           ? "ring-2 ring-primary/70"
                           : ""
                       }`}
                       onClick={() => {
-                        if (!isPaidClientOwner) return;
+                        if (!isClientOwner) return;
                         setSelectedImageId(image.id);
                       }}
                       onKeyDown={(event) => {
-                        if (!isPaidClientOwner) return;
+                        if (!isClientOwner) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           setSelectedImageId(image.id);
                         }
                       }}
-                      role={isPaidClientOwner ? "button" : undefined}
-                      tabIndex={isPaidClientOwner ? 0 : undefined}
+                      role={isClientOwner ? "button" : undefined}
+                      tabIndex={isClientOwner ? 0 : undefined}
                       aria-label={
-                        isPaidClientOwner
+                        isClientOwner
                           ? `Select image ${image.id} for text overlay`
                           : undefined
                       }
@@ -397,7 +388,7 @@ export default function RequestDetail() {
                         alt={image.caption || "Reference image"}
                         className="object-cover w-full h-full"
                       />
-                      {isPaidClientOwner &&
+                      {isClientOwner &&
                         overlayText.trim() &&
                         selectedImageId === image.id && (
                           <div className="pointer-events-none absolute inset-0">
@@ -680,7 +671,7 @@ export default function RequestDetail() {
         {/* Right column - Actions */}
         <div className="space-y-6">
           {/* Text and font tools for paid request owners */}
-          {isPaidClientOwner && (
+          {isClientOwner && (
             <Card>
               <CardHeader>
                 <CardTitle>Text &amp; Font Tools</CardTitle>
@@ -957,13 +948,6 @@ export default function RequestDetail() {
                 </Button>
               </CardFooter>
             </Card>
-          )}
-
-          {isFreeClientOwner && (
-            <UpgradePrompt
-              feature="Text & Font Tools"
-              description="Upgrade to Client Plus or Elite to style request text and add image text overlays."
-            />
           )}
 
           {/* Submit bid card (for artists) */}

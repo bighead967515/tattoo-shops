@@ -2,17 +2,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockGetDb,
-  mockCreateSubscriptionCheckout,
   mockGetArtistByUserId,
   envRef,
 } = vi.hoisted(() => ({
   mockGetDb: vi.fn(),
-  mockCreateSubscriptionCheckout: vi.fn(),
   mockGetArtistByUserId: vi.fn(),
   envRef: {
     ENV: {
-      stripeClientPlusPriceId: "price_plus",
-      stripeClientElitePriceId: "price_elite",
       isProduction: false,
     },
   },
@@ -24,7 +20,7 @@ vi.mock("../../backend/server/db", () => ({
 }));
 
 vi.mock("../../backend/server/stripe", () => ({
-  createSubscriptionCheckout: mockCreateSubscriptionCheckout,
+  createCheckoutSession: vi.fn(),
 }));
 
 vi.mock("../../backend/server/geminiBidOptimizer", () => ({
@@ -111,8 +107,6 @@ describe("client onboarding integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    envRef.ENV.stripeClientPlusPriceId = "price_plus";
-    envRef.ENV.stripeClientElitePriceId = "price_elite";
   });
 
   it("creates profile transactionally with role/tier update and onboarding flag", async () => {
@@ -214,71 +208,4 @@ describe("client onboarding integration", () => {
     expect(tx.insertValuesSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("builds stripe checkout metadata from onboarded client profile", async () => {
-    const selectDb = createDbWithQueuedSelects([
-      [{ id: 88, userId: 7 }],
-      [{ id: 7, email: "client7@example.com", stripeCustomerId: "cus_777" }],
-    ]);
-
-    const db = {
-      select: selectDb.select,
-    };
-
-    mockGetDb.mockResolvedValue(db);
-    mockCreateSubscriptionCheckout.mockResolvedValue({
-      url: "https://checkout.stripe.com/test-session",
-    });
-
-    const caller = createCaller({ id: 7, role: "client" });
-
-    const result = await caller.createSubscriptionCheckout({
-      tier: "client_plus",
-      successUrl: "https://app.example/success",
-      cancelUrl: "https://app.example/cancel",
-    });
-
-    expect(mockCreateSubscriptionCheckout).toHaveBeenCalledWith(
-      expect.objectContaining({
-        priceId: "price_plus",
-        customerEmail: "client7@example.com",
-        stripeCustomerId: "cus_777",
-        metadata: {
-          userId: "7",
-          clientId: "88",
-          tier: "client_plus",
-        },
-      }),
-    );
-
-    expect(result.checkoutUrl).toContain("checkout.stripe.com");
-  });
-
-  it("fails fast when stripe price is not configured", async () => {
-    envRef.ENV.stripeClientPlusPriceId = undefined as unknown as string;
-
-    const selectDb = createDbWithQueuedSelects([
-      [{ id: 88, userId: 7 }],
-      [{ id: 7, email: "client7@example.com" }],
-    ]);
-
-    const db = {
-      select: selectDb.select,
-    };
-
-    mockGetDb.mockResolvedValue(db);
-
-    const caller = createCaller({ id: 7, role: "client" });
-
-    await expect(
-      caller.createSubscriptionCheckout({
-        tier: "client_plus",
-        successUrl: "https://app.example/success",
-        cancelUrl: "https://app.example/cancel",
-      }),
-    ).rejects.toMatchObject({
-      code: "PRECONDITION_FAILED",
-    });
-
-    expect(mockCreateSubscriptionCheckout).not.toHaveBeenCalled();
-  });
 });

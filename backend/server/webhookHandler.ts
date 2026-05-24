@@ -280,7 +280,6 @@ async function handleSubscriptionCheckoutCompleted(
     const userUpdate: {
       stripeCustomerId?: string;
       stripeSubscriptionId?: string;
-      subscriptionTier?: "client_plus" | "client_elite";
       updatedAt: Date;
     } = { updatedAt: new Date() };
 
@@ -323,7 +322,7 @@ async function handleSubscriptionChange(
     return;
   }
 
-  // First check if this is an artist tier subscription
+  // Check if this is an artist tier subscription
   const artistTier = stripePriceToArtistTier(priceId);
   if (artistTier) {
     await handleArtistSubscriptionChange(subscription, artistTier, eventType);

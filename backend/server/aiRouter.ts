@@ -13,8 +13,6 @@ import { getDb } from "./db";
 import { clients, artists } from "../drizzle/schema";
 import { generateTattooDesign } from "./geminiGeneration";
 import {
-  getClientTierLimits,
-  type ClientSubscriptionTier,
   getArtistTierLimits,
   type ArtistSubscriptionTier,
 } from "../shared/tierLimits";
@@ -77,15 +75,14 @@ export const aiRouter = router({
         const [clientProfile] = await db.select().from(clients).where(eq(clients.userId, ctx.user.id)).limit(1);
         if (!clientProfile) throw new TRPCError({ code: "FORBIDDEN", message: "Profile not found." });
 
-        const tier = (ctx.user.subscriptionTier || "client_free") as ClientSubscriptionTier;
-        const tierLimits = getClientTierLimits(tier);
-        if (tierLimits.aiGenerationsPerMonth === 0) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "AI Generation requires AI credits. Buy an add-on to generate." });
+        // Clients purchase AI credits as microtransactions — no tier-based limit.
+        if (clientProfile.aiCredits <= 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "AI Generation requires AI credits. Purchase credits to generate." });
         }
 
         profileId = clientProfile.id;
         availableCredits = clientProfile.aiCredits;
-        limitMax = tierLimits.aiGenerationsPerMonth;
+        limitMax = clientProfile.aiCredits; // credits are the cap
         tableName = clients;
       }
 
@@ -181,15 +178,12 @@ export const aiRouter = router({
       const [clientProfile] = await db.select().from(clients).where(eq(clients.userId, ctx.user.id)).limit(1);
       if (!clientProfile) return { tier: "client_free", tierName: "Collector", aiCredits: 0, maxCredits: 0, isUnlimited: false };
 
-      const tier = (ctx.user.subscriptionTier || "client_free") as ClientSubscriptionTier;
-      const tierLimits = getClientTierLimits(tier);
-
       return {
-        tier,
-        tierName: tierLimits.name,
+        tier: "client_free",
+        tierName: "Collector",
         aiCredits: clientProfile.aiCredits,
-        maxCredits: tierLimits.aiGenerationsPerMonth,
-        isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER,
+        maxCredits: clientProfile.aiCredits,
+        isUnlimited: false,
       };
     }
   }),

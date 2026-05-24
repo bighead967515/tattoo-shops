@@ -2,7 +2,6 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockConstructWebhookEvent,
-  mockStripePriceToClientTier,
   mockStripePriceToArtistTier,
   mockGetBookingById,
   mockWithTransaction,
@@ -14,7 +13,6 @@ const {
   logger,
 } = vi.hoisted(() => ({
   mockConstructWebhookEvent: vi.fn(),
-  mockStripePriceToClientTier: vi.fn(),
   mockStripePriceToArtistTier: vi.fn(),
   mockGetBookingById: vi.fn(),
   mockWithTransaction: vi.fn(),
@@ -33,7 +31,6 @@ const {
 
 vi.mock("../../backend/server/stripe", () => ({
   constructWebhookEvent: mockConstructWebhookEvent,
-  stripePriceToClientTier: mockStripePriceToClientTier,
   stripePriceToArtistTier: mockStripePriceToArtistTier,
 }));
 
@@ -172,87 +169,6 @@ describe("webhook tier-sync and safety integration", () => {
     vi.clearAllMocks();
   });
 
-  it("syncs client tier upgrade on subscription updated events", async () => {
-    const event = {
-      id: "evt_live_1",
-      type: "customer.subscription.updated",
-      data: {
-        object: {
-          id: "sub_123",
-          customer: "cus_123",
-          status: "active",
-          items: {
-            data: [{ price: { id: "price_plus" } }],
-          },
-        },
-      },
-    };
-
-    const { database, updateCalls } = createDbForSubscription({
-      id: 17,
-      stripeCustomerId: "cus_123",
-    });
-
-    mockConstructWebhookEvent.mockResolvedValue(event);
-    mockStripePriceToClientTier.mockReturnValue("client_plus");
-    mockGetDb.mockResolvedValue(database);
-
-    const req = createReq();
-    const res = createRes();
-
-    await handleStripeWebhook(req as any, res as any);
-
-    expect(res.json).toHaveBeenCalledWith({ received: true });
-    expect(database.transaction).toHaveBeenCalledTimes(1);
-
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).subscriptionTier === "client_plus",
-    )).toBe(true);
-
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).aiCredits === 10,
-    )).toBe(true);
-
-    expect(mockQueueWebhookForRetry).not.toHaveBeenCalled();
-  });
-
-  it("downgrades client tier and credits on subscription deleted events", async () => {
-    const event = {
-      id: "evt_live_2",
-      type: "customer.subscription.deleted",
-      data: {
-        object: {
-          id: "sub_456",
-          customer: "cus_456",
-          items: { data: [] },
-        },
-      },
-    };
-
-    const { database, updateCalls } = createDbForSubscription({
-      id: 21,
-      stripeCustomerId: "cus_456",
-    });
-
-    mockConstructWebhookEvent.mockResolvedValue(event);
-    mockGetDb.mockResolvedValue(database);
-
-    const req = createReq();
-    const res = createRes();
-
-    await handleStripeWebhook(req as any, res as any);
-
-    expect(res.json).toHaveBeenCalledWith({ received: true });
-
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).subscriptionTier === "client_free",
-    )).toBe(true);
-
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).aiCredits === 0,
-    )).toBe(true);
-  });
-
   it("does not reprocess duplicate booking payment webhooks", async () => {
     const event = {
       id: "evt_live_3",
@@ -322,14 +238,14 @@ describe("webhook tier-sync and safety integration", () => {
           customer: "cus_fail",
           status: "active",
           items: {
-            data: [{ price: { id: "price_plus" } }],
+            data: [{ price: { id: "price_artist_pro" } }],
           },
         },
       },
     };
 
     mockConstructWebhookEvent.mockResolvedValue(event);
-    mockStripePriceToClientTier.mockReturnValue("client_plus");
+    mockStripePriceToArtistTier.mockReturnValue("artist_pro");
     mockGetDb.mockResolvedValue(null);
 
     const req = createReq();
@@ -342,7 +258,7 @@ describe("webhook tier-sync and safety integration", () => {
       "evt_live_5",
       "customer.subscription.updated",
       event,
-      expect.stringContaining("Database not available for subscription webhook"),
+      expect.stringContaining("Database not available for artist subscription webhook"),
     );
 
     expect(res.json).toHaveBeenCalledWith({ received: true, queued: true });
@@ -394,7 +310,7 @@ describe("webhook tier-sync and safety integration", () => {
           customer: "cus_123",
           status: "past_due",
           items: {
-            data: [{ price: { id: "price_plus" } }],
+            data: [{ price: { id: "price_artist_pro" } }],
           },
         },
       },
@@ -406,7 +322,7 @@ describe("webhook tier-sync and safety integration", () => {
     });
 
     mockConstructWebhookEvent.mockResolvedValue(event);
-    mockStripePriceToClientTier.mockReturnValue("client_plus");
+    mockStripePriceToArtistTier.mockReturnValue("artist_pro");
     mockGetDb.mockResolvedValue(database);
 
     const req = createReq();
@@ -454,9 +370,6 @@ describe("webhook tier-sync and safety integration", () => {
     expect(database.transaction).toHaveBeenCalledTimes(1);
     expect(updateCalls.some((call) =>
       (call.setPayload as Record<string, unknown>).stripeCustomerId === "cus_new_1",
-    )).toBe(true);
-    expect(updateCalls.some((call) =>
-      (call.setPayload as Record<string, unknown>).subscriptionTier === "client_plus",
     )).toBe(true);
   });
 });
