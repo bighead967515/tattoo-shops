@@ -11,8 +11,6 @@ const {
   mockGetArtistByUserId: vi.fn(),
   envRef: {
     ENV: {
-      stripeClientPlusPriceId: "price_plus",
-      stripeClientElitePriceId: "price_elite",
       isProduction: false,
     },
   },
@@ -111,8 +109,6 @@ describe("client onboarding integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    envRef.ENV.stripeClientPlusPriceId = "price_plus";
-    envRef.ENV.stripeClientElitePriceId = "price_elite";
   });
 
   it("creates profile transactionally with role/tier update and onboarding flag", async () => {
