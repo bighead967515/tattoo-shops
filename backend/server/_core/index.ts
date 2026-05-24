@@ -172,11 +172,10 @@ app.get("/api/health", async (_req, res) => {
     // In production, this should be true because startup fails if buckets unavailable
     const storageReady = ENV.isProduction ? true : true; // Can be extended with actual bucket check
 
-    // Check Stripe connectivity (basic: just verify API key is set)
+    // Check Stripe connectivity (basic: just verify API key and artist price IDs are set)
     const stripeReady =
       ENV.stripeSecretKey &&
-      ENV.stripeArtistAmateurPriceIdMonth &&
-      ENV.stripeClientPlusPriceId
+      ENV.stripeArtistAmateurPriceIdMonth
         ? true
         : false;
 
