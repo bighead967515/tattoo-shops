@@ -21,6 +21,14 @@ jobs:
       OWNER_OPEN_ID: owner_test
       STRIPE_SECRET_KEY: sk_test_placeholder
       STRIPE_WEBHOOK_SECRET: whsec_test_placeholder
+      # Artist subscription Stripe Price IDs — test placeholders so env.ts validation passes
+      STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH: price_test_amateur_month
+      STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR: price_test_amateur_year
+      STRIPE_ARTIST_PRO_PRICE_ID_MONTH: price_test_pro_month
+      STRIPE_ARTIST_PRO_PRICE_ID_YEAR: price_test_pro_year
+      STRIPE_ARTIST_ICON_PRICE_ID_MONTH: price_test_icon_month
+      STRIPE_ARTIST_ICON_PRICE_ID_YEAR: price_test_icon_year
+      STRIPE_FOUNDING_ARTIST_PRICE_ID: price_test_founding
       RESEND_API_KEY: re_test_placeholder
       SUPABASE_URL: https://example.supabase.co
       SUPABASE_SERVICE_KEY: service_key_placeholder
@@ -30,21 +38,25 @@ jobs:
       PORT: "3000"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@fe02b74ab04b0346b9e454d30fac55e74e9e0dc6 # v4.0.0
         with:
           version: 10.27.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+        continue-on-error: false
 
       - name: Type check
         run: pnpm check

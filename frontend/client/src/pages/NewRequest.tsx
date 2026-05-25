@@ -343,6 +343,16 @@ export default function NewRequest() {
   const blobUrlsRef = useRef<string[]>([]);
 
   useEffect(() => {
+    const draft = sessionStorage.getItem("newRequestDraft");
+    if (draft) {
+      try {
+        setFormData(JSON.parse(draft));
+      } catch { /* ignore malformed draft */ }
+      sessionStorage.removeItem("newRequestDraft");
+    }
+  }, []);
+
+  useEffect(() => {
     return () => {
       blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       blobUrlsRef.current = [];
@@ -1084,7 +1094,16 @@ export default function NewRequest() {
                     />
                     <p className="text-xs text-muted-foreground">
                       Already have an account?{" "}
-                      <a href="/login" className="text-primary underline underline-offset-2">Sign in</a>
+                      <button
+                        type="button"
+                        className="text-primary underline underline-offset-2"
+                        onClick={() => {
+                          sessionStorage.setItem("newRequestDraft", JSON.stringify(formData));
+                          setLocation("/login");
+                        }}
+                      >
+                        Sign in
+                      </button>
                     </p>
                   </div>
                 )}
@@ -1140,10 +1159,7 @@ export default function NewRequest() {
                     !privacyAccepted ||
                     (!user && !guestEmail.trim())
                   }
-                  onClick={() => {
-                    setShowModal(false);
-                    handleSubmit();
-                  }}
+                  onClick={handleSubmit}
                   className="gap-2 min-w-[130px]"
                 >
                   {isSubmitting ? (

@@ -170,7 +170,7 @@ app.get("/api/health", async (_req, res) => {
 
     // Check if storage buckets are initialized
     // In production, this should be true because startup fails if buckets unavailable
-    const storageReady = ENV.isProduction ? true : true; // Can be extended with actual bucket check
+    const storageReady = true; // Extended check can be added if bucket ping is available
 
     // Check Stripe connectivity (basic: just verify API key and artist price IDs are set)
     const stripeReady =
@@ -182,7 +182,9 @@ app.get("/api/health", async (_req, res) => {
     const overallStatus =
       dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
 
-    res.json({
+    const httpStatus = overallStatus === "ok" ? 200 : 503;
+
+    res.status(httpStatus).json({
       status: overallStatus,
       timestamp: new Date().toISOString(),
       environment: ENV.nodeEnv,
