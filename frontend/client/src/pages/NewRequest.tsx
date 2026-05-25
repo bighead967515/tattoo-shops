@@ -13,6 +13,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,6 +41,8 @@ import {
   ImagePlus,
   Lightbulb,
   ShieldCheck,
+  ArrowRight,
+  UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -295,6 +306,12 @@ export default function NewRequest() {
 
   const [guestEmail, setGuestEmail] = useState("");
 
+  // Post-modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalStep, setModalStep] = useState<"boost" | "account">("boost");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -378,8 +395,7 @@ export default function NewRequest() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
       const newRequest = await createRequest.mutateAsync({
@@ -563,7 +579,7 @@ export default function NewRequest() {
           </div>
         </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
           {/* Card 1: The Idea */}
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
@@ -844,160 +860,7 @@ export default function NewRequest() {
             </CardContent>
           </Card>
 
-          {/* Pre-submit account gate (only shown when not logged in) */}
-          {!user && (
-            <Card className="bg-primary/5 border-primary/30 shadow-sm">
-              <CardContent className="pt-5 pb-5">
-                <h3 className="font-semibold text-base mb-1">Almost there — save your idea so artists can find it.</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create a free account to post your request to the local artist feed. It takes about 30 seconds, and your idea will be waiting right here when you're done.
-                </p>
-                <div className="space-y-1.5 mb-4">
-                  <Label htmlFor="guestEmail" className="text-sm font-medium">
-                    Email Address
-                  </Label>
-                  <Input
-                    id="guestEmail"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
-                    className="bg-background/50 border-border/60 focus:border-primary"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Already have an account?{" "}
-                  <a href="/login" className="text-primary underline underline-offset-2">Sign in</a>
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Card 6: Boost Your Request */}
-          <Card className="bg-card border-border/60 shadow-lg relative overflow-hidden">
-            {/* Glossy gradient effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
-            <CardHeader className="pb-3 relative z-10">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary" />
-                Boost Your Request
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Posting is always free. These optional upgrades help you get faster, better quotes from top artists.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 relative z-10">
-              {/* VIP Bundle Highlight */}
-              <label className={`flex items-start justify-between gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${addOns.vipBundle ? 'border-primary bg-primary/10 shadow-md shadow-primary/20' : 'border-border/60 hover:border-primary/50 hover:bg-primary/5'}`}>
-                <div className="flex-1">
-                  <p className="text-base font-bold text-primary flex items-center gap-2">
-                    VIP Ink Bundle <Badge variant="default" className="text-[10px] h-4 py-0">BEST VALUE</Badge>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get Priority Placement, AI Price Estimate, Pre-Booking Chat, and Perfect Match Router. Usually $21.96.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-base font-bold">{formatUsd(REQUEST_ADDON_PRICING.vipBundleCents)}</span>
-                  <input
-                    type="checkbox"
-                    checked={addOns.vipBundle}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setAddOns((prev) => ({
-                        ...prev,
-                        vipBundle: checked,
-                        // Clear others if VIP selected, or just leave them but VIP overrides price
-                        ...(checked ? { priorityPlacement: false, aiPriceEstimate: false, preBookingChat: false, perfectMatchRouter: false } : {})
-                      }));
-                    }}
-                    className="w-5 h-5 accent-primary rounded"
-                  />
-                </div>
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {/* Priority Placement */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.priorityPlacement && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">Priority Placement</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Top of the artist feed for 48 hrs.</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.priorityPlacementCents)}</span>
-                    <input
-                      type="checkbox"
-                      checked={addOns.priorityPlacement || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, priorityPlacement: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
-                    />
-                  </div>
-                </label>
-
-                {/* AI Price Estimate */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.aiPriceEstimate && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">AI Price Estimate</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Instant accurate cost analysis.</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.aiPriceEstimateCents)}</span>
-                    <input
-                      type="checkbox"
-                      checked={addOns.aiPriceEstimate || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, aiPriceEstimate: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
-                    />
-                  </div>
-                </label>
-
-                {/* Pre-Booking Chat */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.preBookingChat && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">Pre-Booking Chat</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Message artists before you book.</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.preBookingChatCents)}</span>
-                    <input
-                      type="checkbox"
-                      checked={addOns.preBookingChat || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, preBookingChat: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
-                    />
-                  </div>
-                </label>
-
-                {/* Perfect Match Router */}
-                <label className={`flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${addOns.perfectMatchRouter && !addOns.vipBundle ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
-                  <div>
-                    <p className="text-sm font-medium">Perfect Match</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Direct push to 3 ideal artists.</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold">{formatUsd(REQUEST_ADDON_PRICING.perfectMatchRouterCents)}</span>
-                    <input
-                      type="checkbox"
-                      checked={addOns.perfectMatchRouter || addOns.vipBundle}
-                      disabled={addOns.vipBundle}
-                      onChange={(e) => setAddOns((prev) => ({ ...prev, perfectMatchRouter: e.target.checked }))}
-                      className="w-4 h-4 accent-primary rounded disabled:opacity-50"
-                    />
-                  </div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 mt-4">
-                <span className="text-sm font-medium text-primary">Upgrade Total</span>
-                <span className="text-lg font-bold text-primary">{formatUsd(addOnTotalCents)}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 7: Location & Timing */}
+          {/* Card 6: Location & Timing */}
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
@@ -1087,21 +950,16 @@ export default function NewRequest() {
           {/* Submit */}
           <div className="space-y-3 pb-8">
             <Button
-              type="submit"
+              type="button"
               disabled={!isValid || isSubmitting}
+              onClick={() => {
+                setModalStep("boost");
+                setShowModal(true);
+              }}
               className="w-full h-12 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting…
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Post My Idea
-                </>
-              )}
+              <Upload className="w-4 h-4 mr-2" />
+              Post My Idea
             </Button>
 
             {/* Trust line */}
@@ -1116,6 +974,196 @@ export default function NewRequest() {
           </div>{/* end main form col */}
         </div>{/* end grid */}
       </div>
+
+      {/* ── Post-submission modal ─────────────────────────────────────────── */}
+      <Dialog open={showModal} onOpenChange={(open) => { if (!open && !isSubmitting) setShowModal(false); }}>
+        <DialogContent className="sm:max-w-lg">
+          {/* Step 1: Boost Your Request */}
+          {modalStep === "boost" && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Boost Your Request
+                </DialogTitle>
+                <DialogDescription>
+                  Posting is always free. These optional upgrades help you get faster, better quotes from top artists.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2">
+                {/* VIP Bundle */}
+                <label className={`flex items-start justify-between gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all ${addOns.vipBundle ? "border-primary bg-primary/10 shadow-md shadow-primary/20" : "border-border/60 hover:border-primary/50 hover:bg-primary/5"}`}>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-primary flex items-center gap-2">
+                      VIP Ink Bundle <Badge variant="default" className="text-[10px] h-4 py-0">BEST VALUE</Badge>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Priority Placement + AI Price Estimate + Pre-Booking Chat + Perfect Match. Usually $21.96.</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-bold">{formatUsd(REQUEST_ADDON_PRICING.vipBundleCents)}</span>
+                    <input type="checkbox" checked={addOns.vipBundle}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAddOns((prev) => ({ ...prev, vipBundle: checked, ...(checked ? { priorityPlacement: false, aiPriceEstimate: false, preBookingChat: false, perfectMatchRouter: false } : {}) }));
+                      }}
+                      className="w-5 h-5 accent-primary rounded" />
+                  </div>
+                </label>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    { key: "priorityPlacement" as const, label: "Priority Placement", desc: "Top of artist feed for 48 hrs.", price: REQUEST_ADDON_PRICING.priorityPlacementCents },
+                    { key: "aiPriceEstimate" as const, label: "AI Price Estimate", desc: "Instant accurate cost analysis.", price: REQUEST_ADDON_PRICING.aiPriceEstimateCents },
+                    { key: "preBookingChat" as const, label: "Pre-Booking Chat", desc: "Message artists before you book.", price: REQUEST_ADDON_PRICING.preBookingChatCents },
+                    { key: "perfectMatchRouter" as const, label: "Perfect Match", desc: "Direct push to 3 ideal artists.", price: REQUEST_ADDON_PRICING.perfectMatchRouterCents },
+                  ].map(({ key, label, desc, price }) => (
+                    <label key={key} className={`flex items-start justify-between gap-2 rounded-lg border p-3 cursor-pointer transition-colors ${addOns[key] && !addOns.vipBundle ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/40"}`}>
+                      <div>
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-sm font-semibold">{formatUsd(price)}</span>
+                        <input type="checkbox"
+                          checked={addOns[key] || addOns.vipBundle}
+                          disabled={addOns.vipBundle}
+                          onChange={(e) => setAddOns((prev) => ({ ...prev, [key]: e.target.checked }))}
+                          className="w-4 h-4 accent-primary rounded disabled:opacity-50" />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
+                  <span className="text-sm font-medium text-primary">Upgrade Total</span>
+                  <span className="text-lg font-bold text-primary">{formatUsd(addOnTotalCents)}</span>
+                </div>
+              </div>
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="ghost" className="sm:mr-auto text-sm" onClick={() => setModalStep("account")}>
+                  Skip — post for free
+                </Button>
+                <Button onClick={() => setModalStep("account")} className="gap-2">
+                  Continue
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* Step 2: Account + ToS */}
+          {modalStep === "account" && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <UserPlus className="w-5 h-5 text-primary" />
+                  {user ? "Almost there!" : "Create your free account"}
+                </DialogTitle>
+                <DialogDescription>
+                  {user
+                    ? "Review and accept our terms to post your request."
+                    : "Save your idea so artists can find you. It only takes 30 seconds."}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {!user && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="modalGuestEmail" className="text-sm font-medium">
+                      Email Address <span className="text-primary">*</span>
+                    </Label>
+                    <Input
+                      id="modalGuestEmail"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      className="bg-background/50 border-border/60 focus:border-primary"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Already have an account?{" "}
+                      <a href="/login" className="text-primary underline underline-offset-2">Sign in</a>
+                    </p>
+                  </div>
+                )}
+
+                {/* ToS checkbox */}
+                <div className="flex items-start gap-3 rounded-lg border border-border/60 p-3 bg-background/50">
+                  <Checkbox
+                    id="termsCheckbox"
+                    checked={termsAccepted}
+                    onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="termsCheckbox" className="text-sm text-muted-foreground cursor-pointer leading-relaxed">
+                    I have read and agree to the{" "}
+                    <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 hover:text-primary/80">
+                      Terms of Service
+                    </a>
+                  </label>
+                </div>
+
+                {/* Privacy Policy checkbox */}
+                <div className="flex items-start gap-3 rounded-lg border border-border/60 p-3 bg-background/50">
+                  <Checkbox
+                    id="privacyCheckbox"
+                    checked={privacyAccepted}
+                    onCheckedChange={(checked) => setPrivacyAccepted(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="privacyCheckbox" className="text-sm text-muted-foreground cursor-pointer leading-relaxed">
+                    I have read and agree to the{" "}
+                    <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 hover:text-primary/80">
+                      Privacy Policy
+                    </a>
+                  </label>
+                </div>
+
+                {hasAnyAddOn && (
+                  <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Add-ons selected:</span>
+                    <span className="font-semibold text-primary">{formatUsd(addOnTotalCents)}</span>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="ghost" className="sm:mr-auto text-sm" onClick={() => setModalStep("boost")}>
+                  ← Back
+                </Button>
+                <Button
+                  disabled={
+                    isSubmitting ||
+                    !termsAccepted ||
+                    !privacyAccepted ||
+                    (!user && !guestEmail.trim())
+                  }
+                  onClick={() => {
+                    setShowModal(false);
+                    handleSubmit();
+                  }}
+                  className="gap-2 min-w-[130px]"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Posting…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Post My Idea
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
