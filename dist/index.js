@@ -31,9 +31,6 @@ var init_env = __esm({
       STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
       // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
       STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
-      // Client subscription Stripe Price IDs — REQUIRED for checkout. Set after creating Products in the Stripe Dashboard.
-      STRIPE_CLIENT_PLUS_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_PLUS_PRICE_ID is required"),
-      STRIPE_CLIENT_ELITE_PRICE_ID: z.string().min(1, "STRIPE_CLIENT_ELITE_PRICE_ID is required"),
       RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
       SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
       SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
@@ -78,9 +75,6 @@ var init_env = __esm({
       stripeArtistIconPriceIdMonth: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
       stripeArtistIconPriceIdYear: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
       stripeFoundingArtistPriceId: parsed.data.STRIPE_FOUNDING_ARTIST_PRICE_ID,
-      // Client tier price IDs
-      stripeClientPlusPriceId: parsed.data.STRIPE_CLIENT_PLUS_PRICE_ID,
-      stripeClientElitePriceId: parsed.data.STRIPE_CLIENT_ELITE_PRICE_ID,
       resendApiKey: parsed.data.RESEND_API_KEY,
       supabaseUrl: parsed.data.SUPABASE_URL,
       supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,
@@ -1288,9 +1282,7 @@ var SubscriptionTiers = z2.enum([
   "artist_paygo",
   "artist_pro",
   "artist_elite",
-  "client_free",
-  "client_plus",
-  "client_elite"
+  "client_free"
 ]);
 var TIER_LIMITS = {
   // Free: strictly a directory listing.
@@ -1303,15 +1295,14 @@ var TIER_LIMITS = {
     aiCredits: 50,
     canBook: true
   },
-  // Elite: $99/mo, 3% fee, unlimited bids, unlimited AI, sponsored listing.
+  // Elite: $99/mo, 3% fee, unlimited bids, high AI allowance, sponsored listing.
   artist_elite: {
     portfolioMax: Number.MAX_SAFE_INTEGER,
     aiCredits: 999,
     canBook: true
   },
-  client_free: { portfolioMax: 0, aiCredits: 0, canBook: true },
-  client_plus: { portfolioMax: 0, aiCredits: 10, canBook: true },
-  client_elite: { portfolioMax: 0, aiCredits: Number.MAX_SAFE_INTEGER, canBook: true }
+  // Clients are always on free tier; AI credits are purchased via microtransactions.
+  client_free: { portfolioMax: 0, aiCredits: 0, canBook: true }
 };
 
 // backend/server/_core/cookies.ts
@@ -1434,7 +1425,7 @@ function csrfProtectionMiddleware(req, res, next) {
     tokenInCookie = generateCsrfToken();
     res.cookie(CSRF_COOKIE_NAME, tokenInCookie, {
       httpOnly: true,
-      secure: req.protocol === "https",
+      secure: isSecureRequest(req),
       sameSite: "strict",
       // P1-1 fix: use strict instead of none
       path: "/",
@@ -1474,7 +1465,7 @@ function csrfTokenMiddleware(req, res, next) {
   if (!req.cookies?.[CSRF_COOKIE_NAME]) {
     res.cookie(CSRF_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: req.protocol === "https",
+      secure: isSecureRequest(req),
       sameSite: "strict",
       path: "/",
       maxAge: 24 * 60 * 60 * 1e3
@@ -1583,50 +1574,13 @@ function getArtistTierLimits(tier) {
 var CLIENT_TIER_LIMITS = {
   client_free: {
     name: "Collector",
-    requestsPerMonth: 1,
+    requestsPerMonth: Number.MAX_SAFE_INTEGER,
     aiGenerationsPerMonth: 0,
     directChatWithArtists: false,
     priorityRequestBoard: false,
     depositFeeWaived: false
-  },
-  client_plus: {
-    name: "Enthusiast",
-    requestsPerMonth: 10,
-    aiGenerationsPerMonth: 10,
-    directChatWithArtists: false,
-    priorityRequestBoard: true,
-    depositFeeWaived: false
-  },
-  client_elite: {
-    name: "Elite Ink",
-    requestsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited
-    directChatWithArtists: true,
-    priorityRequestBoard: true,
-    depositFeeWaived: true
   }
 };
-var CLIENT_TIER_PRICING = {
-  client_free: {
-    monthly: 0,
-    stripePriceIdMonth: null
-  },
-  client_plus: {
-    monthly: 900,
-    // $9.00
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_PLUS_PRICE_ID")
-  },
-  client_elite: {
-    monthly: 1900,
-    // $19.00
-    stripePriceIdMonth: readRuntimeEnv("STRIPE_CLIENT_ELITE_PRICE_ID")
-  }
-};
-function getClientTierLimits(tier) {
-  return CLIENT_TIER_LIMITS[tier] || CLIENT_TIER_LIMITS.client_free;
-}
 
 // backend/server/routers.ts
 import { TRPCError as TRPCError6 } from "@trpc/server";
@@ -2529,47 +2483,6 @@ var clientsRouter = router({
       });
     }
     return updated;
-  }),
-  /**
-   * Create a Stripe Checkout Session for a client subscription upgrade.
-   * Returns the Checkout URL to redirect the user to.
-   */
-  createSubscriptionCheckout: protectedProcedure.input(
-    z3.object({
-      tier: z3.enum(["client_plus", "client_elite"]),
-      successUrl: z3.string().url(),
-      cancelUrl: z3.string().url()
-    })
-  ).mutation(async ({ ctx, input }) => {
-    const db = await requireDb();
-    const [clientProfile] = await db.select().from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
-    if (!clientProfile) {
-      throw new TRPCError2({
-        code: "FORBIDDEN",
-        message: "Complete client onboarding before upgrading your plan."
-      });
-    }
-    const priceId = input.tier === "client_plus" ? ENV.stripeClientPlusPriceId : ENV.stripeClientElitePriceId;
-    if (!priceId) {
-      throw new TRPCError2({
-        code: "PRECONDITION_FAILED",
-        message: `Stripe price for ${input.tier} is not configured. Please contact support.`
-      });
-    }
-    const [user] = await db.select().from(users).where(eq2(users.id, ctx.user.id)).limit(1);
-    const session = await createArtistSubscriptionCheckout({
-      priceId,
-      customerEmail: user?.email ?? "",
-      stripeCustomerId: user?.stripeCustomerId ?? void 0,
-      metadata: {
-        userId: String(ctx.user.id),
-        clientId: String(clientProfile.id),
-        tier: input.tier
-      },
-      successUrl: input.successUrl,
-      cancelUrl: input.cancelUrl
-    });
-    return { checkoutUrl: session.url };
   })
 });
 var requestsRouter = router({
@@ -3785,14 +3698,12 @@ var aiRouter = router({
     } else {
       const [clientProfile] = await db.select().from(clients).where(eq4(clients.userId, ctx.user.id)).limit(1);
       if (!clientProfile) throw new TRPCError4({ code: "FORBIDDEN", message: "Profile not found." });
-      const tier = ctx.user.subscriptionTier || "client_free";
-      const tierLimits = getClientTierLimits(tier);
-      if (tierLimits.aiGenerationsPerMonth === 0) {
-        throw new TRPCError4({ code: "FORBIDDEN", message: "AI Generation requires AI credits. Buy an add-on to generate." });
+      if (clientProfile.aiCredits <= 0) {
+        throw new TRPCError4({ code: "FORBIDDEN", message: "AI Generation requires AI credits. Purchase credits to generate." });
       }
       profileId = clientProfile.id;
       availableCredits = clientProfile.aiCredits;
-      limitMax = tierLimits.aiGenerationsPerMonth;
+      limitMax = clientProfile.aiCredits;
       tableName = clients;
     }
     if (limitMax !== Number.MAX_SAFE_INTEGER) {
@@ -3856,14 +3767,12 @@ var aiRouter = router({
     } else {
       const [clientProfile] = await db.select().from(clients).where(eq4(clients.userId, ctx.user.id)).limit(1);
       if (!clientProfile) return { tier: "client_free", tierName: "Collector", aiCredits: 0, maxCredits: 0, isUnlimited: false };
-      const tier = ctx.user.subscriptionTier || "client_free";
-      const tierLimits = getClientTierLimits(tier);
       return {
-        tier,
-        tierName: tierLimits.name,
+        tier: "client_free",
+        tierName: "Collector",
         aiCredits: clientProfile.aiCredits,
-        maxCredits: tierLimits.aiGenerationsPerMonth,
-        isUnlimited: tierLimits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER
+        maxCredits: clientProfile.aiCredits,
+        isUnlimited: false
       };
     }
   })
@@ -4146,6 +4055,9 @@ var appRouter = router({
     ).mutation(async ({ ctx, input }) => {
       const newArtist = await createArtist({
         ...input,
+        shopName: sanitizeInput(input.shopName, 255),
+        bio: input.bio ? sanitizeInput(input.bio, 2e3) : void 0,
+        specialties: input.specialties ? sanitizeInput(input.specialties, 500) : void 0,
         userId: ctx.user.id
       });
       if (ENV.n8nOnboardingWebhookUrl) {
@@ -5406,7 +5318,7 @@ app.get("/api/health", async (_req, res) => {
     }
     const webhookStats = await getWebhookQueueStats();
     const storageReady = ENV.isProduction ? true : true;
-    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth && ENV.stripeClientPlusPriceId ? true : false;
+    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth ? true : false;
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
     res.json({
       status: overallStatus,

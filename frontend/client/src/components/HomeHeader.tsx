@@ -16,6 +16,7 @@ import { Menu } from "lucide-react";
 
 const navLinks = [
   { href: "/artists", label: "Browse Artists" },
+  { href: "/requests", label: "Request Board" },
   { href: "/#how-it-works", label: "How It Works", isAnchor: true },
   { href: "/for-artists", label: "For Artists" },
 ];

@@ -18,6 +18,7 @@ import {
   HelpCircle,
   ChevronDown,
   Settings2,
+  ClipboardList,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -45,12 +46,14 @@ export default function Sidebar() {
   const navLinks = isAuthenticated
     ? [
         { href: "/artists", label: "Browse Artists", icon: Users },
+        { href: "/requests", label: "Request Board", icon: ClipboardList },
         { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
         { href: "/for-artists", label: "For Artists", icon: Palette },
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       ]
     : [
         { href: "/artists", label: "Browse Artists", icon: Users },
+        { href: "/requests", label: "Request Board", icon: ClipboardList },
         { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
         { href: "/for-artists", label: "For Artists", icon: Palette },
         { href: "/login", label: "Sign In", icon: LogIn },
