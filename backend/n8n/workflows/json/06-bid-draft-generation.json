@@ -1,0 +1,173 @@
+{
+  "name": "Bid Draft Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bid-draft-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger_webhook_bid_draft",
+      "name": "trigger_webhook_bid_draft",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "bid-draft-request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={ \"error\": \"Unauthorized\" }"
+      },
+      "id": "send_response_401",
+      "name": "send_response_401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/portfolioImages?artistId=eq.{{ $json.body.artistId }}&aiProcessedAt=not.is.null&select=style,aiStyles,aiTags,aiDescription,caption&order=qualityScore.desc&limit=3",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_portfolio",
+      "name": "api_supabase_fetch_portfolio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const portfolio = Array.isArray($json) ? $json : [];\nconst styles = portfolio.map(p => [\n  p.style,\n  p.aiStyles ? JSON.parse(p.aiStyles || '[]').join(', ') : '',\n  p.aiDescription\n].filter(Boolean).join(' — ')).join('\\n');\nconst body = $('trigger_webhook_bid_draft').item.json.body;\nreturn [{ json: {\n  artistId: body.artistId,\n  requestId: body.requestId,\n  requestTitle: body.requestTitle,\n  requestDescription: body.requestDescription,\n  budgetMin: body.requestBudgetMin,\n  budgetMax: body.requestBudgetMax,\n  requestStyle: body.requestStyle,\n  portfolioContext: styles || 'No portfolio images analyzed yet.',\n  portfolioCount: portfolio.length\n}}];"
+      },
+      "id": "transform_build_prompt_context",
+      "name": "transform_build_prompt_context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3-70b-8192\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert tattoo artist writing a compelling bid for a client tattoo request. Write in first person, be specific, professional, and warm. 100-150 words max. Reference the client's style preferences and budget. Show expertise without being arrogant.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a bid message for this tattoo request:\\n\\nTitle: {{ $json.requestTitle }}\\nDescription: {{ $json.requestDescription }}\\nStyle: {{ $json.requestStyle }}\\nBudget: ${{ Math.round($json.budgetMin / 100) }}–${{ Math.round($json.budgetMax / 100) }}\\n\\nMy portfolio samples:\\n{{ $json.portfolioContext }}\\n\\nWrite a personalized bid message that will appeal to this specific client.\"\n    }\n  ],\n  \"max_tokens\": 300,\n  \"temperature\": 0.7\n}"
+      },
+      "id": "api_groq_generate_bid",
+      "name": "api_groq_generate_bid",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const draft = $json.choices?.[0]?.message?.content?.trim() || '';\nconst tokensUsed = $json.usage?.total_tokens || 0;\nreturn [{ json: { draft, tokensUsed } }];"
+      },
+      "id": "transform_extract_draft",
+      "name": "transform_extract_draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "={{ JSON.stringify({ draft: $json.draft, tokensUsed: $json.tokensUsed }) }}"
+      },
+      "id": "send_response_draft",
+      "name": "send_response_draft",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Bid Draft Generation\",\n  \"event\": \"bid_draft_generated\",\n  \"requestId\": {{ $('trigger_webhook_bid_draft').item.json.body.requestId }},\n  \"artistId\": {{ $('trigger_webhook_bid_draft').item.json.body.artistId }},\n  \"tokensUsed\": {{ $('transform_extract_draft').item.json.tokensUsed }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_bid_draft",
+      "name": "log_supabase_bid_draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_bid_draft": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "api_supabase_fetch_portfolio", "type": "main", "index": 0 }],
+        [{ "node": "send_response_401", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_fetch_portfolio": {
+      "main": [[{ "node": "transform_build_prompt_context", "type": "main", "index": 0 }]]
+    },
+    "transform_build_prompt_context": {
+      "main": [[{ "node": "api_groq_generate_bid", "type": "main", "index": 0 }]]
+    },
+    "api_groq_generate_bid": {
+      "main": [[{ "node": "transform_extract_draft", "type": "main", "index": 0 }]]
+    },
+    "transform_extract_draft": {
+      "main": [[{ "node": "send_response_draft", "type": "main", "index": 0 }]]
+    },
+    "send_response_draft": {
+      "main": [[{ "node": "log_supabase_bid_draft", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "ai" }, { "name": "bids" }, { "name": "groq" }]
+}

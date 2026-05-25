@@ -1,0 +1,327 @@
+{
+  "name": "License Review Notification",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "name": "trigger_webhook_license",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "license-verification",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.headers.authorization }}",
+              "operation": "equals",
+              "value2": "={{ 'Bearer ' + $env.N8N_WEBHOOK_SECRET }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "send_response_401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 460],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "{\"error\": \"Unauthorized\"}"
+      }
+    },
+    {
+      "name": "send_response_ok",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "{\"received\": true}"
+      }
+    },
+    {
+      "name": "api_supabase_fetch_document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/verificationDocuments?id=eq.' + $node['trigger_webhook_license'].json.body.documentId + '&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "wait_for_ocr",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1140, 300],
+      "parameters": { "amount": 90, "unit": "seconds" }
+    },
+    {
+      "name": "api_supabase_fetch_ocr_results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1380, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/verificationDocuments?id=eq.' + $node['trigger_webhook_license'].json.body.documentId + '&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "check_ocr_complete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1620, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[0] ? ($json[0].ocrProcessedAt || '') : '' }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "wait_retry_ocr",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1860, 460],
+      "parameters": { "amount": 60, "unit": "seconds" }
+    },
+    {
+      "name": "api_supabase_fetch_ocr_retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2100, 460],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/verificationDocuments?id=eq.' + $node['trigger_webhook_license'].json.body.documentId + '&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "send_email_admin_review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1860, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Ink Connect Admin <admin@inkconnect.app>', to: $env.ADMIN_ALERT_EMAIL, subject: '[License Submission] ' + $node['trigger_webhook_license'].json.body.artistName + ' — ' + ($json[0].ocrVerdict || 'OCR Pending'), html: '<h2>License Verification Submitted</h2><p><b>Artist:</b> ' + $node['trigger_webhook_license'].json.body.artistName + '</p><p><b>Shop:</b> ' + $node['trigger_webhook_license'].json.body.shopName + '</p><p><b>Document Type:</b> ' + $node['trigger_webhook_license'].json.body.documentType + '</p><p><b>File:</b> ' + $node['trigger_webhook_license'].json.body.originalFileName + '</p><hr/><h3>OCR Analysis</h3><p><b>Verdict:</b> ' + ($json[0].ocrVerdict || 'pending') + '</p><p><b>Confidence:</b> ' + ($json[0].ocrConfidence || 'N/A') + '%</p><p><b>Extracted Name:</b> ' + ($json[0].ocrExtractedName || 'N/A') + '</p><p><b>Business Name:</b> ' + ($json[0].ocrExtractedBusinessName || 'N/A') + '</p><p><b>License #:</b> ' + ($json[0].ocrLicenseNumber || 'N/A') + '</p><p><b>Expiry:</b> ' + ($json[0].ocrExpirationDate || 'N/A') + '</p><p><b>Name Match:</b> ' + ($json[0].ocrNameMatch || 'N/A') + '</p><br/><p><a href=\"' + $env.APP_BASE_URL + '/admin/moderation\" style=\"background:#000;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;\">Review in Dashboard</a></p>' }) }}"
+      }
+    },
+    {
+      "name": "log_supabase_notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2100, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/workflow_logs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'license-review-notification', event: 'admin_notified', document_id: $node['trigger_webhook_license'].json.body.documentId, artist_id: $node['trigger_webhook_license'].json.body.artistId, ocr_verdict: $node['api_supabase_fetch_ocr_results'].json[0] ? $node['api_supabase_fetch_ocr_results'].json[0].ocrVerdict : null, created_at: new Date().toISOString() }) }}"
+      }
+    },
+    {
+      "name": "wait_48h_followup",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2340, 300],
+      "parameters": { "amount": 48, "unit": "hours" }
+    },
+    {
+      "name": "api_supabase_check_status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2580, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/verificationDocuments?id=eq.' + $node['trigger_webhook_license'].json.body.documentId + '&select=status,reviewedAt' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "check_still_pending",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2820, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[0] ? $json[0].status : '' }}",
+              "operation": "equals",
+              "value2": "pending"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "send_email_admin_escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3060, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Ink Connect Admin <admin@inkconnect.app>', to: $env.ADMIN_ALERT_EMAIL, subject: '[ESCALATION] License Unreviewed 48h: ' + $node['trigger_webhook_license'].json.body.artistName, html: '<h2>License Review Escalation</h2><p>The license submission from <b>' + $node['trigger_webhook_license'].json.body.artistName + '</b> (<b>' + $node['trigger_webhook_license'].json.body.shopName + '</b>) has been pending for <b>48 hours</b> with no admin review action.</p><p>Document ID: ' + $node['trigger_webhook_license'].json.body.documentId + '</p><p>Submitted: ' + $node['trigger_webhook_license'].json.body.submittedAt + '</p><br/><p><a href=\"' + $env.APP_BASE_URL + '/admin/moderation\" style=\"background:#c00;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;\">Review Now — Escalation</a></p>' }) }}"
+      }
+    },
+    {
+      "name": "log_supabase_escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3300, 300],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/workflow_logs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'license-review-notification', event: 'escalation_sent', document_id: $node['trigger_webhook_license'].json.body.documentId, created_at: new Date().toISOString() }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "trigger_webhook_license": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [
+          { "node": "send_response_ok", "type": "main", "index": 0 },
+          { "node": "api_supabase_fetch_document", "type": "main", "index": 0 }
+        ],
+        [{ "node": "send_response_401", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_fetch_document": {
+      "main": [[{ "node": "wait_for_ocr", "type": "main", "index": 0 }]]
+    },
+    "wait_for_ocr": {
+      "main": [[{ "node": "api_supabase_fetch_ocr_results", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_ocr_results": {
+      "main": [[{ "node": "check_ocr_complete", "type": "main", "index": 0 }]]
+    },
+    "check_ocr_complete": {
+      "main": [
+        [{ "node": "send_email_admin_review", "type": "main", "index": 0 }],
+        [{ "node": "wait_retry_ocr", "type": "main", "index": 0 }]
+      ]
+    },
+    "wait_retry_ocr": {
+      "main": [[{ "node": "api_supabase_fetch_ocr_retry", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_ocr_retry": {
+      "main": [[{ "node": "send_email_admin_review", "type": "main", "index": 0 }]]
+    },
+    "send_email_admin_review": {
+      "main": [[{ "node": "log_supabase_notification", "type": "main", "index": 0 }]]
+    },
+    "log_supabase_notification": {
+      "main": [[{ "node": "wait_48h_followup", "type": "main", "index": 0 }]]
+    },
+    "wait_48h_followup": {
+      "main": [[{ "node": "api_supabase_check_status", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_check_status": {
+      "main": [[{ "node": "check_still_pending", "type": "main", "index": 0 }]]
+    },
+    "check_still_pending": {
+      "main": [
+        [{ "node": "send_email_admin_escalation", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "send_email_admin_escalation": {
+      "main": [[{ "node": "log_supabase_escalation", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -1,0 +1,282 @@
+{
+  "name": "Customer Metadata Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-metadata-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger_webhook_metadata_sync",
+      "name": "trigger_webhook_metadata_sync",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "customer-metadata-sync"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={ \"error\": \"Unauthorized\" }"
+      },
+      "id": "send_response_401",
+      "name": "send_response_401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "={ \"accepted\": true }"
+      },
+      "id": "send_response_200",
+      "name": "send_response_200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('trigger_webhook_metadata_sync').item.json.body.stripeCustomerId }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "check_has_customer_id",
+      "name": "check_has_customer_id",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/customers/{{ $('trigger_webhook_metadata_sync').item.json.body.stripeCustomerId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.STRIPE_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "email", "value": "={{ $('trigger_webhook_metadata_sync').item.json.body.email }}" },
+            { "name": "name", "value": "={{ $('trigger_webhook_metadata_sync').item.json.body.name }}" }
+          ]
+        }
+      },
+      "id": "api_stripe_update_customer",
+      "name": "api_stripe_update_customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.stripe.com/v1/customers/search?query=email:'{{ $('trigger_webhook_metadata_sync').item.json.body.email }}'&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.STRIPE_API_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_stripe_search_customer",
+      "name": "api_stripe_search_customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 420],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data?.length > 0 }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_stripe_customer_exists",
+      "name": "check_stripe_customer_exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 420]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $('trigger_webhook_metadata_sync').item.json.body.userId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"stripeCustomerId\": \"{{ $json.data[0].id }}\",\n  \"updatedAt\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "api_supabase_save_existing_customer",
+      "name": "api_supabase_save_existing_customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 360],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/customers",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.STRIPE_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "email", "value": "={{ $('trigger_webhook_metadata_sync').item.json.body.email }}" },
+            { "name": "name", "value": "={{ $('trigger_webhook_metadata_sync').item.json.body.name }}" },
+            { "name": "metadata[userId]", "value": "={{ $('trigger_webhook_metadata_sync').item.json.body.userId }}" }
+          ]
+        }
+      },
+      "id": "api_stripe_create_customer",
+      "name": "api_stripe_create_customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $('trigger_webhook_metadata_sync').item.json.body.userId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"stripeCustomerId\": \"{{ $json.id }}\",\n  \"updatedAt\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "api_supabase_save_new_customer",
+      "name": "api_supabase_save_new_customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Customer Metadata Sync\",\n  \"event\": \"metadata_sync_complete\",\n  \"userId\": {{ $('trigger_webhook_metadata_sync').item.json.body.userId }},\n  \"email\": \"{{ $('trigger_webhook_metadata_sync').item.json.body.email }}\",\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_metadata_sync",
+      "name": "log_supabase_metadata_sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 400],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_metadata_sync": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "send_response_200", "type": "main", "index": 0 }],
+        [{ "node": "send_response_401", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_response_200": {
+      "main": [[{ "node": "check_has_customer_id", "type": "main", "index": 0 }]]
+    },
+    "check_has_customer_id": {
+      "main": [
+        [{ "node": "api_stripe_update_customer", "type": "main", "index": 0 }],
+        [{ "node": "api_stripe_search_customer", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_stripe_update_customer": {
+      "main": [[{ "node": "log_supabase_metadata_sync", "type": "main", "index": 0 }]]
+    },
+    "api_stripe_search_customer": {
+      "main": [[{ "node": "check_stripe_customer_exists", "type": "main", "index": 0 }]]
+    },
+    "check_stripe_customer_exists": {
+      "main": [
+        [{ "node": "api_supabase_save_existing_customer", "type": "main", "index": 0 }],
+        [{ "node": "api_stripe_create_customer", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_save_existing_customer": {
+      "main": [[{ "node": "log_supabase_metadata_sync", "type": "main", "index": 0 }]]
+    },
+    "api_stripe_create_customer": {
+      "main": [[{ "node": "api_supabase_save_new_customer", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_save_new_customer": {
+      "main": [[{ "node": "log_supabase_metadata_sync", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "stripe" }, { "name": "sync" }]
+}

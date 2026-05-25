@@ -1,0 +1,292 @@
+{
+  "name": "License Review Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "license-verification",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "trigger_webhook_license_review",
+      "name": "trigger_webhook_license_review",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "license-verification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "amount": 90,
+        "unit": "seconds"
+      },
+      "id": "wait_90_seconds_ocr",
+      "name": "wait_90_seconds_ocr",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/verificationDocuments?id=eq.{{ $('trigger_webhook_license_review').item.json.body.documentId }}&select=ocrProcessedAt,ocrDocumentType,ocrExtractedName,ocrExtractedBusinessName,ocrLicenseNumber,ocrExpirationDate,ocrIssuingAuthority,ocrConfidence,ocrNameMatch,ocrVerdict,ocrVerdictReason,ocrIssues,status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_ocr_1",
+      "name": "api_supabase_fetch_ocr_1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ Array.isArray($json) && $json.length > 0 && $json[0].ocrProcessedAt !== null }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_ocr_ready_1",
+      "name": "check_ocr_ready_1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "amount": 120,
+        "unit": "seconds"
+      },
+      "id": "wait_120_seconds_retry",
+      "name": "wait_120_seconds_retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1340, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/verificationDocuments?id=eq.{{ $('trigger_webhook_license_review').item.json.body.documentId }}&select=ocrProcessedAt,ocrDocumentType,ocrExtractedName,ocrExtractedBusinessName,ocrLicenseNumber,ocrExpirationDate,ocrIssuingAuthority,ocrConfidence,ocrNameMatch,ocrVerdict,ocrVerdictReason,ocrIssues,status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_ocr_2",
+      "name": "api_supabase_fetch_ocr_2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 480],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use whichever OCR fetch returned data\nconst ocr1 = $('api_supabase_fetch_ocr_1').item?.json;\nconst ocr2 = $('api_supabase_fetch_ocr_2')?.item?.json;\nconst data = (Array.isArray(ocr1) && ocr1.length > 0 && ocr1[0].ocrProcessedAt) ? ocr1[0]\n  : (Array.isArray(ocr2) && ocr2.length > 0) ? ocr2[0]\n  : {};\n\nconst verdictColors = { verified: '#16a34a', needs_review: '#d97706', rejected: '#dc2626' };\nconst body = $('trigger_webhook_license_review').item.json.body;\nreturn [{ json: {\n  ...data,\n  documentId: body.documentId,\n  userId: body.userId,\n  artistId: body.artistId,\n  artistName: body.artistName,\n  shopName: body.shopName,\n  documentType: body.documentType,\n  originalFileName: body.originalFileName,\n  submittedAt: body.submittedAt,\n  verdictColor: verdictColors[data.ocrVerdict] || '#6b7280'\n}}];"
+      },
+      "id": "transform_build_email_data",
+      "name": "transform_build_email_data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect Verification <verify@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"License Verification: {{ $json.artistName }} — {{ $json.ocrVerdict || 'Pending OCR' }}\",\n  \"html\": \"<h2>License Verification Submission</h2><table style='border-collapse:collapse;width:100%'><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Artist</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.artistName }} ({{ $json.shopName }})</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Document</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.documentType }} — {{ $json.originalFileName }}</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Submitted</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.submittedAt }}</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>OCR Verdict</strong></td><td style='padding:8px;border:1px solid #e5e7eb;color:{{ $json.verdictColor }}'><strong>{{ $json.ocrVerdict || 'Not processed' }}</strong></td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Confidence</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.ocrConfidence }}%</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Extracted Name</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.ocrExtractedName }} (match: {{ $json.ocrNameMatch }})</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>License #</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.ocrLicenseNumber }}</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Expiry</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.ocrExpirationDate }}</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Issuing Authority</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.ocrIssuingAuthority }}</td></tr><tr><td style='padding:8px;border:1px solid #e5e7eb'><strong>Reason</strong></td><td style='padding:8px;border:1px solid #e5e7eb'>{{ $json.ocrVerdictReason }}</td></tr></table><p><a href='{{ $env.APP_BASE_URL }}/admin/verification?doc={{ $json.documentId }}' style='background:#000;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;'>Review Document</a></p>\"\n}"
+      },
+      "id": "send_email_admin_ocr_summary",
+      "name": "send_email_admin_ocr_summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 48,
+        "unit": "hours"
+      },
+      "id": "wait_48_hours_followup",
+      "name": "wait_48_hours_followup",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2220, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/verificationDocuments?id=eq.{{ $('trigger_webhook_license_review').item.json.body.documentId }}&select=status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_check_status",
+      "name": "api_supabase_check_status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2440, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ Array.isArray($json) && $json.length > 0 && $json[0].status === 'pending' }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_still_pending",
+      "name": "check_still_pending",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect Verification <verify@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"[ESCALATION] License still pending 48h: {{ $('trigger_webhook_license_review').item.json.body.artistName }}\",\n  \"html\": \"<h2>Verification Escalation</h2><p>The license submission for <strong>{{ $('trigger_webhook_license_review').item.json.body.artistName }}</strong> ({{ $('trigger_webhook_license_review').item.json.body.shopName }}) has been pending for over 48 hours.</p><p>Document ID: {{ $('trigger_webhook_license_review').item.json.body.documentId }}</p><p>Submitted: {{ $('trigger_webhook_license_review').item.json.body.submittedAt }}</p><p><a href='{{ $env.APP_BASE_URL }}/admin/verification?doc={{ $('trigger_webhook_license_review').item.json.body.documentId }}'>Review Now</a></p>\"\n}"
+      },
+      "id": "send_email_escalation",
+      "name": "send_email_escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2880, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"License Review Notification\",\n  \"event\": \"license_review_workflow_complete\",\n  \"documentId\": {{ $('trigger_webhook_license_review').item.json.body.documentId }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_license_review",
+      "name": "log_supabase_license_review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3100, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_license_review": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "wait_90_seconds_ocr", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_license_review", "type": "main", "index": 0 }]
+      ]
+    },
+    "wait_90_seconds_ocr": {
+      "main": [[{ "node": "api_supabase_fetch_ocr_1", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_ocr_1": {
+      "main": [[{ "node": "check_ocr_ready_1", "type": "main", "index": 0 }]]
+    },
+    "check_ocr_ready_1": {
+      "main": [
+        [{ "node": "transform_build_email_data", "type": "main", "index": 0 }],
+        [{ "node": "wait_120_seconds_retry", "type": "main", "index": 0 }]
+      ]
+    },
+    "wait_120_seconds_retry": {
+      "main": [[{ "node": "api_supabase_fetch_ocr_2", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_ocr_2": {
+      "main": [[{ "node": "transform_build_email_data", "type": "main", "index": 0 }]]
+    },
+    "transform_build_email_data": {
+      "main": [[{ "node": "send_email_admin_ocr_summary", "type": "main", "index": 0 }]]
+    },
+    "send_email_admin_ocr_summary": {
+      "main": [[{ "node": "wait_48_hours_followup", "type": "main", "index": 0 }]]
+    },
+    "wait_48_hours_followup": {
+      "main": [[{ "node": "api_supabase_check_status", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_check_status": {
+      "main": [[{ "node": "check_still_pending", "type": "main", "index": 0 }]]
+    },
+    "check_still_pending": {
+      "main": [
+        [{ "node": "send_email_escalation", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_license_review", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_email_escalation": {
+      "main": [[{ "node": "log_supabase_license_review", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "verification" }, { "name": "email" }, { "name": "admin" }]
+}

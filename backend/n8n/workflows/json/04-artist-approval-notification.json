@@ -1,0 +1,191 @@
+{
+  "name": "Artist Approval Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "artist-approval",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "trigger_webhook_artist_approval",
+      "name": "trigger_webhook_artist_approval",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "artist-approval"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/artists?id=eq.{{ $json.body.artistId }}&select=userId,shopName",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_artist",
+      "name": "api_supabase_fetch_artist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $json[0].userId }}&select=email,name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_user",
+      "name": "api_supabase_fetch_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('trigger_webhook_artist_approval').item.json.body.approved }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_approved",
+      "name": "check_approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <noreply@inkconnect.co>\",\n  \"to\": \"{{ $json[0].email }}\",\n  \"subject\": \"Your Artist Profile is Now Live\",\n  \"html\": \"<h2>Welcome to Ink Connect, {{ $json[0].name }}!</h2><p>Your artist profile for <strong>{{ $('api_supabase_fetch_artist').item.json[0].shopName }}</strong> has been approved and is now visible to clients.</p><h3>Next Steps:</h3><ul><li>Browse and respond to tattoo requests</li><li>Manage your portfolio and subscription</li><li>Track your bookings and earnings</li></ul><p><a href='{{ $env.APP_BASE_URL }}/artist-dashboard' style='background:#000;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;'>Go to Dashboard</a></p>\"\n}"
+      },
+      "id": "send_email_approved",
+      "name": "send_email_approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <noreply@inkconnect.co>\",\n  \"to\": \"{{ $('api_supabase_fetch_user').item.json[0].email }}\",\n  \"subject\": \"Artist Profile Review Status\",\n  \"html\": \"<h2>Hello {{ $('api_supabase_fetch_user').item.json[0].name }},</h2><p>Thank you for applying to Ink Connect. After reviewing your profile, we're unable to approve it at this time.</p><p><strong>Reason:</strong> {{ $('trigger_webhook_artist_approval').item.json.body.rejectionReason || 'Profile does not meet our current guidelines.' }}</p><p>You may reapply once you've addressed these concerns. <a href='https://support.inkconnect.co'>Contact support</a> for help.</p>\"\n}"
+      },
+      "id": "send_email_rejected",
+      "name": "send_email_rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 420],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Artist Approval Notification\",\n  \"event\": \"approval_notification_sent\",\n  \"artistId\": {{ $('trigger_webhook_artist_approval').item.json.body.artistId }},\n  \"approved\": {{ $('trigger_webhook_artist_approval').item.json.body.approved }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_notification",
+      "name": "log_supabase_notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_artist_approval": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "api_supabase_fetch_artist", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_notification", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_fetch_artist": {
+      "main": [[{ "node": "api_supabase_fetch_user", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_user": {
+      "main": [[{ "node": "check_approved", "type": "main", "index": 0 }]]
+    },
+    "check_approved": {
+      "main": [
+        [{ "node": "send_email_approved", "type": "main", "index": 0 }],
+        [{ "node": "send_email_rejected", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_email_approved": {
+      "main": [[{ "node": "log_supabase_notification", "type": "main", "index": 0 }]]
+    },
+    "send_email_rejected": {
+      "main": [[{ "node": "log_supabase_notification", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "email" }, { "name": "artist" }, { "name": "approval" }]
+}

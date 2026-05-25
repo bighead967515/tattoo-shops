@@ -1,0 +1,219 @@
+{
+  "name": "Artist Tier Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 3 * * *" }]
+        }
+      },
+      "id": "trigger_cron_daily",
+      "name": "trigger_cron_daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.stripe.com/v1/subscriptions?status=active&limit=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.STRIPE_API_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_stripe_list_subscriptions",
+      "name": "api_stripe_list_subscriptions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "split_subscriptions",
+      "name": "split_subscriptions",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sub = $json;\nconst priceId = sub.items?.data?.[0]?.price?.id ?? '';\nconst iconPrice = $env.STRIPE_PRICE_ID_ARTIST_ICON ?? '';\nconst amateurPrice = $env.STRIPE_PRICE_ID_ARTIST_AMATEUR ?? '';\nlet expectedTier = 'artist_free';\nif (priceId === iconPrice) expectedTier = 'artist_icon';\nelse if (priceId === amateurPrice) expectedTier = 'artist_amateur';\nreturn [{ json: {\n  subscriptionId: sub.id,\n  customerId: sub.customer,\n  priceId,\n  expectedTier,\n  status: sub.status\n}}];"
+      },
+      "id": "transform_map_tier",
+      "name": "transform_map_tier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?stripeCustomerId=eq.{{ $json.customerId }}&select=id,email,subscriptionTier",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_user",
+      "name": "api_supabase_fetch_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ Array.isArray($json) && $json.length > 0 && $json[0].subscriptionTier !== $('transform_map_tier').item.json.expectedTier }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_tier_mismatch",
+      "name": "check_tier_mismatch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $json[0].id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subscriptionTier\": \"{{ $('transform_map_tier').item.json.expectedTier }}\",\n  \"updatedAt\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "api_supabase_correct_tier",
+      "name": "api_supabase_correct_tier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate_corrections",
+      "name": "aggregate_corrections",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $json.data ?? [];\nconst corrections = items.length;\nreturn [{ json: { corrections, items } }];"
+      },
+      "id": "transform_count_corrections",
+      "name": "transform_count_corrections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect System <hello@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"Daily Tier Sync — {{ $json.corrections }} correction(s)\",\n  \"html\": \"<h2>Daily Tier Sync Report</h2><p>The daily Stripe tier sync ran at {{ new Date().toISOString() }}.</p><p><strong>Corrections made: {{ $json.corrections }}</strong></p>{{ $json.corrections > 0 ? '<p>Users corrected: ' + $json.items.map(i => i.userId || i.id).join(', ') + '</p>' : '<p>No drift detected — all tiers are in sync.</p>' }}<hr/><p>Next sync: tomorrow at 3:00 AM UTC</p>\"\n}"
+      },
+      "id": "send_email_sync_report",
+      "name": "send_email_sync_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2220, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Artist Tier Sync\",\n  \"event\": \"tier_sync_complete\",\n  \"corrections\": {{ $('transform_count_corrections').item.json.corrections }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_sync",
+      "name": "log_supabase_sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2440, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_cron_daily": {
+      "main": [[{ "node": "api_stripe_list_subscriptions", "type": "main", "index": 0 }]]
+    },
+    "api_stripe_list_subscriptions": {
+      "main": [[{ "node": "split_subscriptions", "type": "main", "index": 0 }]]
+    },
+    "split_subscriptions": {
+      "main": [[{ "node": "transform_map_tier", "type": "main", "index": 0 }]]
+    },
+    "transform_map_tier": {
+      "main": [[{ "node": "api_supabase_fetch_user", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_user": {
+      "main": [[{ "node": "check_tier_mismatch", "type": "main", "index": 0 }]]
+    },
+    "check_tier_mismatch": {
+      "main": [
+        [{ "node": "api_supabase_correct_tier", "type": "main", "index": 0 }],
+        [{ "node": "aggregate_corrections", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_correct_tier": {
+      "main": [[{ "node": "aggregate_corrections", "type": "main", "index": 0 }]]
+    },
+    "aggregate_corrections": {
+      "main": [[{ "node": "transform_count_corrections", "type": "main", "index": 0 }]]
+    },
+    "transform_count_corrections": {
+      "main": [[{ "node": "send_email_sync_report", "type": "main", "index": 0 }]]
+    },
+    "send_email_sync_report": {
+      "main": [[{ "node": "log_supabase_sync", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "billing" }, { "name": "cron" }, { "name": "stripe" }]
+}

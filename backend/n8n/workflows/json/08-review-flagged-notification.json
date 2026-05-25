@@ -1,0 +1,218 @@
+{
+  "name": "Review Flagged Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "review-flagged",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger_webhook_review_flagged",
+      "name": "trigger_webhook_review_flagged",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "review-flagged"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={ \"error\": \"Unauthorized\" }"
+      },
+      "id": "send_response_401",
+      "name": "send_response_401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "={ \"received\": true }"
+      },
+      "id": "send_response_200",
+      "name": "send_response_200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect Moderation <moderation@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"[Flagged Review] Artist: {{ $('trigger_webhook_review_flagged').item.json.body.artistName }} — Toxicity: {{ $('trigger_webhook_review_flagged').item.json.body.toxicityScore }}\",\n  \"html\": \"<h2>Review Flagged for Moderation</h2><table><tr><td><strong>Review ID</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.reviewId }}</td></tr><tr><td><strong>Artist</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.artistName }} (ID: {{ $('trigger_webhook_review_flagged').item.json.body.artistId }})</td></tr><tr><td><strong>Rating</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.rating }}/5</td></tr><tr><td><strong>Comment</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.comment }}</td></tr><tr><td><strong>Toxicity Score</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.toxicityScore }}/100</td></tr><tr><td><strong>Spam Score</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.spamScore }}/100</td></tr><tr><td><strong>Reason</strong></td><td>{{ $('trigger_webhook_review_flagged').item.json.body.moderationReason }}</td></tr></table><p><a href='{{ $env.APP_BASE_URL }}/admin/moderation'>Review in Moderation Dashboard</a></p>\"\n}"
+      },
+      "id": "send_email_admin_alert",
+      "name": "send_email_admin_alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('trigger_webhook_review_flagged').item.json.body.toxicityScore }}",
+              "rightValue": 70,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
+      },
+      "id": "check_high_toxicity",
+      "name": "check_high_toxicity",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/artists?id=eq.{{ $('trigger_webhook_review_flagged').item.json.body.artistId }}&select=userId",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_artist",
+      "name": "api_supabase_fetch_artist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $json[0].userId }}&select=email,name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_artist_user",
+      "name": "api_supabase_fetch_artist_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <noreply@inkconnect.co>\",\n  \"to\": \"{{ $json[0].email }}\",\n  \"subject\": \"A review on your profile was hidden\",\n  \"html\": \"<p>Hi {{ $json[0].name }},</p><p>A recent review on your Ink Connect profile has been hidden by our moderation team. This means it will no longer be visible to other users.</p><p>If you believe this is an error, you can contact our support team for review.</p><p><a href='{{ $env.APP_BASE_URL }}/artist-dashboard'>View Your Profile</a></p><p>— Ink Connect</p>\"\n}"
+      },
+      "id": "send_email_artist_notification",
+      "name": "send_email_artist_notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Review Flagged Notification\",\n  \"event\": \"review_flagged_notifications_sent\",\n  \"reviewId\": {{ $('trigger_webhook_review_flagged').item.json.body.reviewId }},\n  \"artistId\": {{ $('trigger_webhook_review_flagged').item.json.body.artistId }},\n  \"toxicityScore\": {{ $('trigger_webhook_review_flagged').item.json.body.toxicityScore }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_review_flagged",
+      "name": "log_supabase_review_flagged",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_review_flagged": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "send_response_200", "type": "main", "index": 0 }],
+        [{ "node": "send_response_401", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_response_200": {
+      "main": [[{ "node": "send_email_admin_alert", "type": "main", "index": 0 }]]
+    },
+    "send_email_admin_alert": {
+      "main": [[{ "node": "check_high_toxicity", "type": "main", "index": 0 }]]
+    },
+    "check_high_toxicity": {
+      "main": [
+        [{ "node": "api_supabase_fetch_artist", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_review_flagged", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_fetch_artist": {
+      "main": [[{ "node": "api_supabase_fetch_artist_user", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_artist_user": {
+      "main": [[{ "node": "send_email_artist_notification", "type": "main", "index": 0 }]]
+    },
+    "send_email_artist_notification": {
+      "main": [[{ "node": "log_supabase_review_flagged", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "moderation" }, { "name": "email" }]
+}

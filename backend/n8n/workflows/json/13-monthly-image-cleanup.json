@@ -1,0 +1,237 @@
+{
+  "name": "Monthly Image Cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 2 1 * *" }]
+        }
+      },
+      "id": "trigger_cron_monthly",
+      "name": "trigger_cron_monthly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/list/portfolio-images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prefix\": \"\",\n  \"limit\": 1000,\n  \"offset\": 0,\n  \"sortBy\": { \"column\": \"created_at\", \"order\": \"asc\" }\n}"
+      },
+      "id": "api_supabase_list_storage",
+      "name": "api_supabase_list_storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/portfolioImages?select=imageKey&limit=10000",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_list_db_keys",
+      "name": "api_supabase_list_db_keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 480],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const storageFiles = $('api_supabase_list_storage').item.json;\nconst dbRows = $('api_supabase_list_db_keys').item.json;\nif (!Array.isArray(storageFiles) || !Array.isArray(dbRows)) {\n  return [{ json: { orphans: [], storageCount: 0, dbCount: 0 } }];\n}\nconst dbKeys = new Set(dbRows.map(r => r.imageKey));\nconst oneDayAgo = new Date(Date.now() - 86400000).toISOString();\nconst orphans = storageFiles.filter(f => {\n  const key = f.name;\n  const createdAt = f.created_at || f.createdAt || '';\n  return !dbKeys.has(key) && createdAt < oneDayAgo;\n});\nreturn [{ json: {\n  orphans: orphans.map(f => f.name),\n  orphanCount: orphans.length,\n  storageCount: storageFiles.length,\n  dbCount: dbRows.length\n}}];"
+      },
+      "id": "transform_find_orphans",
+      "name": "transform_find_orphans",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.orphanCount > 0 }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_has_orphans",
+      "name": "check_has_orphans",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $env.DRY_RUN }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_dry_run",
+      "name": "check_dry_run",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1140, 280]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/portfolio-images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prefixes\": {{ JSON.stringify($('transform_find_orphans').item.json.orphans) }}\n}"
+      },
+      "id": "api_supabase_delete_orphans",
+      "name": "api_supabase_delete_orphans",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1360, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect System <hello@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"Monthly Image Cleanup — {{ $('transform_find_orphans').item.json.orphanCount }} orphan(s) deleted\",\n  \"html\": \"<h2>Monthly Storage Cleanup Report</h2><p>Run: {{ new Date().toISOString() }}</p><table><tr><td><strong>Storage files scanned</strong></td><td>{{ $('transform_find_orphans').item.json.storageCount }}</td></tr><tr><td><strong>DB records found</strong></td><td>{{ $('transform_find_orphans').item.json.dbCount }}</td></tr><tr><td><strong>Orphans deleted</strong></td><td>{{ $('transform_find_orphans').item.json.orphanCount }}</td></tr><tr><td><strong>Mode</strong></td><td>{{ $env.DRY_RUN === 'true' ? 'DRY RUN (no deletion)' : 'LIVE' }}</td></tr></table>\"\n}"
+      },
+      "id": "send_email_cleanup_report",
+      "name": "send_email_cleanup_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1580, 380],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect System <hello@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"Monthly Image Cleanup — No orphans found\",\n  \"html\": \"<h2>Monthly Storage Cleanup Report</h2><p>Run: {{ new Date().toISOString() }}</p><p>Storage is clean — no orphaned files found.</p><p>Storage files: {{ $('transform_find_orphans').item.json.storageCount }} | DB records: {{ $('transform_find_orphans').item.json.dbCount }}</p>\"\n}"
+      },
+      "id": "send_email_no_orphans",
+      "name": "send_email_no_orphans",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1140, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Monthly Image Cleanup\",\n  \"event\": \"cleanup_complete\",\n  \"orphansDeleted\": {{ $('transform_find_orphans').item.json.orphanCount }},\n  \"dryRun\": {{ $env.DRY_RUN === 'true' }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_cleanup",
+      "name": "log_supabase_cleanup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1800, 380],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_cron_monthly": {
+      "main": [
+        [
+          { "node": "api_supabase_list_storage", "type": "main", "index": 0 },
+          { "node": "api_supabase_list_db_keys", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "api_supabase_list_storage": {
+      "main": [[{ "node": "transform_find_orphans", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_list_db_keys": {
+      "main": [[{ "node": "transform_find_orphans", "type": "main", "index": 0 }]]
+    },
+    "transform_find_orphans": {
+      "main": [[{ "node": "check_has_orphans", "type": "main", "index": 0 }]]
+    },
+    "check_has_orphans": {
+      "main": [
+        [{ "node": "check_dry_run", "type": "main", "index": 0 }],
+        [{ "node": "send_email_no_orphans", "type": "main", "index": 0 }]
+      ]
+    },
+    "check_dry_run": {
+      "main": [
+        [{ "node": "send_email_cleanup_report", "type": "main", "index": 0 }],
+        [{ "node": "api_supabase_delete_orphans", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_delete_orphans": {
+      "main": [[{ "node": "send_email_cleanup_report", "type": "main", "index": 0 }]]
+    },
+    "send_email_cleanup_report": {
+      "main": [[{ "node": "log_supabase_cleanup", "type": "main", "index": 0 }]]
+    },
+    "send_email_no_orphans": {
+      "main": [[{ "node": "log_supabase_cleanup", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "storage" }, { "name": "cron" }, { "name": "maintenance" }]
+}

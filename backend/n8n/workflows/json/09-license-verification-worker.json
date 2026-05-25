@@ -1,0 +1,203 @@
+{
+  "name": "License Verification Worker",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "license-verification-worker",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger_webhook_license_worker",
+      "name": "trigger_webhook_license_worker",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "license-verification-worker"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={ \"error\": \"Unauthorized\" }"
+      },
+      "id": "send_response_401",
+      "name": "send_response_401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 202,
+        "responseBody": "={ \"accepted\": true, \"message\": \"OCR processing started\" }"
+      },
+      "id": "send_response_202",
+      "name": "send_response_202",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/sign/id-documents/{{ $('trigger_webhook_license_worker').item.json.body.documentKey }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"expiresIn\": 300 }"
+      },
+      "id": "api_supabase_signed_url",
+      "name": "api_supabase_signed_url",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const signedPath = $json.signedURL || $json.signedUrl || '';\nconst fullUrl = signedPath.startsWith('http') ? signedPath : `${$env.SUPABASE_URL}${signedPath}`;\nreturn [{ json: {\n  signedUrl: fullUrl,\n  documentId: $('trigger_webhook_license_worker').item.json.body.documentId,\n  documentType: $('trigger_webhook_license_worker').item.json.body.documentType,\n  artistName: $('trigger_webhook_license_worker').item.json.body.artistName\n}}];"
+      },
+      "id": "transform_build_signed_url",
+      "name": "transform_build_signed_url",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3-70b-8192\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a document OCR and verification system. Analyze the document description and return ONLY valid JSON with these exact fields: ocrDocumentType (string), ocrExtractedName (string), ocrExtractedBusinessName (string), ocrLicenseNumber (string), ocrExpirationDate (string, YYYY-MM-DD or empty), ocrIssuingAuthority (string), ocrConfidence (integer 0-100), ocrIssues (array of strings).\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze this license/permit document for a tattoo artist named '{{ $json.artistName }}'. Document type declared: {{ $json.documentType }}. Document URL: {{ $json.signedUrl }}\\n\\nExtract all available information and assess the document's authenticity. Return your analysis as valid JSON only.\"\n    }\n  ],\n  \"max_tokens\": 500,\n  \"temperature\": 0.1\n}"
+      },
+      "id": "api_groq_ocr_document",
+      "name": "api_groq_ocr_document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $json.choices?.[0]?.message?.content || '{}';\nlet ocr;\ntry {\n  const match = content.match(/\\{[\\s\\S]*\\}/);\n  ocr = JSON.parse(match ? match[0] : content);\n} catch (e) {\n  ocr = { ocrConfidence: 0, ocrIssues: ['parse_error'], ocrDocumentType: '', ocrExtractedName: '', ocrExtractedBusinessName: '', ocrLicenseNumber: '', ocrExpirationDate: '', ocrIssuingAuthority: '' };\n}\n\nconst artistName = $('trigger_webhook_license_worker').item.json.body.artistName || '';\nconst extractedName = ocr.ocrExtractedName || '';\n\nlet nameMatch = 'unavailable';\nif (extractedName && artistName) {\n  const norm = s => s.toLowerCase().trim();\n  if (norm(extractedName) === norm(artistName)) nameMatch = 'exact';\n  else if (norm(artistName).includes(norm(extractedName.split(' ')[0])) || norm(extractedName).includes(norm(artistName.split(' ')[0]))) nameMatch = 'partial';\n  else nameMatch = 'mismatch';\n}\n\nconst conf = ocr.ocrConfidence ?? 0;\nlet verdict, verdictReason;\nif (conf > 70 && (nameMatch === 'exact' || nameMatch === 'partial')) {\n  verdict = 'verified'; verdictReason = 'High confidence + name match';\n} else if (conf >= 40) {\n  verdict = 'needs_review'; verdictReason = `Confidence ${conf}% — manual review required`;\n} else {\n  verdict = 'rejected'; verdictReason = `Low confidence (${conf}%) — document may be invalid`;\n}\n\nreturn [{ json: {\n  documentId: $('trigger_webhook_license_worker').item.json.body.documentId,\n  ocrDocumentType: ocr.ocrDocumentType || '',\n  ocrExtractedName: ocr.ocrExtractedName || '',\n  ocrExtractedBusinessName: ocr.ocrExtractedBusinessName || '',\n  ocrLicenseNumber: ocr.ocrLicenseNumber || '',\n  ocrExpirationDate: ocr.ocrExpirationDate || null,\n  ocrIssuingAuthority: ocr.ocrIssuingAuthority || '',\n  ocrConfidence: conf,\n  ocrIssues: JSON.stringify(ocr.ocrIssues || []),\n  ocrNameMatch: nameMatch,\n  ocrVerdict: verdict,\n  ocrVerdictReason: verdictReason,\n  ocrProcessedAt: new Date().toISOString()\n}}];"
+      },
+      "id": "transform_parse_ocr",
+      "name": "transform_parse_ocr",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/verificationDocuments?id=eq.{{ $json.documentId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ocrDocumentType\": \"{{ $json.ocrDocumentType }}\",\n  \"ocrExtractedName\": \"{{ $json.ocrExtractedName }}\",\n  \"ocrExtractedBusinessName\": \"{{ $json.ocrExtractedBusinessName }}\",\n  \"ocrLicenseNumber\": \"{{ $json.ocrLicenseNumber }}\",\n  \"ocrIssuingAuthority\": \"{{ $json.ocrIssuingAuthority }}\",\n  \"ocrConfidence\": {{ $json.ocrConfidence }},\n  \"ocrIssues\": \"{{ $json.ocrIssues }}\",\n  \"ocrNameMatch\": \"{{ $json.ocrNameMatch }}\",\n  \"ocrVerdict\": \"{{ $json.ocrVerdict }}\",\n  \"ocrVerdictReason\": \"{{ $json.ocrVerdictReason }}\",\n  \"ocrProcessedAt\": \"{{ $json.ocrProcessedAt }}\",\n  \"updatedAt\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "api_supabase_update_ocr",
+      "name": "api_supabase_update_ocr",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"License Verification Worker\",\n  \"event\": \"ocr_complete\",\n  \"documentId\": {{ $('transform_parse_ocr').item.json.documentId }},\n  \"ocrVerdict\": \"{{ $('transform_parse_ocr').item.json.ocrVerdict }}\",\n  \"ocrConfidence\": {{ $('transform_parse_ocr').item.json.ocrConfidence }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_ocr_complete",
+      "name": "log_supabase_ocr_complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_license_worker": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "send_response_202", "type": "main", "index": 0 }],
+        [{ "node": "send_response_401", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_response_202": {
+      "main": [[{ "node": "api_supabase_signed_url", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_signed_url": {
+      "main": [[{ "node": "transform_build_signed_url", "type": "main", "index": 0 }]]
+    },
+    "transform_build_signed_url": {
+      "main": [[{ "node": "api_groq_ocr_document", "type": "main", "index": 0 }]]
+    },
+    "api_groq_ocr_document": {
+      "main": [[{ "node": "transform_parse_ocr", "type": "main", "index": 0 }]]
+    },
+    "transform_parse_ocr": {
+      "main": [[{ "node": "api_supabase_update_ocr", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_update_ocr": {
+      "main": [[{ "node": "log_supabase_ocr_complete", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "verification" }, { "name": "ai" }, { "name": "ocr" }]
+}

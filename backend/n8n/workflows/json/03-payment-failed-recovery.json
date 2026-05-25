@@ -1,0 +1,306 @@
+{
+  "name": "Payment Failed Recovery",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-payment-failed",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "trigger_webhook_payment_failed",
+      "name": "trigger_webhook_payment_failed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "stripe-payment-failed"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers['stripe-signature'] }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "check_stripe_signature",
+      "name": "check_stripe_signature",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const obj = $json.body.data.object;\nreturn [{ json: {\n  invoiceId: obj.id,\n  customerId: obj.customer,\n  attemptCount: obj.attempt_count,\n  nextPaymentAttempt: obj.next_payment_attempt,\n  subscriptionId: obj.subscription,\n  amountDue: obj.amount_due,\n  currency: obj.currency\n}}];"
+      },
+      "id": "transform_payment_event",
+      "name": "transform_payment_event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?stripeCustomerId=eq.{{ $json.customerId }}&select=id,email,name,subscriptionTier",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_user",
+      "name": "api_supabase_fetch_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('transform_payment_event').item.json.attemptCount }}",
+              "rightValue": 1,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_attempt_1",
+      "name": "check_attempt_1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <hello@inkconnect.app>\",\n  \"to\": \"{{ $json[0].email }}\",\n  \"subject\": \"Payment issue with your Ink Connect subscription\",\n  \"html\": \"<p>Hi {{ $json[0].name }},</p><p>We had trouble processing your subscription payment. Please update your payment method to keep your profile active.</p><p><a href='{{ $env.APP_BASE_URL }}/dashboard?tab=billing' style='background:#000;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;'>Update Payment Method</a></p><p>If you have questions, reply to this email.</p><p>— Ink Connect</p>\"\n}"
+      },
+      "id": "send_email_soft_retry",
+      "name": "send_email_soft_retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 160],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('transform_payment_event').item.json.attemptCount }}",
+              "rightValue": 2,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_attempt_2",
+      "name": "check_attempt_2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <hello@inkconnect.app>\",\n  \"to\": \"{{ $('api_supabase_fetch_user').item.json[0].email }}\",\n  \"subject\": \"Second payment failure — action required\",\n  \"html\": \"<p>Hi {{ $('api_supabase_fetch_user').item.json[0].name }},</p><p><strong>This is the second failed payment attempt.</strong> Your subscription will be paused if this isn't resolved.</p><p><a href='{{ $env.APP_BASE_URL }}/dashboard?tab=billing' style='background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;'>Fix Payment Now</a></p><p>— Ink Connect</p>\"\n}"
+      },
+      "id": "send_email_urgent_retry",
+      "name": "send_email_urgent_retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 320],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('transform_payment_event').item.json.attemptCount }}",
+              "rightValue": 3,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ]
+        }
+      },
+      "id": "check_attempt_3",
+      "name": "check_attempt_3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 500]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $('api_supabase_fetch_user').item.json[0].id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"subscriptionTier\": \"artist_free\", \"updatedAt\": \"{{ new Date().toISOString() }}\" }"
+      },
+      "id": "api_supabase_downgrade_tier",
+      "name": "api_supabase_downgrade_tier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 440],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <hello@inkconnect.app>\",\n  \"to\": \"{{ $('api_supabase_fetch_user').item.json[0].email }}\",\n  \"subject\": \"Your Ink Connect subscription has been paused\",\n  \"html\": \"<p>Hi {{ $('api_supabase_fetch_user').item.json[0].name }},</p><p>After 3 failed payment attempts, your subscription has been paused and your account is now on the free plan. You've lost access to: bidding on requests, contact details, and analytics.</p><p><a href='{{ $env.APP_BASE_URL }}/pricing' style='background:#000;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;'>Reactivate Subscription</a></p><p>— Ink Connect</p>\"\n}"
+      },
+      "id": "send_email_subscription_paused",
+      "name": "send_email_subscription_paused",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <hello@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"Artist downgraded to free tier after payment failure\",\n  \"html\": \"<p>User <strong>{{ $('api_supabase_fetch_user').item.json[0].email }}</strong> (ID: {{ $('api_supabase_fetch_user').item.json[0].id }}) was downgraded to artist_free after {{ $('transform_payment_event').item.json.attemptCount }} failed payment attempts.</p><p>Subscription: {{ $('transform_payment_event').item.json.subscriptionId }}</p><p>Invoice: {{ $('transform_payment_event').item.json.invoiceId }}</p>\"\n}"
+      },
+      "id": "send_alert_admin_downgrade",
+      "name": "send_alert_admin_downgrade",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 560],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Payment Failed Recovery\",\n  \"event\": \"payment_failed\",\n  \"invoiceId\": \"{{ $('transform_payment_event').item.json.invoiceId }}\",\n  \"attemptCount\": {{ $('transform_payment_event').item.json.attemptCount }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_payment_event",
+      "name": "log_supabase_payment_event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2220, 480],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_payment_failed": {
+      "main": [[{ "node": "check_stripe_signature", "type": "main", "index": 0 }]]
+    },
+    "check_stripe_signature": {
+      "main": [
+        [{ "node": "transform_payment_event", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_payment_event", "type": "main", "index": 0 }]
+      ]
+    },
+    "transform_payment_event": {
+      "main": [[{ "node": "api_supabase_fetch_user", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_user": {
+      "main": [[{ "node": "check_attempt_1", "type": "main", "index": 0 }]]
+    },
+    "check_attempt_1": {
+      "main": [
+        [{ "node": "send_email_soft_retry", "type": "main", "index": 0 }],
+        [{ "node": "check_attempt_2", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_email_soft_retry": {
+      "main": [[{ "node": "log_supabase_payment_event", "type": "main", "index": 0 }]]
+    },
+    "check_attempt_2": {
+      "main": [
+        [{ "node": "send_email_urgent_retry", "type": "main", "index": 0 }],
+        [{ "node": "check_attempt_3", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_email_urgent_retry": {
+      "main": [[{ "node": "log_supabase_payment_event", "type": "main", "index": 0 }]]
+    },
+    "check_attempt_3": {
+      "main": [
+        [{ "node": "api_supabase_downgrade_tier", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_payment_event", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_downgrade_tier": {
+      "main": [[{ "node": "send_email_subscription_paused", "type": "main", "index": 0 }]]
+    },
+    "send_email_subscription_paused": {
+      "main": [[{ "node": "send_alert_admin_downgrade", "type": "main", "index": 0 }]]
+    },
+    "send_alert_admin_downgrade": {
+      "main": [[{ "node": "log_supabase_payment_event", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "billing" }, { "name": "stripe" }, { "name": "dunning" }]
+}

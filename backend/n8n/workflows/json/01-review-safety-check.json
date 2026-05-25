@@ -1,0 +1,237 @@
+{
+  "name": "Review Safety Check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "review-safety-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger_webhook_review",
+      "name": "trigger_webhook_review",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "review-safety-check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "=Bearer {{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_auth_header",
+      "name": "check_auth_header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={ \"error\": \"Unauthorized\" }"
+      },
+      "id": "send_response_401",
+      "name": "send_response_401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GROQ_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama3-70b-8192"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\":\"system\",\"content\":\"You are a content moderation system. Analyze the review and respond ONLY with valid JSON.\"},{\"role\":\"user\",\"content\":\"Analyze this tattoo artist marketplace review. Return JSON with: toxicityScore (0-100), spamScore (0-100), isApproved (boolean: true if both scores < 30), reason (string, 1 sentence).\\nReview: \\\"{{ $('trigger_webhook_review').item.json.body.comment }}\\\"\\nRating: {{ $('trigger_webhook_review').item.json.body.rating }}/5\"}]"
+            },
+            { "name": "max_tokens", "value": "200" },
+            { "name": "temperature", "value": "0.1" }
+          ]
+        },
+        "options": { "response": { "response": { "fullResponse": false } } }
+      },
+      "id": "api_groq_analyze_review",
+      "name": "api_groq_analyze_review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $json.choices?.[0]?.message?.content || '';\nlet parsed;\ntry {\n  const match = content.match(/\\{[\\s\\S]*\\}/);\n  parsed = JSON.parse(match ? match[0] : content);\n} catch (e) {\n  parsed = { toxicityScore: 50, spamScore: 50, isApproved: false, reason: 'parse_error' };\n}\nreturn [{ json: {\n  toxicityScore: parsed.toxicityScore ?? 50,\n  spamScore: parsed.spamScore ?? 50,\n  isApproved: parsed.isApproved ?? false,\n  reason: parsed.reason ?? 'unknown',\n  moderationStatus: (parsed.isApproved ?? false) ? 'approved' : 'flagged',\n  moderationFlags: JSON.stringify({ toxicityScore: parsed.toxicityScore, spamScore: parsed.spamScore, reason: parsed.reason }),\n  moderatedAt: new Date().toISOString(),\n  reviewId: $('trigger_webhook_review').item.json.body.reviewId,\n  artistId: $('trigger_webhook_review').item.json.body.artistId,\n  userId: $('trigger_webhook_review').item.json.body.userId,\n  rating: $('trigger_webhook_review').item.json.body.rating,\n  comment: $('trigger_webhook_review').item.json.body.comment\n}}];"
+      },
+      "id": "transform_parse_scores",
+      "name": "transform_parse_scores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/reviews?id=eq.{{ $json.reviewId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "toxicityScore", "value": "={{ $json.toxicityScore }}" },
+            { "name": "spamScore", "value": "={{ $json.spamScore }}" },
+            { "name": "moderationStatus", "value": "={{ $json.moderationStatus }}" },
+            { "name": "moderationFlags", "value": "={{ $json.moderationFlags }}" },
+            { "name": "moderatedAt", "value": "={{ $json.moderatedAt }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_update_review",
+      "name": "api_supabase_update_review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('transform_parse_scores').item.json.moderationStatus }}",
+              "rightValue": "flagged",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_review_flagged",
+      "name": "check_review_flagged",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect Moderation <moderation@inkconnect.app>\",\n  \"to\": \"{{ $env.ADMIN_ALERT_EMAIL }}\",\n  \"subject\": \"[Flagged Review] Artist #{{ $('transform_parse_scores').item.json.artistId }} — Toxicity: {{ $('transform_parse_scores').item.json.toxicityScore }}, Spam: {{ $('transform_parse_scores').item.json.spamScore }}\",\n  \"html\": \"<h2>Flagged Review</h2><p><strong>Review ID:</strong> {{ $('transform_parse_scores').item.json.reviewId }}</p><p><strong>Artist ID:</strong> {{ $('transform_parse_scores').item.json.artistId }}</p><p><strong>Rating:</strong> {{ $('transform_parse_scores').item.json.rating }}/5</p><p><strong>Comment:</strong> {{ $('transform_parse_scores').item.json.comment }}</p><p><strong>Toxicity Score:</strong> {{ $('transform_parse_scores').item.json.toxicityScore }}</p><p><strong>Spam Score:</strong> {{ $('transform_parse_scores').item.json.spamScore }}</p><p><strong>Reason:</strong> {{ $('transform_parse_scores').item.json.reason }}</p><p><a href='{{ $env.APP_BASE_URL }}/admin/moderation'>Review in Moderation Dashboard</a></p>\"\n}"
+      },
+      "id": "send_email_admin_flagged_review",
+      "name": "send_email_admin_flagged_review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "={{ JSON.stringify({ reviewId: $('transform_parse_scores').item.json.reviewId, moderationStatus: $('transform_parse_scores').item.json.moderationStatus, toxicityScore: $('transform_parse_scores').item.json.toxicityScore, spamScore: $('transform_parse_scores').item.json.spamScore, isApproved: $('transform_parse_scores').item.json.isApproved }) }}"
+      },
+      "id": "send_response_result",
+      "name": "send_response_result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Review Safety Check\",\n  \"event\": \"moderation_complete\",\n  \"reviewId\": {{ $('transform_parse_scores').item.json.reviewId }},\n  \"artistId\": {{ $('transform_parse_scores').item.json.artistId }},\n  \"moderationStatus\": \"{{ $('transform_parse_scores').item.json.moderationStatus }}\",\n  \"toxicityScore\": {{ $('transform_parse_scores').item.json.toxicityScore }},\n  \"spamScore\": {{ $('transform_parse_scores').item.json.spamScore }},\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_moderation",
+      "name": "log_supabase_moderation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 400],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_review": {
+      "main": [[{ "node": "check_auth_header", "type": "main", "index": 0 }]]
+    },
+    "check_auth_header": {
+      "main": [
+        [{ "node": "api_groq_analyze_review", "type": "main", "index": 0 }],
+        [{ "node": "send_response_401", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_groq_analyze_review": {
+      "main": [[{ "node": "transform_parse_scores", "type": "main", "index": 0 }]]
+    },
+    "transform_parse_scores": {
+      "main": [[{ "node": "api_supabase_update_review", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_update_review": {
+      "main": [[{ "node": "check_review_flagged", "type": "main", "index": 0 }]]
+    },
+    "check_review_flagged": {
+      "main": [
+        [{ "node": "send_email_admin_flagged_review", "type": "main", "index": 0 }],
+        [{ "node": "send_response_result", "type": "main", "index": 0 }]
+      ]
+    },
+    "send_email_admin_flagged_review": {
+      "main": [[{ "node": "send_response_result", "type": "main", "index": 0 }]]
+    },
+    "send_response_result": {
+      "main": [[{ "node": "log_supabase_moderation", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "moderation" }, { "name": "ai" }]
+}

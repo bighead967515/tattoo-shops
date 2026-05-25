@@ -1,0 +1,234 @@
+{
+  "name": "Subscription Created",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-subscription-created",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "trigger_webhook_stripe",
+      "name": "trigger_webhook_stripe",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "stripe-subscription-created"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers['stripe-signature'] }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "check_stripe_signature",
+      "name": "check_stripe_signature",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const obj = $json.body.data.object;\nconst priceId = obj.items?.data?.[0]?.price?.id ?? '';\nconst iconPrice = $env.STRIPE_PRICE_ID_ARTIST_ICON ?? '';\nconst amateurPrice = $env.STRIPE_PRICE_ID_ARTIST_AMATEUR ?? '';\nlet tier = 'artist_free';\nif (priceId === iconPrice) tier = 'artist_icon';\nelse if (priceId === amateurPrice) tier = 'artist_amateur';\nreturn [{ json: {\n  subscriptionId: obj.id,\n  customerId: obj.customer,\n  priceId,\n  status: obj.status,\n  trialEnd: obj.trial_end,\n  metaUserId: obj.metadata?.userId,\n  tier\n}}];"
+      },
+      "id": "transform_stripe_payload",
+      "name": "transform_stripe_payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?stripeCustomerId=eq.{{ $json.customerId }}&select=id,email,name,subscriptionTier",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        }
+      },
+      "id": "api_supabase_fetch_user",
+      "name": "api_supabase_fetch_user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ Array.isArray($json) && $json.length > 0 }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_user_found",
+      "name": "check_user_found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/users?id=eq.{{ $json[0].id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subscriptionTier\": \"{{ $('transform_stripe_payload').item.json.tier }}\",\n  \"stripeSubscriptionId\": \"{{ $('transform_stripe_payload').item.json.subscriptionId }}\",\n  \"updatedAt\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "api_supabase_update_user_tier",
+      "name": "api_supabase_update_user_tier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('transform_stripe_payload').item.json.trialEnd !== null && $('transform_stripe_payload').item.json.tier === 'artist_icon' }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check_is_founding_artist",
+      "name": "check_is_founding_artist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/artists?userId=eq.{{ $('api_supabase_fetch_user').item.json[0].id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"isFoundingArtist\": true,\n  \"foundingTrialEndsAt\": \"{{ new Date($('transform_stripe_payload').item.json.trialEnd * 1000).toISOString() }}\"\n}"
+      },
+      "id": "api_supabase_update_founding_flags",
+      "name": "api_supabase_update_founding_flags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Ink Connect <hello@inkconnect.app>\",\n  \"to\": \"{{ $('api_supabase_fetch_user').item.json[0].email }}\",\n  \"subject\": \"Your Ink Connect subscription is live\",\n  \"html\": \"<p>Hi {{ $('api_supabase_fetch_user').item.json[0].name }},</p><p>Your <strong>{{ $('transform_stripe_payload').item.json.tier }}</strong> subscription is now active. Welcome aboard.</p><p><a href='{{ $env.APP_BASE_URL }}/artist-dashboard'>Go to your dashboard</a></p><p>— The Ink Connect Team</p>\"\n}"
+      },
+      "id": "send_email_welcome_subscription",
+      "name": "send_email_welcome_subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow\": \"Subscription Created\",\n  \"event\": \"subscription_created\",\n  \"tier\": \"{{ $('transform_stripe_payload').item.json.tier }}\",\n  \"subscriptionId\": \"{{ $('transform_stripe_payload').item.json.subscriptionId }}\",\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "log_supabase_subscription_created",
+      "name": "log_supabase_subscription_created",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 400],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "trigger_webhook_stripe": {
+      "main": [[{ "node": "check_stripe_signature", "type": "main", "index": 0 }]]
+    },
+    "check_stripe_signature": {
+      "main": [
+        [{ "node": "transform_stripe_payload", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_subscription_created", "type": "main", "index": 0 }]
+      ]
+    },
+    "transform_stripe_payload": {
+      "main": [[{ "node": "api_supabase_fetch_user", "type": "main", "index": 0 }]]
+    },
+    "api_supabase_fetch_user": {
+      "main": [[{ "node": "check_user_found", "type": "main", "index": 0 }]]
+    },
+    "check_user_found": {
+      "main": [
+        [{ "node": "api_supabase_update_user_tier", "type": "main", "index": 0 }],
+        [{ "node": "log_supabase_subscription_created", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_update_user_tier": {
+      "main": [[{ "node": "check_is_founding_artist", "type": "main", "index": 0 }]]
+    },
+    "check_is_founding_artist": {
+      "main": [
+        [{ "node": "api_supabase_update_founding_flags", "type": "main", "index": 0 }],
+        [{ "node": "send_email_welcome_subscription", "type": "main", "index": 0 }]
+      ]
+    },
+    "api_supabase_update_founding_flags": {
+      "main": [[{ "node": "send_email_welcome_subscription", "type": "main", "index": 0 }]]
+    },
+    "send_email_welcome_subscription": {
+      "main": [[{ "node": "log_supabase_subscription_created", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "billing" }, { "name": "stripe" }]
+}
