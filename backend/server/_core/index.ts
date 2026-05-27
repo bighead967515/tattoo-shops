@@ -1,11 +1,16 @@
 import "dotenv/config";
-import express, { type Request, type Response, type NextFunction } from "express";
+import express, {
+  type Request,
+  type Response,
+  type NextFunction,
+  type RequestHandler,
+} from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
+import { createRequire } from "module";
 import path from "path";
 import cors from "cors";
-import compression from "compression";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -68,6 +73,7 @@ function parseAllowedOrigins(): string[] {
 }
 
 const allowedOrigins = parseAllowedOrigins();
+const require = createRequire(import.meta.url);
 
 const app = express();
 
@@ -129,7 +135,17 @@ app.use(
 // Gzip/deflate response compression — applied before all middleware so every
 // response (API JSON, HTML, assets) benefits. Static assets already have
 // Content-Encoding from Vite build, so this mainly helps API responses.
-app.use(compression());
+let compressionMiddleware: RequestHandler | null = null;
+try {
+  const compressionModule = require("compression") as () => RequestHandler;
+  compressionMiddleware = compressionModule();
+} catch {
+  logger.warn("compression package not found; continuing without response compression");
+}
+
+if (compressionMiddleware) {
+  app.use(compressionMiddleware);
+}
 
 // CORS configuration
 app.use(
