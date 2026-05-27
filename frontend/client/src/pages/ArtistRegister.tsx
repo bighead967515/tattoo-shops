@@ -392,8 +392,17 @@ export default function ArtistRegister() {
                 Portfolio Photos * <span className="text-muted-foreground font-normal">(min 3, max 6)</span>
               </Label>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                aria-label="Upload portfolio photos"
+                className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mx-auto mb-3 transition-colors" />
                 <p className="text-sm font-medium">Click to upload photos</p>
@@ -425,7 +434,8 @@ export default function ArtistRegister() {
                       <button
                         type="button"
                         onClick={() => removeFile(i)}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={`Remove photo ${i + 1}`}
+                        className="absolute top-1 right-1 w-11 h-11 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                       >
                         <X className="w-3 h-3 text-white" />
                       </button>

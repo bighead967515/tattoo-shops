@@ -206,36 +206,43 @@ export async function draftBidResponse(
   },
 ): Promise<BidAssistantResult> {
   try {
+    // Sanitize user-controlled strings before embedding in the prompt to mitigate
+    // prompt injection. Strip control characters and newlines that could break prompt structure.
+    const sanitizeForPrompt = (s: string, maxLen = 500) =>
+      s.replace(/[\r\n]+/g, " ").replace(/[^\x20-\x7E]/g, "").slice(0, maxLen).trim();
+
     // Build request context
     const requestContext = [
-      `Title: "${request.title}"`,
-      `Description: "${request.description}"`,
-      request.style ? `Style: ${request.style}` : null,
-      `Placement: ${request.placement}`,
-      `Size: ${request.size}`,
+      `Title: "${sanitizeForPrompt(request.title)}"`,
+      `Description: "${sanitizeForPrompt(request.description, 1000)}"`,
+      request.style ? `Style: ${sanitizeForPrompt(request.style)}` : null,
+      `Placement: ${sanitizeForPrompt(request.placement)}`,
+      `Size: ${sanitizeForPrompt(request.size)}`,
       request.colorPreference
-        ? `Color Preference: ${request.colorPreference.replace(/_/g, " & ")}`
+        ? `Color Preference: ${sanitizeForPrompt(request.colorPreference).replace(/_/g, " & ")}`
         : null,
       request.budgetMin || request.budgetMax
         ? `Budget: ${request.budgetMin ? `$${(request.budgetMin / 100).toFixed(0)}` : "?"} - ${request.budgetMax ? `$${(request.budgetMax / 100).toFixed(0)}` : "?"}`
         : null,
       request.desiredTimeframe
-        ? `Timeframe: ${request.desiredTimeframe}`
+        ? `Timeframe: ${sanitizeForPrompt(request.desiredTimeframe)}`
         : null,
     ]
       .filter(Boolean)
       .join("\n");
 
     // Build artist context
+    // Sanitize free-text fields sourced from user input to mitigate prompt injection.
+    // Strip newlines so injected "system:" / "instruction:" lines can't break prompt structure.
     const artistContext = [
-      `Shop/Artist Name: ${artist.shopName}`,
-      artist.styles ? `Specializes in: ${artist.styles}` : null,
-      artist.specialties ? `Known for: ${artist.specialties}` : null,
+      `Shop/Artist Name: ${sanitizeForPrompt(artist.shopName)}`,
+      artist.styles ? `Specializes in: ${sanitizeForPrompt(artist.styles)}` : null,
+      artist.specialties ? `Known for: ${sanitizeForPrompt(artist.specialties)}` : null,
       artist.experience ? `${artist.experience} years of experience` : null,
       artist.city && artist.state
-        ? `Based in ${artist.city}, ${artist.state}`
+        ? `Based in ${sanitizeForPrompt(artist.city)}, ${sanitizeForPrompt(artist.state)}`
         : null,
-      artist.bio ? `Bio: ${artist.bio}` : null,
+      artist.bio ? `Bio: ${sanitizeForPrompt(artist.bio)}` : null,
     ]
       .filter(Boolean)
       .join("\n");

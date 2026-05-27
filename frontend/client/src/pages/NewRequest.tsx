@@ -298,6 +298,10 @@ function PromptRefinerSection({ description, context, onUseImproved }: PromptRef
 export default function NewRequest() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const [preferredArtist, setPreferredArtist] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRequestId, setSubmittedRequestId] = useState<number | null>(null);
   const [selectedBudgetPreset, setSelectedBudgetPreset] = useState<
@@ -350,6 +354,28 @@ export default function NewRequest() {
       } catch { /* ignore malformed draft */ }
       sessionStorage.removeItem("newRequestDraft");
     }
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const artistIdRaw = params.get("artistId");
+    const artistName = params.get("artistName")?.trim() || "";
+    const artistStyle = params.get("artistStyle")?.trim() || "";
+    const artistCity = params.get("artistCity")?.trim() || "";
+    const artistState = params.get("artistState")?.trim() || "";
+
+    const artistId = artistIdRaw ? Number.parseInt(artistIdRaw, 10) : NaN;
+    if (!Number.isFinite(artistId) || !artistName) return;
+
+    setPreferredArtist({ id: artistId, name: artistName });
+
+    setFormData((prev) => ({
+      ...prev,
+      title: prev.title || `Tattoo idea for ${artistName}`,
+      style: prev.style || artistStyle,
+      preferredCity: prev.preferredCity || artistCity,
+      preferredState: prev.preferredState || artistState,
+    }));
   }, []);
 
   useEffect(() => {
@@ -408,9 +434,18 @@ export default function NewRequest() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      const preferredArtistPrefix = preferredArtist
+        ? `[Preferred artist: ${preferredArtist.name} (${preferredArtist.id})] `
+        : "";
+      const descriptionWithPreference =
+        preferredArtist &&
+        !formData.description.startsWith(preferredArtistPrefix)
+          ? `${preferredArtistPrefix}${formData.description}`
+          : formData.description;
+
       const newRequest = await createRequest.mutateAsync({
         title: formData.title,
-        description: formData.description,
+        description: descriptionWithPreference,
         style: formData.style || undefined,
         placement: formData.placement,
         size: formData.size,
@@ -587,6 +622,11 @@ export default function NewRequest() {
               </p>
             </div>
           </div>
+          {preferredArtist && (
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+              Sending this request with a preferred artist tag for <strong>{preferredArtist.name}</strong>.
+            </div>
+          )}
         </div>
 
           <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
@@ -841,7 +881,8 @@ export default function NewRequest() {
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={`Remove reference image ${index + 1}`}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full min-w-[44px] min-h-[44px] p-2 flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -850,7 +891,16 @@ export default function NewRequest() {
                 </div>
               )}
               {uploadedImages.length < 3 && (
-                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border/50 rounded-xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
+                <label
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.currentTarget.click();
+                    }
+                  }}
+                  className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border/50 rounded-xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
                   <ImagePlus className="h-7 w-7 text-muted-foreground mb-1.5" />
                   <span className="text-sm text-muted-foreground">
                     Add Photos (Optional)

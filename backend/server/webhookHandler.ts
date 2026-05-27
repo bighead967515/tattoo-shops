@@ -299,9 +299,7 @@ async function handleSubscriptionCheckoutCompleted(
 
 /**
  * Handle subscription created / updated events.
- * Maps the Stripe Price ID to a client tier, updates both
- * the canonical `users.subscriptionTier` and the legacy
- * `clients.subscriptionTier` + `aiCredits`.
+ * Maps the Stripe Price ID to a tier and updates users.subscriptionTier.
  */
 async function handleSubscriptionChange(
   subscription: Stripe.Subscription,
@@ -340,7 +338,7 @@ async function handleSubscriptionChange(
 
 /**
  * Handle artist subscription created / updated events.
- * Updates both users.subscriptionTier and artists.subscriptionTier.
+ * Updates users.subscriptionTier (canonical).
  */
 async function handleArtistSubscriptionChange(
   subscription: Stripe.Subscription,
@@ -381,12 +379,14 @@ async function handleArtistSubscriptionChange(
       .where(eq(users.id, user.id));
 
     const isFoundingArtist = subscription.metadata?.isFoundingArtist === "true";
+    // subscriptionTier is no longer synced to the artists table — users.subscriptionTier
+    // is the canonical source. The deprecated artists.subscriptionTier column has been
+    // dropped from the schema; run `pnpm db:push` to apply the migration.
     const artistUpdate: {
-      subscriptionTier: typeof tier;
       updatedAt: Date;
       isFoundingArtist?: boolean;
       foundingTrialEndsAt?: Date | null;
-    } = { subscriptionTier: tier, updatedAt: new Date() };
+    } = { updatedAt: new Date() };
 
     if (isFoundingArtist) {
       artistUpdate.isFoundingArtist = true;
@@ -466,11 +466,9 @@ async function handleSubscriptionCancelled(
         })
         .where(eq(users.id, user.id));
 
-      // Keep deprecated column in sync for backward compat
       await tx
         .update(artists)
         .set({
-          subscriptionTier: "artist_free",
           updatedAt: new Date(),
         })
         .where(eq(artists.userId, user.id));
@@ -487,7 +485,6 @@ async function handleSubscriptionCancelled(
       await tx
         .update(clients)
         .set({
-          subscriptionTier: "client_free",
           aiCredits: 0,
           stripeSubscriptionId: null,
           updatedAt: new Date(),

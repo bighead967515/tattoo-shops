@@ -12,6 +12,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   Plus,
@@ -373,15 +384,36 @@ function RequestList({ requests, loading, onCancel }: RequestListProps) {
                   </Button>
                 </Link>
                 {request.status === "open" && onCancel && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10"
-                    onClick={() => onCancel(request.id)}
-                  >
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Cancel
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel this request?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will cancel your tattoo request and notify any
+                          artists who have bid. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep Request</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => onCancel(request.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Yes, cancel it
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
             </CardContent>
@@ -394,7 +426,11 @@ function RequestList({ requests, loading, onCancel }: RequestListProps) {
 
 function DashboardSkeleton() {
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div
+      aria-busy="true"
+      aria-label="Loading dashboard"
+      className="container mx-auto py-8 px-4"
+    >
       <div className="flex justify-between items-center mb-8">
         <div>
           <Skeleton className="h-8 w-48 mb-2" />

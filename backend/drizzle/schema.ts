@@ -116,11 +116,9 @@ export const artists = pgTable("artists", {
   averageRating: text("averageRating"),
   totalReviews: integer("totalReviews").default(0),
   isApproved: boolean("isApproved").default(false),
-  /** @deprecated Read from users.subscriptionTier instead. Kept for backward-compat queries. */
-  subscriptionTier: varchar("subscriptionTier", { length: 30 })
-    .$type<SubscriptionTier>()
-    .default("artist_free")
-    .notNull(),
+  // artists.subscriptionTier was deprecated in favour of users.subscriptionTier.
+  // The column has been removed from this schema; run `pnpm db:push` to drop it from
+  // the database (generates: ALTER TABLE artists DROP COLUMN subscriptionTier).
   bidsUsed: integer("bidsUsed").default(0).notNull(),
   /** Number of bids submitted in the current calendar month (resets on 1st of each month) */
   bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
@@ -386,14 +384,9 @@ export const clients = pgTable("clients", {
   state: varchar("state", { length: 50 }),
   phone: varchar("phone", { length: 50 }),
   onboardingCompleted: boolean("onboardingCompleted").default(false),
-  /**
-   * @deprecated Read from users.subscriptionTier instead. Kept for backward-compat queries.
-   * During the transition, application-level sync propagates users.subscriptionTier → clients.subscriptionTier
-   * whenever Stripe webhooks update the user record.
-   */
-  subscriptionTier: varchar("subscriptionTier", { length: 30 })
-    .default("client_free")
-    .notNull(), // 'client_free', 'enthusiast', 'elite'
+  // clients.subscriptionTier was deprecated in favour of users.subscriptionTier.
+  // The column has been removed from this schema; run `pnpm db:push` to drop it from
+  // the database (generates: ALTER TABLE clients DROP COLUMN subscriptionTier).
   aiCredits: integer("aiCredits").default(0).notNull(), // Number of AI generation credits remaining
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID for billing
   createdAt: timestamp("createdAt").defaultNow().notNull(),

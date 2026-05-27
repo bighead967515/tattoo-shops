@@ -45,6 +45,29 @@ Ink Connect now supports all tattoo projects. Discover artists by style, compare
 - Day 2: Send client and artist announcement emails
 - Day 3-7: Monitor engagement and collect qualitative feedback
 
+## Launch Readiness Gates (Must Be Complete Before Day 1)
+
+This rollout should not start until the blocking launch items in TODO are complete.
+
+- [ ] Environment and secrets configured for production
+	- DATABASE_URL, JWT_SECRET, Supabase, Stripe, Resend, Groq, Hugging Face
+- [ ] Domain/cookies/CORS behavior verified on Render
+- [ ] Stripe webhook reliability checks complete
+	- SSL/proxy validation, webhook retry backlog alerting, replay process tested
+- [ ] Health and incident readiness complete
+	- /api/health uptime monitor, Sentry on-call alerts, DB backup/recovery runbook
+- [ ] Staging e2e validation complete
+	- auth regression, booking payment path, request to bid to accept flow, license verification flow
+
+Reference checklist: TODO.md (Critical Before Launch + Launch Day Runbook)
+
+## Unified Execution Sequence
+
+1. Complete Launch Readiness Gates above.
+2. Execute Day 1-2 rollout schedule.
+3. Monitor Day 3-7 signals and feedback channels.
+4. Execute Follow-up Actions based on metric direction.
+
 ## Feedback Plan
 
 ### Collection channels

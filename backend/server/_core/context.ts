@@ -1,5 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
+import type { Artist, User } from "../../drizzle/schema";
 import { supabaseAdmin } from "./supabase";
 import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
@@ -10,6 +10,7 @@ export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  artist?: Artist | null;
 };
 
 export async function createContext(
@@ -53,5 +54,6 @@ export async function createContext(
     req: opts.req,
     res: opts.res,
     user,
+    artist: null,
   };
 }

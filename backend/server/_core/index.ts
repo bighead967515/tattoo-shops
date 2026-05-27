@@ -5,7 +5,9 @@ import { createServer } from "http";
 import net from "net";
 import path from "path";
 import cors from "cors";
+import compression from "compression";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerSupabaseAuthRoutes } from "./supabaseAuth";
 import { csrfTokenMiddleware, csrfProtectionMiddleware } from "./csrf";
@@ -76,6 +78,59 @@ app.set("trust proxy", 1);
 // Initialize Sentry early (must be before other middleware)
 initSentry();
 
+// Security headers
+// CSP is production-only — Vite dev middleware uses websockets and inline code for HMR
+// that would be blocked by a strict policy.
+//
+// Policy notes:
+//   script-src: 'strict-dynamic' allows Vite's code-split dynamic imports without
+//               'unsafe-eval'. https:/http: are legacy-browser fallbacks (ignored when
+//               strict-dynamic is supported).
+//   style-src:  'unsafe-inline' required by Tailwind/shadcn runtime class injection.
+//   img-src:    Supabase hostname for portfolio/request images; data: + blob: for upload
+//               previews generated with URL.createObjectURL().
+//   connect-src: tRPC (same-origin), Supabase auth + realtime websocket, Stripe checkout.
+//   frame-src:  Stripe payment iframe.
+app.use(
+  helmet({
+    contentSecurityPolicy: ENV.isProduction
+      ? {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'strict-dynamic'", "https:", "http:"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: [
+              "'self'",
+              "data:",
+              "blob:",
+              new URL(ENV.supabaseUrl).hostname,
+            ],
+            connectSrc: [
+              "'self'",
+              ENV.supabaseUrl,
+              ENV.supabaseUrl.replace("https://", "wss://"),
+              "https://api.stripe.com",
+            ],
+            frameSrc: [
+              "https://js.stripe.com",
+              "https://hooks.stripe.com",
+            ],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            upgradeInsecureRequests: [],
+          },
+        }
+      : false,
+  }),
+);
+
+// Gzip/deflate response compression — applied before all middleware so every
+// response (API JSON, HTML, assets) benefits. Static assets already have
+// Content-Encoding from Vite build, so this mainly helps API responses.
+app.use(compression());
+
 // CORS configuration
 app.use(
   cors({
@@ -108,8 +163,11 @@ const limiter = rateLimit({
     });
   },
   skip: (req) => {
-    // Skip rate limiting for GET tRPC queries (read-only, public data)
-    return req.method === "GET" && req.path.startsWith("/api/trpc/");
+    // Only skip rate limiting for lightweight, cacheable GET tRPC queries.
+    // AI discovery, search, and other expensive procedures remain rate-limited.
+    if (req.method !== "GET" || !req.path.startsWith("/api/trpc/")) return false;
+    const expensive = ["artists.discover", "requests.refineDescription", "ai."];
+    return !expensive.some((prefix) => req.path.includes(prefix));
   },
 });
 app.use("/api/", limiter);
@@ -129,6 +187,33 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth/", authLimiter);
 
+// Strict rate limiting for AI generation routes: 10 requests per 15 minutes per IP.
+// Each call triggers a paid Hugging Face image generation; the general 500 req/15min
+// limit is far too permissive for a billed external API.
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      error: "AI generation limit reached. Please try again in 15 minutes.",
+      retryAfter: 15,
+    });
+  },
+  keyGenerator: (req) => {
+    // Key by IP + user cookie so authenticated users have individual limits
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.ip ||
+      "unknown";
+    const session = req.cookies?.["app_session_id"] || "";
+    return `${ip}:${session}`;
+  },
+});
+// Applied before the generic /api/ limiter so AI routes hit this limit first.
+app.use("/api/trpc/ai.", aiLimiter);
+
 // Stripe webhook needs raw body for signature verification
 // MUST be registered BEFORE express.json()
 app.post(
@@ -137,10 +222,11 @@ app.post(
   handleStripeWebhook,
 );
 
-// Configure body parser with larger size limit for file uploads
+// Configure body parser — files are uploaded directly to Supabase Storage via signed URLs,
+// so the JSON body limit only needs to cover text payloads (descriptions, bids, reviews).
 app.use(cookieParser());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ limit: "5mb", extended: true }));
 
 // P1-1 CSRF Protection Middleware
 // Verify CSRF tokens on all mutations (POST/PUT/PATCH/DELETE)
@@ -361,6 +447,23 @@ app.use(
     server.listen(port, host, () => {
       logger.info(`Server running on http://${host}:${port}/`);
     });
+
+    // Graceful shutdown: allow in-flight requests to complete before exiting.
+    // Render (and most container orchestrators) send SIGTERM before force-killing.
+    const shutdown = (signal: string) => {
+      logger.info(`${signal} received — shutting down gracefully`);
+      server.close(() => {
+        logger.info("HTTP server closed");
+        process.exit(0);
+      });
+      // Force exit after 10 s if connections don't drain
+      setTimeout(() => {
+        logger.error("Forced shutdown after timeout");
+        process.exit(1);
+      }, 10_000).unref();
+    };
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   };
 
   startServer().catch((error) => {

@@ -106,8 +106,6 @@ if (ENV.isProduction) {
     ENV.stripeArtistIconPriceIdMonth,
     ENV.stripeArtistIconPriceIdYear,
     ENV.stripeFoundingArtistPriceId,
-    ENV.stripeClientPlusPriceId,
-    ENV.stripeClientElitePriceId,
   ];
   
   const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));

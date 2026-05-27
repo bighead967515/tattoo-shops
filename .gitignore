@@ -27,6 +27,8 @@ jspm_packages/
 coverage/
 *.lcov
 .nyc_output
+playwright-report/
+test-results/
 
 # Next.js
 /.next/

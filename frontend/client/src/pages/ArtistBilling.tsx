@@ -200,7 +200,7 @@ export default function ArtistBilling() {
     );
   }
 
-  const currentCanonical = artist.subscriptionTier ?? "artist_free";
+  const currentCanonical = user.subscriptionTier ?? "artist_free";
   const currentPlan = PLANS.find((p) => p.canonicalTier === currentCanonical) ?? PLANS[0];
 
   const handleSubscribe = async (plan: PlanDef) => {

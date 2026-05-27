@@ -2,6 +2,7 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import type { Artist } from "../../drizzle/schema";
 import { getArtistByUserId } from "../db";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -42,13 +43,16 @@ export const artistProcedure = protectedProcedure.use(
       });
     }
 
-    return next({ ctx });
+    // Attach the fetched artist to context so artistOwnerProcedure can reuse it
+    // without issuing a second database query for the same row.
+    return next({ ctx: { ...ctx, artist: artist as Artist | null } });
   }),
 );
 
 /**
- * Ensures the user owns the artist profile specified in input
- * Checks input.artistId or input.id depending on the mutation/query
+ * Ensures the user owns the artist profile specified in input.
+ * Checks input.artistId or input.id depending on the mutation/query.
+ * Reuses ctx.artist populated by artistProcedure — no extra DB query.
  */
 export const artistOwnerProcedure = artistProcedure.use(
   t.middleware(async ({ ctx, next, input }) => {
@@ -58,7 +62,8 @@ export const artistOwnerProcedure = artistProcedure.use(
 
     if (ctx.user.role === "admin") return next({ ctx });
 
-    const artist = await getArtistByUserId(ctx.user.id);
+    // ctx.artist was already fetched by artistProcedure middleware.
+    const artist = ctx.artist;
     const parsedInput = input as { artistId?: number; id?: number } | undefined;
     const targetArtistId = parsedInput?.artistId ?? parsedInput?.id;
 

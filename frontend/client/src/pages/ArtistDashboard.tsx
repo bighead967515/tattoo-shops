@@ -45,6 +45,17 @@ import { format } from "date-fns";
 import ArtistDashboardFeed from "@/components/ArtistDashboardFeed";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import axios from "axios";
 import { getArtistTierLimits, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { Link } from "wouter";
@@ -587,17 +598,37 @@ export default function ArtistDashboard() {
                         )}
                       {/* Hover overlay with delete + re-analyze buttons */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={() =>
-                            deletePortfolioImageMutation.mutate({
-                              id: image.id,
-                            })
-                          }
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Delete this image?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently remove the image from your
+                                portfolio. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  deletePortfolioImageMutation.mutate({
+                                    id: image.id,
+                                  })
+                                }
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </Card>
                   );

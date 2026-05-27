@@ -123,6 +123,17 @@ export default function ArtistProfile() {
     setShowBookingDialog(true);
   };
 
+  const handleSendRequest = () => {
+    const params = new URLSearchParams({
+      artistId: String(artistId),
+      artistName: artist.shopName || "",
+      artistStyle: artist.styles || "",
+      artistCity: artist.city || "",
+      artistState: artist.state || "",
+    });
+    setLocation(`/client/new-request?${params.toString()}`);
+  };
+
   const seo = useMemo(() => {
     const fallbackTitle = "Tattoo Artist Profile | Ink Connect";
     const fallbackDescription =
@@ -179,6 +190,9 @@ export default function ArtistProfile() {
   }
 
   const avgRating = artist.averageRating ? parseFloat(artist.averageRating) : 0;
+  const isVerifiedArtist =
+    (artist as { verificationStatus?: string }).verificationStatus ===
+    "verified";
 
   return (
     <div className="min-h-screen bg-background">
@@ -191,6 +205,12 @@ export default function ArtistProfile() {
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 <h1 className="text-4xl font-bold">{artist.shopName}</h1>
+                {isVerifiedArtist && (
+                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30 gap-1.5 px-3 py-1 text-sm font-semibold">
+                    <ShieldCheck className="w-4 h-4" />
+                    Verified Artist
+                  </Badge>
+                )}
                 {portfolio && portfolio.length >= 3 && (
                   <Badge className="bg-primary/15 text-primary border border-primary/30 gap-1.5 px-3 py-1 text-sm font-semibold">
                     <ShieldCheck className="w-4 h-4" />
@@ -336,7 +356,11 @@ export default function ArtistProfile() {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 w-full md:w-auto md:min-w-[200px]">
-              <Button size="lg" className="w-full" onClick={handleBookNow}>
+              <Button size="lg" className="w-full" onClick={handleSendRequest}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Send a Request
+              </Button>
+              <Button size="lg" variant="outline" className="w-full" onClick={handleBookNow}>
                 <Calendar className="w-4 h-4 mr-2" />
                 Book Appointment
               </Button>
@@ -367,15 +391,26 @@ export default function ArtistProfile() {
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label
+                        id="review-rating-label"
+                        className="block text-sm font-medium mb-2"
+                      >
                         Rating
                       </label>
-                      <div className="flex gap-2">
+                      <div
+                        role="radiogroup"
+                        aria-labelledby="review-rating-label"
+                        className="flex gap-2"
+                      >
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
+                            type="button"
+                            role="radio"
+                            aria-checked={star === reviewRating}
+                            aria-label={`${star} star${star > 1 ? "s" : ""}`}
                             onClick={() => setReviewRating(star)}
-                            className="focus:outline-none"
+                            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                           >
                             <Star
                               className={`w-8 h-8 ${
@@ -389,10 +424,14 @@ export default function ArtistProfile() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label
+                        htmlFor="review-comment"
+                        className="block text-sm font-medium mb-2"
+                      >
                         Comment
                       </label>
                       <Textarea
+                        id="review-comment"
                         value={reviewComment}
                         onChange={(e) => setReviewComment(e.target.value)}
                         placeholder="Share your experience..."

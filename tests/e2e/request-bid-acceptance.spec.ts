@@ -12,6 +12,55 @@ function trpcResult(json: unknown) {
 }
 
 test.describe("Request To Bid Acceptance", () => {
+  test("shows secure payment trust copy and cancellation policy link in accept dialog", async ({
+    page,
+  }) => {
+    await page.route("**/api/trpc/**", async (route) => {
+      const url = route.request().url();
+
+      if (url.includes("/api/trpc/auth.me")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(trpcResult(SEEDED_CLIENT_USER)),
+        });
+        return;
+      }
+
+      if (url.includes("/api/trpc/requests.getById")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(trpcResult(buildSeededRequestDetail(false))),
+        });
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.goto(`${BASE_URL}/requests/${SEEDED_REQUEST_ID}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+
+    await page.getByRole("button", { name: /Accept This Bid/i }).click();
+
+    await expect(
+      page.getByText(/Deposits are processed securely via Stripe\./i),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Card details are not shared with the artist\./i),
+    ).toBeVisible();
+
+    const policyLink = page.getByRole("link", {
+      name: /View cancellation policy/i,
+    });
+    await expect(policyLink).toBeVisible();
+    await expect(policyLink).toHaveAttribute("href", "/cancellation-policy");
+    await expect(policyLink).toHaveAttribute("target", "_blank");
+  });
+
   test("accepts a pending bid using seeded fixtures", async ({ page }) => {
     let accepted = false;
 

@@ -32,6 +32,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -240,7 +251,7 @@ export default function RequestDetail() {
   );
   // Per-tier monthly bid quota logic
   const effectiveArtistTier =
-    (user?.subscriptionTier ?? artistProfile?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+    (user?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
   const isFreeTier = effectiveArtistTier === "artist_free";
   const tierLimits = getArtistTierLimits(effectiveArtistTier);
   const bidsPerMonth = tierLimits.freeBidsPerMonth;
@@ -294,7 +305,11 @@ export default function RequestDetail() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div
+        aria-busy="true"
+        aria-label="Loading request details"
+        className="container mx-auto py-8 px-4 max-w-4xl"
+      >
         <Skeleton className="h-8 w-64 mb-4" />
         <Skeleton className="h-64 w-full mb-4" />
         <Skeleton className="h-32 w-full" />
@@ -644,20 +659,59 @@ export default function RequestDetail() {
                         request.status === "open" &&
                         bid.status === "pending" && (
                           <CardFooter className="border-t pt-4">
-                            <Button
-                              onClick={() =>
-                                acceptBid.mutate({ bidId: bid.id })
-                              }
-                              disabled={acceptBid.isPending}
-                              className="w-full"
-                            >
-                              {acceptBid.isPending ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Check className="mr-2 h-4 w-4" />
-                              )}
-                              Accept This Bid
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  disabled={acceptBid.isPending}
+                                  className="w-full"
+                                >
+                                  {acceptBid.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="mr-2 h-4 w-4" />
+                                  )}
+                                  Accept This Bid
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Accept this bid?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will accept the bid and automatically
+                                    decline all other bids on this request. This
+                                    action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <div className="space-y-2 text-sm text-muted-foreground">
+                                  <p>
+                                    Deposits are processed securely via Stripe.
+                                  </p>
+                                  <p>
+                                    Card details are not shared with the artist.
+                                  </p>
+                                  <a
+                                    href="/cancellation-policy"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-block underline underline-offset-2"
+                                  >
+                                    View cancellation policy
+                                  </a>
+                                </div>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      acceptBid.mutate({ bidId: bid.id })
+                                    }
+                                  >
+                                    Yes, accept bid
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </CardFooter>
                         )}
                     </Card>

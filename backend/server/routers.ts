@@ -448,12 +448,6 @@ export const appRouter = router({
         .set({ subscriptionTier: "artist_pro" })
         .where(eq(users.id, ctx.user.id));
 
-      // Keep deprecated mirror field in sync during migration period.
-      await database
-        .update(artists)
-        .set({ subscriptionTier: "artist_pro" })
-        .where(eq(artists.id, artist.id));
-
       return { success: true, tier: "artist_pro" as const };
     }),
   }),

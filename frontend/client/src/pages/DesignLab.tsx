@@ -120,6 +120,7 @@ function DesignLab() {
 
   const credits = creditsQuery.data;
   const hasCredits = (credits?.aiCredits ?? 0) > 0;
+  const isFreeTier = user.subscriptionTier === "client_free";
   const isGenerating = generateMutation.isPending;
 
   return (
