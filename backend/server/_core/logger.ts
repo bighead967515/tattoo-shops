@@ -47,13 +47,32 @@ export const logger = winston.createLogger({
   transports,
 });
 
+function serializeUnknownError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    value: error,
+  };
+}
+
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection at:", { promise, reason });
+  logger.error("Unhandled Rejection at:", {
+    promise,
+    reason: serializeUnknownError(reason),
+  });
 });
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
-  logger.error("Uncaught Exception:", { error });
+  logger.error("Uncaught Exception:", {
+    error: serializeUnknownError(error),
+  });
   process.exit(1);
 });

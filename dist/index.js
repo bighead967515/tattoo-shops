@@ -113,9 +113,7 @@ var init_env = __esm({
         ENV.stripeArtistProPriceIdYear,
         ENV.stripeArtistIconPriceIdMonth,
         ENV.stripeArtistIconPriceIdYear,
-        ENV.stripeFoundingArtistPriceId,
-        ENV.stripeClientPlusPriceId,
-        ENV.stripeClientElitePriceId
+        ENV.stripeFoundingArtistPriceId
       ];
       const testIdUsed = priceIds.some((id) => testModeStripeIds.includes(id));
       if (testIdUsed) {
@@ -228,8 +226,9 @@ var init_schema = __esm({
       averageRating: text("averageRating"),
       totalReviews: integer("totalReviews").default(0),
       isApproved: boolean("isApproved").default(false),
-      /** @deprecated Read from users.subscriptionTier instead. Kept for backward-compat queries. */
-      subscriptionTier: varchar("subscriptionTier", { length: 30 }).$type().default("artist_free").notNull(),
+      // artists.subscriptionTier was deprecated in favour of users.subscriptionTier.
+      // The column has been removed from this schema; run `pnpm db:push` to drop it from
+      // the database (generates: ALTER TABLE artists DROP COLUMN subscriptionTier).
       bidsUsed: integer("bidsUsed").default(0).notNull(),
       /** Number of bids submitted in the current calendar month (resets on 1st of each month) */
       bidsThisMonth: integer("bidsThisMonth").default(0).notNull(),
@@ -461,13 +460,9 @@ var init_schema = __esm({
       state: varchar("state", { length: 50 }),
       phone: varchar("phone", { length: 50 }),
       onboardingCompleted: boolean("onboardingCompleted").default(false),
-      /**
-       * @deprecated Read from users.subscriptionTier instead. Kept for backward-compat queries.
-       * During the transition, application-level sync propagates users.subscriptionTier → clients.subscriptionTier
-       * whenever Stripe webhooks update the user record.
-       */
-      subscriptionTier: varchar("subscriptionTier", { length: 30 }).default("client_free").notNull(),
-      // 'client_free', 'enthusiast', 'elite'
+      // clients.subscriptionTier was deprecated in favour of users.subscriptionTier.
+      // The column has been removed from this schema; run `pnpm db:push` to drop it from
+      // the database (generates: ALTER TABLE clients DROP COLUMN subscriptionTier).
       aiCredits: integer("aiCredits").default(0).notNull(),
       // Number of AI generation credits remaining
       stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
@@ -1248,9 +1243,11 @@ import express2 from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
+import { createRequire } from "module";
 import path6 from "path";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // backend/server/_core/supabase.ts
@@ -1621,7 +1618,7 @@ var artistProcedure = protectedProcedure.use(
         message: "You must have an artist profile to perform this action"
       });
     }
-    return next({ ctx });
+    return next({ ctx: { ...ctx, artist } });
   })
 );
 var artistOwnerProcedure = artistProcedure.use(
@@ -1630,7 +1627,7 @@ var artistOwnerProcedure = artistProcedure.use(
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
     if (ctx.user.role === "admin") return next({ ctx });
-    const artist = await getArtistByUserId(ctx.user.id);
+    const artist = ctx.artist;
     const parsedInput = input;
     const targetArtistId = parsedInput?.artistId ?? parsedInput?.id;
     if (!artist || targetArtistId && artist.id !== targetArtistId) {
@@ -2047,23 +2044,24 @@ IMPORTANT:
 - Return ONLY the raw JSON object.`;
 async function draftBidResponse(request, artist) {
   try {
+    const sanitizeForPrompt = (s, maxLen = 500) => s.replace(/[\r\n]+/g, " ").replace(/[^\x20-\x7E]/g, "").slice(0, maxLen).trim();
     const requestContext = [
-      `Title: "${request.title}"`,
-      `Description: "${request.description}"`,
-      request.style ? `Style: ${request.style}` : null,
-      `Placement: ${request.placement}`,
-      `Size: ${request.size}`,
-      request.colorPreference ? `Color Preference: ${request.colorPreference.replace(/_/g, " & ")}` : null,
+      `Title: "${sanitizeForPrompt(request.title)}"`,
+      `Description: "${sanitizeForPrompt(request.description, 1e3)}"`,
+      request.style ? `Style: ${sanitizeForPrompt(request.style)}` : null,
+      `Placement: ${sanitizeForPrompt(request.placement)}`,
+      `Size: ${sanitizeForPrompt(request.size)}`,
+      request.colorPreference ? `Color Preference: ${sanitizeForPrompt(request.colorPreference).replace(/_/g, " & ")}` : null,
       request.budgetMin || request.budgetMax ? `Budget: ${request.budgetMin ? `$${(request.budgetMin / 100).toFixed(0)}` : "?"} - ${request.budgetMax ? `$${(request.budgetMax / 100).toFixed(0)}` : "?"}` : null,
-      request.desiredTimeframe ? `Timeframe: ${request.desiredTimeframe}` : null
+      request.desiredTimeframe ? `Timeframe: ${sanitizeForPrompt(request.desiredTimeframe)}` : null
     ].filter(Boolean).join("\n");
     const artistContext = [
-      `Shop/Artist Name: ${artist.shopName}`,
-      artist.styles ? `Specializes in: ${artist.styles}` : null,
-      artist.specialties ? `Known for: ${artist.specialties}` : null,
+      `Shop/Artist Name: ${sanitizeForPrompt(artist.shopName)}`,
+      artist.styles ? `Specializes in: ${sanitizeForPrompt(artist.styles)}` : null,
+      artist.specialties ? `Known for: ${sanitizeForPrompt(artist.specialties)}` : null,
       artist.experience ? `${artist.experience} years of experience` : null,
-      artist.city && artist.state ? `Based in ${artist.city}, ${artist.state}` : null,
-      artist.bio ? `Bio: ${artist.bio}` : null
+      artist.city && artist.state ? `Based in ${sanitizeForPrompt(artist.city)}, ${sanitizeForPrompt(artist.state)}` : null,
+      artist.bio ? `Bio: ${sanitizeForPrompt(artist.bio)}` : null
     ].filter(Boolean).join("\n");
     const parsed2 = await groqGenerateJson(
       BID_ASSISTANT_PROMPT,
@@ -4139,7 +4137,6 @@ var appRouter = router({
         });
       }
       await database.update(users).set({ subscriptionTier: "artist_pro" }).where(eq5(users.id, ctx.user.id));
-      await database.update(artists).set({ subscriptionTier: "artist_pro" }).where(eq5(artists.id, artist.id));
       return { success: true, tier: "artist_pro" };
     })
   }),
@@ -4478,7 +4475,8 @@ async function createContext(opts) {
   return {
     req: opts.req,
     res: opts.res,
-    user
+    user,
+    artist: null
   };
 }
 
@@ -5027,7 +5025,7 @@ async function handleArtistSubscriptionChange(subscription, tier, eventType) {
   await database.transaction(async (tx) => {
     await tx.update(users).set({ stripeCustomerId, subscriptionTier: tier, stripeSubscriptionId: subscription.id, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(users.id, user.id));
     const isFoundingArtist = subscription.metadata?.isFoundingArtist === "true";
-    const artistUpdate = { subscriptionTier: tier, updatedAt: /* @__PURE__ */ new Date() };
+    const artistUpdate = { updatedAt: /* @__PURE__ */ new Date() };
     if (isFoundingArtist) {
       artistUpdate.isFoundingArtist = true;
       const trialEnd = subscription.trial_end;
@@ -5075,7 +5073,6 @@ async function handleSubscriptionCancelled(subscription) {
         updatedAt: /* @__PURE__ */ new Date()
       }).where(eq8(users.id, user.id));
       await tx.update(artists).set({
-        subscriptionTier: "artist_free",
         updatedAt: /* @__PURE__ */ new Date()
       }).where(eq8(artists.userId, user.id));
     } else {
@@ -5085,7 +5082,6 @@ async function handleSubscriptionCancelled(subscription) {
         updatedAt: /* @__PURE__ */ new Date()
       }).where(eq8(users.id, user.id));
       await tx.update(clients).set({
-        subscriptionTier: "client_free",
         aiCredits: 0,
         stripeSubscriptionId: null,
         updatedAt: /* @__PURE__ */ new Date()
@@ -5249,9 +5245,52 @@ function parseAllowedOrigins() {
   ] : ["http://localhost:3000", "http://localhost:5173"];
 }
 var allowedOrigins = parseAllowedOrigins();
+var require2 = createRequire(import.meta.url);
 var app = express2();
 app.set("trust proxy", 1);
 initSentry();
+app.use(
+  helmet({
+    contentSecurityPolicy: ENV.isProduction ? {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'strict-dynamic'", "https:", "http:"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          new URL(ENV.supabaseUrl).hostname
+        ],
+        connectSrc: [
+          "'self'",
+          ENV.supabaseUrl,
+          ENV.supabaseUrl.replace("https://", "wss://"),
+          "https://api.stripe.com"
+        ],
+        frameSrc: [
+          "https://js.stripe.com",
+          "https://hooks.stripe.com"
+        ],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        upgradeInsecureRequests: []
+      }
+    } : false
+  })
+);
+var compressionMiddleware = null;
+try {
+  const compressionModule = require2("compression");
+  compressionMiddleware = compressionModule();
+} catch {
+  logger.warn("compression package not found; continuing without response compression");
+}
+if (compressionMiddleware) {
+  app.use(compressionMiddleware);
+}
 app.use(
   cors({
     origin(origin, callback) {
@@ -5279,7 +5318,9 @@ var limiter = rateLimit({
     });
   },
   skip: (req) => {
-    return req.method === "GET" && req.path.startsWith("/api/trpc/");
+    if (req.method !== "GET" || !req.path.startsWith("/api/trpc/")) return false;
+    const expensive = ["artists.discover", "requests.refineDescription", "ai."];
+    return !expensive.some((prefix) => req.path.includes(prefix));
   }
 });
 app.use("/api/", limiter);
@@ -5296,14 +5337,32 @@ var authLimiter = rateLimit({
   }
 });
 app.use("/api/auth/", authLimiter);
+var aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1e3,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      error: "AI generation limit reached. Please try again in 15 minutes.",
+      retryAfter: 15
+    });
+  },
+  keyGenerator: (req) => {
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+    const session = req.cookies?.["app_session_id"] || "";
+    return `${ip}:${session}`;
+  }
+});
+app.use("/api/trpc/ai.", aiLimiter);
 app.post(
   "/api/stripe/webhook",
   express2.raw({ type: "application/json" }),
   handleStripeWebhook
 );
 app.use(cookieParser());
-app.use(express2.json({ limit: "50mb" }));
-app.use(express2.urlencoded({ limit: "50mb", extended: true }));
+app.use(express2.json({ limit: "5mb" }));
+app.use(express2.urlencoded({ limit: "5mb", extended: true }));
 app.use(csrfTokenMiddleware);
 app.use(csrfProtectionMiddleware);
 registerSupabaseAuthRoutes(app);
@@ -5317,10 +5376,11 @@ app.get("/api/health", async (_req, res) => {
       dbStatus = "connected";
     }
     const webhookStats = await getWebhookQueueStats();
-    const storageReady = ENV.isProduction ? true : true;
+    const storageReady = true;
     const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth ? true : false;
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
-    res.json({
+    const httpStatus = overallStatus === "ok" ? 200 : 503;
+    res.status(httpStatus).json({
       status: overallStatus,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       environment: ENV.nodeEnv,
@@ -5455,6 +5515,19 @@ app.use(
     server.listen(port, host, () => {
       logger.info(`Server running on http://${host}:${port}/`);
     });
+    const shutdown = (signal) => {
+      logger.info(`${signal} received \u2014 shutting down gracefully`);
+      server.close(() => {
+        logger.info("HTTP server closed");
+        process.exit(0);
+      });
+      setTimeout(() => {
+        logger.error("Forced shutdown after timeout");
+        process.exit(1);
+      }, 1e4).unref();
+    };
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   };
   startServer().catch((error) => {
     logger.error("Failed to start server", { error });

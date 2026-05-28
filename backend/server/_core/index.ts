@@ -11,7 +11,7 @@ import net from "net";
 import { createRequire } from "module";
 import path from "path";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerSupabaseAuthRoutes } from "./supabaseAuth";
@@ -218,11 +218,9 @@ const aiLimiter = rateLimit({
     });
   },
   keyGenerator: (req) => {
-    // Key by IP + user cookie so authenticated users have individual limits
-    const ip =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-      req.ip ||
-      "unknown";
+    // express-rate-limit v8 requires the helper for IPv6-safe IP fallback keys.
+    // Keep authenticated users isolated by appending the session cookie.
+    const ip = ipKeyGenerator(req.ip || req.socket.remoteAddress || "unknown");
     const session = req.cookies?.["app_session_id"] || "";
     return `${ip}:${session}`;
   },
