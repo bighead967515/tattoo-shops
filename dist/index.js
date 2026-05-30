@@ -589,6 +589,18 @@ var init_schema = __esm({
 
 // backend/server/_core/logger.ts
 import winston from "winston";
+function serializeUnknownError(error) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+  return {
+    value: error
+  };
+}
 var isDev, transports, logger;
 var init_logger = __esm({
   "backend/server/_core/logger.ts"() {
@@ -633,10 +645,15 @@ var init_logger = __esm({
       transports
     });
     process.on("unhandledRejection", (reason, promise) => {
-      logger.error("Unhandled Rejection at:", { promise, reason });
+      logger.error("Unhandled Rejection at:", {
+        promise,
+        reason: serializeUnknownError(reason)
+      });
     });
     process.on("uncaughtException", (error) => {
-      logger.error("Uncaught Exception:", { error });
+      logger.error("Uncaught Exception:", {
+        error: serializeUnknownError(error)
+      });
       process.exit(1);
     });
   }
@@ -1246,7 +1263,7 @@ import net from "net";
 import { createRequire } from "module";
 import path6 from "path";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
@@ -5349,7 +5366,7 @@ var aiLimiter = rateLimit({
     });
   },
   keyGenerator: (req) => {
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+    const ip = ipKeyGenerator(req.ip || req.socket.remoteAddress || "unknown");
     const session = req.cookies?.["app_session_id"] || "";
     return `${ip}:${session}`;
   }
