@@ -126,10 +126,10 @@ export default function ArtistProfile() {
   const handleSendRequest = () => {
     const params = new URLSearchParams({
       artistId: String(artistId),
-      artistName: artist.shopName || "",
-      artistStyle: artist.styles || "",
-      artistCity: artist.city || "",
-      artistState: artist.state || "",
+      artistName: artist?.shopName || "",
+      artistStyle: artist?.styles || "",
+      artistCity: artist?.city || "",
+      artistState: artist?.state || "",
     });
     setLocation(`/client/new-request?${params.toString()}`);
   };
