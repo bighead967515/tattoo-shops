@@ -18,6 +18,10 @@ function storeCsrfToken(token: string) {
   window.sessionStorage.setItem(CSRF_STORAGE_KEY, token);
 }
 
+export async function getCsrfToken(): Promise<string | null> {
+  return ensureCsrfToken();
+}
+
 async function ensureCsrfToken(): Promise<string | null> {
   const existing = readStoredCsrfToken();
   if (existing) return existing;

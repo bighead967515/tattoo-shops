@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
+import { getCsrfToken } from "../lib/trpc";
 
 interface AuthState {
   user: User | null;
@@ -98,9 +99,11 @@ export function useSupabaseAuth() {
       // Clear backend cookie on sign out
       if (event === "SIGNED_OUT") {
         lastSyncedAccessTokenRef.current = null;
+        const csrfToken = await getCsrfToken();
         await fetch("/api/auth/signout", {
           method: "POST",
           credentials: "include",
+          headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         });
       }
     });
@@ -117,9 +120,13 @@ export function useSupabaseAuth() {
     accessToken: string,
     refreshToken?: string,
   ) {
+    const csrfToken = await getCsrfToken();
     const response = await fetch("/api/auth/session", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
+      },
       credentials: "include",
       body: JSON.stringify({
         access_token: accessToken,

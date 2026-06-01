@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
+import { getCsrfToken } from "@/lib/trpc";
 
 export default function AuthCallback() {
   const [, setLocation] = useLocation();
@@ -34,10 +35,12 @@ export default function AuthCallback() {
         if (session) {
           // Exchange Supabase token for backend session cookie
           try {
+            const csrfToken = await getCsrfToken();
             const response = await fetch("/api/auth/session", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
+                ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
               },
               credentials: "include",
               body: JSON.stringify({
