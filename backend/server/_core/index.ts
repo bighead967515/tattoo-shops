@@ -89,9 +89,10 @@ initSentry();
 // that would be blocked by a strict policy.
 //
 // Policy notes:
-//   script-src: 'strict-dynamic' allows Vite's code-split dynamic imports without
-//               'unsafe-eval'. https:/http: are legacy-browser fallbacks (ignored when
-//               strict-dynamic is supported).
+//   script-src: 'self' covers the Vite-built bundle served from the same origin.
+//               'strict-dynamic' is intentionally omitted — it disables domain
+//               allowlisting and requires per-script nonces, which a static SPA
+//               cannot provide, resulting in a blank page.
 //   style-src:  'unsafe-inline' required by Tailwind/shadcn runtime class injection.
 //   img-src:    Supabase hostname for portfolio/request images; data: + blob: for upload
 //               previews generated with URL.createObjectURL().
@@ -103,8 +104,12 @@ app.use(
       ? {
           directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'strict-dynamic'", "https:", "http:"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "https://js.stripe.com"],
+            styleSrc: [
+              "'self'",
+              "'unsafe-inline'",
+              "https://fonts.googleapis.com",
+            ],
             imgSrc: [
               "'self'",
               "data:",
@@ -121,7 +126,7 @@ app.use(
               "https://js.stripe.com",
               "https://hooks.stripe.com",
             ],
-            fontSrc: ["'self'"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
             formAction: ["'self'"],
