@@ -212,7 +212,7 @@
       "minimatch>brace-expansion": ">=5.0.6",
       "ws@>=8.0.0 <8.20.1": ">=8.20.1",
       "mermaid@>=11.0.0-alpha.1 <=11.14.0": ">=11.15.0",
-      "path-to-regexp@<0.1.13": ">=0.1.13",
+
       "glob>minimatch": ">=9.0.7",
       "module-lookup-amd>minimatch": ">=9.0.7",
       "matcher-collection>minimatch": ">=9.0.7",
