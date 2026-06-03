@@ -5271,8 +5271,12 @@ app.use(
     contentSecurityPolicy: ENV.isProduction ? {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'strict-dynamic'", "https:", "http:"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "https://js.stripe.com"],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com"
+        ],
         imgSrc: [
           "'self'",
           "data:",
@@ -5289,7 +5293,7 @@ app.use(
           "https://js.stripe.com",
           "https://hooks.stripe.com"
         ],
-        fontSrc: ["'self'"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { trpc, trpcClient } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from "@shared/clientConst";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +10,13 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import { initAnalytics } from "./lib/analytics";
 import "./index.css";
+
+Sentry.init({
+  dsn: "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752",
+  // Setting this option to true will send default PII data to Sentry.
+  // For example, automatic IP address collection on events
+  sendDefaultPii: true
+});
 
 initAnalytics();
 
