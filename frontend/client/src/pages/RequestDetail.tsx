@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { useRoute, Link } from "wouter";
+import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,8 +90,8 @@ function clampNumber(value: number, min: number, max: number): number {
 }
 
 export default function RequestDetail() {
-  const [, params] = useRoute("/requests/:id");
-  const requestId = parseInt(params?.id || "0");
+  const { id } = useParams();
+  const requestId = parseInt(id || "0");
   const { user } = useAuth();
 
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
