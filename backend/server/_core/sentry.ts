@@ -8,7 +8,7 @@ let initialized = false;
  * Call this once at server startup
  */
 export function initSentry(): void {
-  const dsn = process.env.SENTRY_DSN;
+  const dsn = process.env.SENTRY_DSN || "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752";
 
   if (!dsn) {
     logger.warn("SENTRY_DSN not configured - error tracking disabled");

@@ -13,6 +13,7 @@ import {
   Store,
   BadgeCheck,
   User,
+  Info,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import {
@@ -85,6 +86,21 @@ export default function ArtistFinder() {
     [tabFiltered, activeSearch],
   );
 
+  const dynamicPlaceholder = useMemo(() => {
+    const cities = new Set<string>();
+    for (const entry of allEntries) {
+      if (entry.city && entry.city.trim()) {
+        cities.add(entry.city.trim());
+        if (cities.size >= 3) break;
+      }
+    }
+    const cityList = Array.from(cities);
+    if (cityList.length > 0) {
+      return `Search by city or shop name (e.g., ${cityList.join(", ")})`;
+    }
+    return "Search by city or shop name";
+  }, [allEntries]);
+
   const handleSearch = () => {
     setActiveSearch(searchCity);
   };
@@ -117,7 +133,7 @@ export default function ArtistFinder() {
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search by city or shop name (e.g., New Orleans, Baton Rouge)"
+                placeholder={dynamicPlaceholder}
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -176,8 +192,7 @@ export default function ArtistFinder() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-foreground">
-                    {filteredShops.length} Result
-                    {filteredShops.length !== 1 ? "s" : ""} Found
+                    {filteredShops.length} {filteredShops.length === 1 ? "Result" : "Results"} Found
                   </h2>
                 </div>
 
@@ -194,25 +209,31 @@ export default function ArtistFinder() {
                       const { rating, count } = parseRating(shop.rating);
                       const initials = getInitials(shop.name);
                       const isShopEntry = shop.source === "shop";
+                      const isPremium =
+                        isShopEntry ||
+                        shop.subscriptionTier === "artist_pro" ||
+                        shop.subscriptionTier === "artist_elite" ||
+                        shop.subscriptionTier === "professional" ||
+                        shop.subscriptionTier === "frontPage";
 
                       return (
-                        <Card
+                         <Card
                           key={`${shop.source}-${shop.id}`}
                           className="p-4 bg-card border-border hover:border-primary/50 transition-colors"
                         >
-                          <div className="flex gap-4">
+                          <div className="flex gap-4 items-center">
                             {/* Avatar */}
                             <div
-                              className={`flex h-16 w-16 items-center justify-center rounded-full font-bold text-lg flex-shrink-0 ${
+                              className={`flex h-16 w-16 items-center justify-center rounded-full flex-shrink-0 ${
                                 isShopEntry
                                   ? "bg-secondary text-secondary-foreground"
-                                  : "bg-primary text-primary-foreground"
+                                  : "bg-primary/10 text-primary border border-primary/20"
                               }`}
                             >
                               {isShopEntry ? (
                                 <Store className="h-7 w-7" />
                               ) : (
-                                initials
+                                <User className="h-7 w-7" />
                               )}
                             </div>
 
@@ -277,7 +298,7 @@ export default function ArtistFinder() {
                                 </div>
                               )}
 
-                              {shop.address && (
+                              {shop.address && isPremium && (
                                 <p className="text-xs text-muted-foreground mb-2 flex items-start gap-1">
                                   <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
                                   <span>{shop.address}</span>
@@ -301,7 +322,7 @@ export default function ArtistFinder() {
                               )}
 
                               <div className="flex flex-wrap gap-2 mb-3">
-                                {shop.phone && (
+                                {shop.phone && isPremium && (
                                   <a
                                     href={`tel:${shop.phone}`}
                                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
@@ -310,7 +331,7 @@ export default function ArtistFinder() {
                                     {shop.phone}
                                   </a>
                                 )}
-                                {shop.website && (
+                                {shop.website && isPremium && (
                                   <a
                                     href={shop.website}
                                     target="_blank"
@@ -321,7 +342,7 @@ export default function ArtistFinder() {
                                     Website
                                   </a>
                                 )}
-                                {shop.email && (
+                                {shop.email && isPremium && (
                                   <a
                                     href={`mailto:${shop.email}`}
                                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
@@ -329,6 +350,12 @@ export default function ArtistFinder() {
                                     <Mail className="h-3 w-3" />
                                     Email
                                   </a>
+                                )}
+                                {!isPremium && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/50 px-2 py-1 rounded">
+                                    <Info className="h-3 w-3 shrink-0" />
+                                    Book to contact this artist
+                                  </span>
                                 )}
                               </div>
 

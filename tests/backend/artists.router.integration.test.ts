@@ -34,6 +34,15 @@ function seedRequiredEnv() {
   process.env.SUPABASE_ANON_KEY = "anon_key";
   process.env.GROQ_API_KEY = "groq_api_key";
   process.env.HUGGINGFACE_API_KEY = "hf_api_key";
+
+  // Stripe prices required by environment validation
+  process.env.STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH = "price_amateur_mo";
+  process.env.STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR = "price_amateur_yr";
+  process.env.STRIPE_ARTIST_PRO_PRICE_ID_MONTH = "price_pro_mo";
+  process.env.STRIPE_ARTIST_PRO_PRICE_ID_YEAR = "price_pro_yr";
+  process.env.STRIPE_ARTIST_ICON_PRICE_ID_MONTH = "price_icon_mo";
+  process.env.STRIPE_ARTIST_ICON_PRICE_ID_YEAR = "price_icon_yr";
+  process.env.STRIPE_FOUNDING_ARTIST_PRICE_ID = "price_founding";
 }
 
 let appRouter: (typeof import("../../backend/server/routers"))["appRouter"];

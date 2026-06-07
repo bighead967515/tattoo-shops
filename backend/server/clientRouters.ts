@@ -174,6 +174,27 @@ export const clientsRouter = router({
 
 });
 
+function maskContactInfo(
+  request: any,
+  client: any,
+  userClientId: number | null,
+  isAdmin: boolean,
+) {
+  const isOwner = userClientId !== null && request.clientId === userClientId;
+  const shouldMask = !isOwner && !isAdmin;
+
+  return {
+    ...request,
+    guestEmail: shouldMask ? "[Masked - Use platform chat]" : request.guestEmail,
+    client: client
+      ? {
+          ...client,
+          phone: shouldMask ? "[Masked - Use platform chat]" : client.phone,
+        }
+      : null,
+  };
+}
+
 // ============================================
 // TATTOO REQUESTS ROUTER
 // ============================================
@@ -191,9 +212,30 @@ export const requestsRouter = router({
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await requireDb();
       const filters = input || { limit: 20, offset: 0 };
+
+      let userClientId: number | null = null;
+      let isAdmin = false;
+      let isArtist = false;
+      if (ctx?.user) {
+        isAdmin = ctx.user.role === "admin";
+        const [client] = await db
+          .select()
+          .from(clients)
+          .where(eq(clients.userId, ctx.user.id))
+          .limit(1);
+        if (client) {
+          userClientId = client.id;
+        }
+        const [artist] = await db
+          .select()
+          .from(artists)
+          .where(eq(artists.userId, ctx.user.id))
+          .limit(1);
+        isArtist = !!artist;
+      }
 
       // P1-2 Fix: Build WHERE clause dynamically based on filters
       const whereConditions = [eq(tattooRequests.status, "open")];
@@ -242,12 +284,14 @@ export const requestsRouter = router({
         .limit(filters.limit ?? 20)
         .offset(filters.offset ?? 0);
 
-      return results.map((r: (typeof results)[number]) => ({
-        ...r.request,
-        client: r.client,
-        images: r.images ? JSON.parse(r.images as unknown as string) : [],
-        bidCount: Number(r.bidCount),
-      }));
+      return results.map((r: (typeof results)[number]) => {
+        const requestData = {
+          ...r.request,
+          images: r.images ? JSON.parse(r.images as unknown as string) : [],
+          bidCount: Number(r.bidCount),
+        };
+        return maskContactInfo(requestData, r.client, userClientId, isAdmin);
+      });
     }),
 
   // Get open requests for paid artists' dashboard
@@ -340,8 +384,22 @@ export const requestsRouter = router({
     }),
 
   // Get recent open requests for the homepage feed
-  listForHomepage: publicProcedure.query(async () => {
+  listForHomepage: publicProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
+
+    let userClientId: number | null = null;
+    let isAdmin = false;
+    if (ctx?.user) {
+      isAdmin = ctx.user.role === "admin";
+      const [client] = await db
+        .select()
+        .from(clients)
+        .where(eq(clients.userId, ctx.user.id))
+        .limit(1);
+      if (client) {
+        userClientId = client.id;
+      }
+    }
 
     const results = await db
       .select({
@@ -367,18 +425,20 @@ export const requestsRouter = router({
       )
       .limit(8);
 
-    return results.map((r: (typeof results)[number]) => ({
-      ...r.request,
-      client: r.client,
-      images: r.images ? JSON.parse(r.images as unknown as string) : [],
-      bidCount: Number(r.bidCount),
-    }));
+    return results.map((r: (typeof results)[number]) => {
+      const requestData = {
+        ...r.request,
+        images: r.images ? JSON.parse(r.images as unknown as string) : [],
+        bidCount: Number(r.bidCount),
+      };
+      return maskContactInfo(requestData, r.client, userClientId, isAdmin);
+    });
   }),
 
   // Get request by ID
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await requireDb();
       const [result] = await db
         .select({
@@ -420,15 +480,29 @@ export const requestsRouter = router({
         .set({ viewCount: sql`${tattooRequests.viewCount} + 1` })
         .where(eq(tattooRequests.id, input.id));
 
-      return {
+      let userClientId: number | null = null;
+      let isAdmin = false;
+      if (ctx?.user) {
+        isAdmin = ctx.user.role === "admin";
+        const [client] = await db
+          .select()
+          .from(clients)
+          .where(eq(clients.userId, ctx.user.id))
+          .limit(1);
+        if (client) {
+          userClientId = client.id;
+        }
+      }
+
+      const requestData = {
         ...result.request,
-        client: result.client,
         images,
         bids: requestBids.map((b: (typeof requestBids)[number]) => ({
           ...b.bid,
           artist: b.artist,
         })),
       };
+      return maskContactInfo(requestData, result.client, userClientId, isAdmin);
     }),
 
   // Get my requests (for clients)

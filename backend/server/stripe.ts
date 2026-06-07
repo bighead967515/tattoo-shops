@@ -175,3 +175,16 @@ export async function constructWebhookEvent(
     ENV.stripeWebhookSecret,
   );
 }
+
+export async function refundPaymentIntent(
+  paymentIntentId: string,
+  amount?: number,
+): Promise<Stripe.Refund> {
+  return stripeCircuit.execute(async () => {
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      ...(amount ? { amount } : {}),
+    });
+    return refund;
+  });
+}

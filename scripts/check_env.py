@@ -17,6 +17,14 @@ import sys
 import argparse
 from pathlib import Path
 
+# Force UTF-8 encoding on Windows standard streams to prevent UnicodeEncodeError
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+
 # ── ANSI colours ──────────────────────────────────────────────────────────────
 GREEN  = "\033[92m"
 YELLOW = "\033[93m"
@@ -97,53 +105,48 @@ VARIABLES = [
     dict(name="STRIPE_WEBHOOK_SECRET",  required=True,
          description="Stripe webhook signing secret",
          prefix="whsec_", min_len=30),
-
-    # Stripe Price IDs — optional in .env (defaults hardcoded in env.ts)
-    dict(name="STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH", required=False,
-         description="Artist Amateur monthly Price ID (default in env.ts)",
+    # Stripe Price IDs — required in env.ts
+    dict(name="STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH", required=True,
+         description="Artist Amateur monthly Price ID",
          prefix="price_", min_len=10),
 
-    dict(name="STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR",  required=False,
-         description="Artist Amateur yearly Price ID (default in env.ts)",
+    dict(name="STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR",  required=True,
+         description="Artist Amateur yearly Price ID",
          prefix="price_", min_len=10),
 
-    dict(name="STRIPE_ARTIST_PRO_PRICE_ID_MONTH",     required=False,
-         description="Artist Pro monthly Price ID (default in env.ts)",
+    dict(name="STRIPE_ARTIST_PRO_PRICE_ID_MONTH",     required=True,
+         description="Artist Pro monthly Price ID",
          prefix="price_", min_len=10),
 
-    dict(name="STRIPE_ARTIST_PRO_PRICE_ID_YEAR",      required=False,
-         description="Artist Pro yearly Price ID (default in env.ts)",
+    dict(name="STRIPE_ARTIST_PRO_PRICE_ID_YEAR",      required=True,
+         description="Artist Pro yearly Price ID",
          prefix="price_", min_len=10),
 
-    dict(name="STRIPE_ARTIST_ICON_PRICE_ID_MONTH",    required=False,
-         description="Artist Icon monthly Price ID (default in env.ts)",
+    dict(name="STRIPE_ARTIST_ICON_PRICE_ID_MONTH",    required=True,
+         description="Artist Icon monthly Price ID",
          prefix="price_", min_len=10),
 
-    dict(name="STRIPE_ARTIST_ICON_PRICE_ID_YEAR",     required=False,
-         description="Artist Icon yearly Price ID (default in env.ts)",
+    dict(name="STRIPE_ARTIST_ICON_PRICE_ID_YEAR",     required=True,
+         description="Artist Icon yearly Price ID",
          prefix="price_", min_len=10),
 
+    dict(name="STRIPE_FOUNDING_ARTIST_PRICE_ID",      required=True,
+         description="Founding Artist Price ID",
+         prefix="price_", min_len=10),
+
+    # Stripe client subscription product price IDs
     dict(name="STRIPE_CLIENT_PLUS_PRICE_ID",          required=False,
-         description="Client Plus Price ID (not yet used)",
+         description="Client Plus Price ID",
          prefix="price_", min_len=10),
 
     dict(name="STRIPE_CLIENT_ELITE_PRICE_ID",         required=False,
-         description="Client Elite Price ID (not yet used)",
+         description="Client Elite Price ID",
          prefix="price_", min_len=10),
 
     # ── Email ─────────────────────────────────────────────────────────────────
     dict(name="RESEND_API_KEY",         required=True,
          description="Resend transactional email API key",
          prefix="re_", min_len=20),
-
-    # ── Maps ──────────────────────────────────────────────────────────────────
-    dict(name="MAPTILER_API_KEY",       required=True,
-         description="MapTiler API key (server)",
-         prefix=None, min_len=10),
-
-    dict(name="VITE_MAPTILER_API_KEY",  required=True,
-         description="MapTiler API key (frontend/Vite)",
-         prefix=None, min_len=10),
 
     # ── AI / ML ───────────────────────────────────────────────────────────────
     dict(name="GROQ_API_KEY",           required=True,
@@ -173,6 +176,32 @@ VARIABLES = [
     dict(name="OWNER_OPEN_ID",          required=True,
          description="Supabase user ID of the platform owner/admin",
          prefix=None, min_len=10),
+
+    # ── Optional CORS & Base URL ──────────────────────────────────────────────
+    dict(name="CORS_ALLOWED_ORIGINS",   required=False,
+         description="CORS allowed origins (comma separated)",
+         prefix=None, min_len=5),
+
+    dict(name="PUBLIC_BASE_URL",        required=False,
+         description="Public domain base URL",
+         prefix="http", min_len=10),
+
+    # ── Optional n8n Workflow Integration ─────────────────────────────────────
+    dict(name="N8N_WEBHOOK_URL",        required=False,
+         description="n8n instance base URL",
+         prefix="http", min_len=10),
+
+    dict(name="N8N_WEBHOOK_SECRET",     required=False,
+         description="n8n webhook authentication bearer secret",
+         prefix=None, min_len=5),
+
+    dict(name="N8N_ONBOARDING_WEBHOOK_URL", required=False,
+         description="n8n onboarding webhook URL",
+         prefix="http", min_len=10),
+
+    dict(name="N8N_VERIFICATION_WEBHOOK_URL", required=False,
+         description="n8n verification webhook URL",
+         prefix="http", min_len=10),
 ]
 
 

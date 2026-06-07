@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -74,10 +74,16 @@ interface Screen2Data {
 
 export default function ArtistRegister() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [screen, setScreen] = useState<1 | 2>(1);
   const [showLegal, setShowLegal] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === "artist") {
+      setLocation("/artist-dashboard");
+    }
+  }, [user, setLocation]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -203,6 +209,7 @@ export default function ArtistRegister() {
         }
       }
 
+      await refresh();
       toast.success("🎉 Welcome to Ink Connect! Your profile is under review.");
       setLocation("/artist-dashboard");
     } catch (err: any) {

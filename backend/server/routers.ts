@@ -14,6 +14,7 @@ import {
 import { sanitizeInput, sanitizeEmail, sanitizePhone } from "./_core/sanitize";
 import { z } from "zod";
 import * as db from "./db";
+import { sendBookingIntakeNotification } from "./email";
 import {
   createSignedUploadUrl,
   deleteFile,
@@ -21,9 +22,9 @@ import {
   getPublicUrl,
 } from "./_core/supabaseStorage";
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
-import { createArtistSubscriptionCheckout, createFoundingArtistCheckout } from "./stripe";
-import { artists, users } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { createArtistSubscriptionCheckout, createFoundingArtistCheckout, createCheckoutSession } from "./stripe";
+import { artists, users, flashArt, bookings } from "../drizzle/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { verificationRouter } from "./verificationRouter";
@@ -708,7 +709,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid email address" });
         }
 
-        return await db.createBooking({
+        const booking = await db.createBooking({
           ...input,
           userId: ctx.user.id,
           customerName: sanitizeInput(input.customerName, 255),
@@ -722,6 +723,43 @@ export const appRouter = router({
             ? sanitizeInput(input.additionalNotes, 2000)
             : undefined,
         });
+
+        // Stamp brand on lead and notify artist via email
+        try {
+          const database = await getDb();
+          if (database) {
+            const [artistWithUser] = await database
+              .select({
+                artistId: artists.id,
+                shopName: artists.shopName,
+                userEmail: users.email,
+                userName: users.name,
+              })
+              .from(artists)
+              .innerJoin(users, eq(artists.userId, users.id))
+              .where(eq(artists.id, input.artistId))
+              .limit(1);
+
+            if (artistWithUser && artistWithUser.userEmail) {
+              await sendBookingIntakeNotification(artistWithUser.userEmail, {
+                artistName: artistWithUser.userName || artistWithUser.shopName,
+                clientName: booking.customerName,
+                clientEmail: booking.customerEmail,
+                clientPhone: booking.customerPhone,
+                tattooDescription: booking.tattooDescription,
+                preferredDate: new Date(booking.preferredDate).toLocaleString(),
+                placement: booking.placement,
+                size: booking.size,
+                budget: booking.budget || "N/A",
+                additionalNotes: booking.additionalNotes || "N/A",
+              });
+            }
+          }
+        } catch (err) {
+          logger.error("Failed to send booking intake notification email:", err);
+        }
+
+        return booking;
       }),
 
     getByUserId: protectedProcedure.query(async ({ ctx }) => {
@@ -752,9 +790,9 @@ export const appRouter = router({
         const isCustomer = booking.userId === ctx.user.id;
         let isArtist = false;
 
-        if (!isCustomer) {
-          const artist = await db.getArtistById(booking.artistId);
-          isArtist = !!(artist && artist.userId === ctx.user.id);
+        const artist = await db.getArtistById(booking.artistId);
+        if (artist && artist.userId === ctx.user.id) {
+          isArtist = true;
         }
 
         if (!isCustomer && !isArtist) {
@@ -764,7 +802,150 @@ export const appRouter = router({
           });
         }
 
+        // If the booking is being cancelled
+        if (input.status === "cancelled") {
+          let refundProcessed = false;
+          let refundId: string | undefined = undefined;
+
+          // If the artist is the one cancelling, auto-refund deposit if paid
+          if (isArtist) {
+            if (booking.depositPaid && booking.stripePaymentIntentId) {
+              try {
+                const { refundPaymentIntent } = await import("./stripe");
+                const refund = await refundPaymentIntent(booking.stripePaymentIntentId);
+                refundProcessed = true;
+                refundId = refund.id;
+              } catch (err) {
+                logger.error("Failed to auto-refund deposit on artist cancellation:", err);
+              }
+            }
+
+            await db.updateBooking(input.id, {
+              status: "cancelled",
+              cancelledBy: "artist",
+              refundStatus: refundProcessed ? "refunded" : "not_requested",
+              stripeRefundId: refundId,
+              refundProcessedAt: refundProcessed ? new Date() : null,
+            });
+            return { success: true };
+          } else if (isCustomer) {
+            // Client cancelled
+            await db.updateBooking(input.id, {
+              status: "cancelled",
+              cancelledBy: "client",
+            });
+            return { success: true };
+          }
+        }
+
         return await db.updateBooking(input.id, { status: input.status });
+      }),
+
+    requestRefund: protectedProcedure
+      .input(
+        z.object({
+          bookingId: z.number(),
+          reason: z.string().min(5).max(1000),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const booking = await db.getBookingById(input.bookingId);
+        if (!booking) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Booking not found" });
+        }
+        if (booking.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only request refunds for your own bookings",
+          });
+        }
+        if (!booking.depositPaid) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No deposit has been paid for this booking",
+          });
+        }
+        if (booking.refundStatus !== "not_requested") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A refund has already been requested or processed for this booking",
+          });
+        }
+
+        await db.updateBooking(input.bookingId, {
+          refundStatus: "requested",
+          refundReason: sanitizeInput(input.reason, 1000),
+          refundRequestedAt: new Date(),
+        });
+
+        return { success: true };
+      }),
+
+    adminGetRefundRequests: adminProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      }
+
+      const results = await database
+        .select({
+          booking: bookings,
+          artistName: artists.shopName,
+          clientName: users.name,
+        })
+        .from(bookings)
+        .leftJoin(artists, eq(bookings.artistId, artists.id))
+        .leftJoin(users, eq(bookings.userId, users.id))
+        .where(eq(bookings.refundStatus, "requested"))
+        .orderBy(desc(bookings.refundRequestedAt));
+
+      return results;
+    }),
+
+    adminReviewRefund: adminProcedure
+      .input(
+        z.object({
+          bookingId: z.number(),
+          approve: z.boolean(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        const booking = await db.getBookingById(input.bookingId);
+        if (!booking) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Booking not found" });
+        }
+
+        if (input.approve) {
+          let refundProcessed = false;
+          let refundId: string | undefined = undefined;
+
+          if (booking.depositPaid && booking.stripePaymentIntentId) {
+            try {
+              const { refundPaymentIntent } = await import("./stripe");
+              const refund = await refundPaymentIntent(booking.stripePaymentIntentId);
+              refundProcessed = true;
+              refundId = refund.id;
+            } catch (err) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: `Stripe refund failed: ${err instanceof Error ? err.message : String(err)}`,
+              });
+            }
+          }
+
+          await db.updateBooking(input.bookingId, {
+            status: "cancelled",
+            refundStatus: "refunded",
+            stripeRefundId: refundId,
+            refundProcessedAt: new Date(),
+          });
+        } else {
+          await db.updateBooking(input.bookingId, {
+            refundStatus: "rejected",
+          });
+        }
+
+        return { success: true };
       }),
   }),
 
@@ -864,6 +1045,174 @@ export const appRouter = router({
         });
 
         return analysis;
+      }),
+  }),
+
+  flash: router({
+    getUploadUrl: artistOwnerProcedure
+      .input(
+        z.object({
+          artistId: z.number(),
+          fileName: z.string(),
+          contentType: z.string(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Only Elite Icon artists can upload flash art
+        const tier = (ctx.user?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+        if (tier !== "artist_elite") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only Elite Icon tier artists can post flash art on the front page.",
+          });
+        }
+
+        const sanitizedFileName = sanitizeFileName(input.fileName);
+        const fileKey = `public/${input.artistId}/flash-${Date.now()}-${sanitizedFileName}`;
+
+        return await createSignedUploadUrl(BUCKETS.PORTFOLIO_IMAGES, fileKey);
+      }),
+
+    create: artistOwnerProcedure
+      .input(
+        z.object({
+          artistId: z.number(),
+          imageUrl: z.string().url(),
+          imageKey: z.string(),
+          title: z.string().min(1).max(255),
+          description: z.string().max(2000).optional(),
+          price: z.number().int().positive(),
+          depositAmount: z.number().int().positive(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const tier = (ctx.user?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+        if (tier !== "artist_elite") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only Elite Icon tier artists can post flash art.",
+          });
+        }
+
+        if (input.depositAmount > input.price) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Deposit amount cannot exceed the total price.",
+          });
+        }
+
+        return await db.createFlashArt({
+          ...input,
+          title: sanitizeInput(input.title, 255),
+          description: input.description ? sanitizeInput(input.description, 2000) : undefined,
+        });
+      }),
+
+    delete: artistOwnerProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          artistId: z.number(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const tier = (ctx.user?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+        if (tier !== "artist_elite") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only Elite Icon tier artists can manage flash art.",
+          });
+        }
+
+        const flash = await db.getFlashArtById(input.id);
+        if (!flash || flash.artistId !== input.artistId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Flash art not found" });
+        }
+
+        const deleted = await db.deleteFlashArt(input.id, input.artistId);
+        if (deleted) {
+          try {
+            await deleteFile(BUCKETS.PORTFOLIO_IMAGES, deleted.imageKey);
+          } catch (err) {
+            logger.warn("Failed to delete flash art image from storage", { key: deleted.imageKey, err });
+          }
+        }
+        return { success: true };
+      }),
+
+    getMyFlash: artistOwnerProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const tier = (ctx.user?.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
+        if (tier !== "artist_elite") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only Elite Icon tier artists have access to flash art management.",
+          });
+        }
+        return await db.getFlashArtByArtistId(input.artistId);
+      }),
+
+    getAllActive: publicProcedure.query(async () => {
+      return await db.getAllActiveFlashArt();
+    }),
+
+    getByArtistId: publicProcedure
+      .input(z.object({ artistId: z.number() }))
+      .query(async ({ input }) => {
+        const database = await getDb();
+        if (!database) return [];
+        return await database
+          .select()
+          .from(flashArt)
+          .where(and(eq(flashArt.artistId, input.artistId), eq(flashArt.isLocked, false)))
+          .orderBy(desc(flashArt.createdAt));
+      }),
+
+    createLockCheckout: protectedProcedure
+      .input(
+        z.object({
+          flashId: z.number(),
+          preferredDate: z.string(), // ISO String
+          customerPhone: z.string().min(1).max(50),
+          successUrl: z.string().url(),
+          cancelUrl: z.string().url(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const flash = await db.getFlashArtById(input.flashId);
+        if (!flash) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Flash art not found" });
+        }
+        if (flash.isLocked) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This flash piece is already locked." });
+        }
+
+        const artist = await db.getArtistById(flash.artistId);
+        if (!artist) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Artist not found" });
+        }
+
+        // Create Stripe checkout session using existing helper
+        const session = await createCheckoutSession({
+          priceInCents: flash.depositAmount,
+          productName: `Lock Flash: "${flash.title}"`,
+          productDescription: `Non-refundable deposit to claim and book this custom flash art by ${artist.shopName}.`,
+          customerEmail: ctx.user.email ?? "",
+          metadata: {
+            paymentType: "flash_deposit",
+            flashId: String(flash.id),
+            userId: String(ctx.user.id),
+            preferredDate: input.preferredDate,
+            customerPhone: input.customerPhone,
+            customerName: ctx.user.name || "",
+            customerEmail: ctx.user.email || "",
+          },
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+        });
+
+        return { checkoutUrl: session.url };
       }),
   }),
 

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useLocation, Link } from "wouter";
@@ -7,6 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
   Calendar,
   Heart,
   User,
@@ -15,9 +25,11 @@ import {
   Clock,
   LayoutDashboard,
   Sparkles,
+  Info,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect } from "react";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -33,8 +45,24 @@ export default function Dashboard() {
     enabled: isAuthenticated,
   });
 
-  const { data: bookings, isLoading: bookingsLoading } =
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+
+  const { data: bookings, isLoading: bookingsLoading, refetch: refetchBookings } =
     trpc.bookings.getByUserId.useQuery(undefined, { enabled: isAuthenticated });
+
+  const requestRefundMutation = trpc.bookings.requestRefund.useMutation({
+    onSuccess: () => {
+      toast.success("Refund request submitted successfully!");
+      setIsRefundDialogOpen(false);
+      setRefundReason("");
+      refetchBookings();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to submit refund request.");
+    },
+  });
 
   const {
     data: favorites,
@@ -215,6 +243,27 @@ export default function Dashboard() {
                               </span>
                             </div>
                           )}
+
+                          {item.booking.depositPaid && item.booking.refundStatus === "requested" && (
+                            <div className="flex items-center gap-2 text-yellow-600 mt-2">
+                              <Info className="w-4 h-4" />
+                              <span className="font-medium">Refund Status: Requested</span>
+                            </div>
+                          )}
+
+                          {item.booking.depositPaid && item.booking.refundStatus === "refunded" && (
+                            <div className="flex items-center gap-2 text-green-600 mt-2">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="font-medium">Refund Status: Refunded</span>
+                            </div>
+                          )}
+
+                          {item.booking.depositPaid && item.booking.refundStatus === "rejected" && (
+                            <div className="flex items-center gap-2 text-red-600 mt-2">
+                              <XCircle className="w-4 h-4" />
+                              <span className="font-medium">Refund Status: Request Rejected</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -228,6 +277,18 @@ export default function Dashboard() {
                             }
                           >
                             View Artist
+                          </Button>
+                        )}
+                        {item.booking.depositPaid && item.booking.refundStatus === "not_requested" && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBookingId(item.booking.id);
+                              setIsRefundDialogOpen(true);
+                            }}
+                          >
+                            Request Refund
                           </Button>
                         )}
                       </div>
@@ -382,6 +443,63 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Deposit Refund</DialogTitle>
+            <DialogDescription>
+              Please provide the reason for requesting a refund. The admin will review your request and process it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!selectedBookingId) return;
+              if (refundReason.trim().length < 5) {
+                toast.error("Please provide a reason with at least 5 characters.");
+                return;
+              }
+              requestRefundMutation.mutate({
+                bookingId: selectedBookingId,
+                reason: refundReason,
+              });
+            }}
+            className="space-y-4 pt-2"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="refund-reason">Reason for Refund *</Label>
+              <Textarea
+                id="refund-reason"
+                placeholder="e.g. Artist failed to show up at the scheduled time, or cancelled the appointment offline."
+                rows={4}
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsRefundDialogOpen(false)}
+                disabled={requestRefundMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={requestRefundMutation.isPending}
+              >
+                {requestRefundMutation.isPending ? "Submitting..." : "Submit Request"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

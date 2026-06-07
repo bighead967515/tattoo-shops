@@ -15,9 +15,9 @@ export const ARTIST_TIER_LIMITS = {
   artist_free: {
     name: "Directory Profile",
     portfolioPhotos: 10,
-    canBid: false,
-    freeBidsPerMonth: 0,
-    transactionFeePercent: 0, // Cannot book
+    canBid: true,
+    freeBidsPerMonth: 3,
+    transactionFeePercent: 15,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
     sponsoredListing: false,

@@ -3,16 +3,16 @@ import Stripe from "stripe";
 import { constructWebhookEvent, stripePriceToArtistTier } from "./stripe";
 import * as db from "./db";
 import { getDb } from "./db";
-import { clients, users, tattooRequests } from "../drizzle/schema";
+import { clients, users, tattooRequests, artists, bookings, flashArt } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "./_core/logger";
+import { sendBookingIntakeNotification } from "./email";
 import {
   queueWebhookForRetry,
   startQueueProcessor,
   getQueueStats,
 } from "./webhookQueue";
 
-import { artists } from "../drizzle/schema";
 import { REQUEST_ADDON_PAYMENT_STATUSES } from "@shared/requestAddons";
 
 // Flag to track if processor is started
@@ -47,6 +47,11 @@ async function processWebhookEvent(
 
       if (session.metadata?.paymentType === "request_addons") {
         await handleRequestAddonCheckoutCompleted(session);
+        break;
+      }
+
+      if (session.metadata?.paymentType === "flash_deposit") {
+        await handleFlashDepositCheckoutCompleted(session);
         break;
       }
 
@@ -151,6 +156,109 @@ async function processWebhookEvent(
 
     default:
       logger.debug("Received unhandled webhook event type", { eventType });
+  }
+}
+
+async function handleFlashDepositCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const flashId = parseInt(session.metadata?.flashId || "0", 10);
+  const userId = parseInt(session.metadata?.userId || "0", 10);
+  const preferredDate = session.metadata?.preferredDate
+    ? new Date(session.metadata.preferredDate)
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days from now
+  const customerPhone = session.metadata?.customerPhone || "";
+  const customerName = session.metadata?.customerName || "";
+  const customerEmail = session.metadata?.customerEmail || "";
+
+  if (!flashId || isNaN(flashId) || flashId <= 0) {
+    logger.warn("Flash deposit checkout missing valid flashId", {
+      sessionId: session.id,
+    });
+    return;
+  }
+
+  // Check if already locked (idempotency)
+  const flash = await db.getFlashArtById(flashId);
+  if (!flash) {
+    logger.warn("Flash art piece not found in database", { flashId });
+    return;
+  }
+
+  if (flash.isLocked) {
+    logger.debug("Flash art piece is already locked, skipping processing", { flashId });
+    return;
+  }
+
+  const depositAmount = session.amount_total ? Number(session.amount_total) : flash.depositAmount;
+
+  // Use database transaction for atomicity
+  const database = await getDb();
+  if (!database) throw new Error("Database not available for flash locking");
+
+  await database.transaction(async (tx) => {
+    // 1. Lock the flash art
+    await tx
+      .update(flashArt)
+      .set({ isLocked: true, lockedByUserId: userId, updatedAt: new Date() })
+      .where(eq(flashArt.id, flashId));
+
+    // 2. Create the booking automatically
+    const [booking] = await tx
+      .insert(bookings)
+      .values({
+        artistId: flash.artistId,
+        userId: userId || null,
+        customerName: customerName || "Guest Collector",
+        customerEmail: customerEmail || "guest@theinkednetwork.website",
+        customerPhone: customerPhone || "N/A",
+        preferredDate,
+        tattooDescription: `Locked Flash Art: "${flash.title}" (ID: ${flash.id})`,
+        placement: "See Flash Art",
+        size: "Custom (Flash Art)",
+        depositAmount,
+        depositPaid: true,
+        status: "confirmed",
+        stripePaymentIntentId: (session.payment_intent as string) || null,
+      })
+      .returning();
+
+    logger.info("Flash art locked and booking created successfully", {
+      flashId,
+      bookingId: booking.id,
+    });
+  });
+
+  // Query the artist's user email to send booking request intake notification
+  try {
+    const [artistWithUser] = await database
+      .select({
+        artistId: artists.id,
+        shopName: artists.shopName,
+        userEmail: users.email,
+        userName: users.name,
+      })
+      .from(artists)
+      .innerJoin(users, eq(artists.userId, users.id))
+      .where(eq(artists.id, flash.artistId))
+      .limit(1);
+
+    if (artistWithUser && artistWithUser.userEmail) {
+      await sendBookingIntakeNotification(artistWithUser.userEmail, {
+        artistName: artistWithUser.userName || artistWithUser.shopName,
+        clientName: customerName || "Guest Collector",
+        clientEmail: customerEmail || "guest@theinkednetwork.website",
+        clientPhone: customerPhone || "N/A",
+        tattooDescription: `Locked Flash Art: "${flash.title}"`,
+        preferredDate: preferredDate.toLocaleString(),
+        placement: "See Flash Art",
+        size: "Custom (Flash Art)",
+        budget: String(flash.price / 100) + " USD",
+        additionalNotes: `Flash piece total price is $${(flash.price / 100).toFixed(2)}. Deposit paid is $${(depositAmount / 100).toFixed(2)}.`,
+      });
+    }
+  } catch (err) {
+    logger.error("Failed to send booking intake notification email for locked flash:", err);
   }
 }
 

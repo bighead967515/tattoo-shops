@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import LegalAcceptanceModal from "@/components/LegalAcceptanceModal";
@@ -36,10 +37,17 @@ const TATTOO_STYLES = [
 
 export default function ClientOnboarding() {
   const [, setLocation] = useLocation();
+  const { user, refresh } = useAuth();
   const [step, setStep] = useState(1);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === "client") {
+      setLocation("/client/dashboard");
+    }
+  }, [user, setLocation]);
 
   const [formData, setFormData] = useState({
     displayName: "",
@@ -50,7 +58,8 @@ export default function ClientOnboarding() {
   });
 
   const createProfile = trpc.clients.createProfile.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refresh();
       toast.success("Your client profile has been created successfully!");
       setLocation("/client/dashboard");
     },

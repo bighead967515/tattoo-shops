@@ -139,7 +139,7 @@ import {
   unique,
   jsonb
 } from "drizzle-orm/pg-core";
-var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages;
+var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, flashArt;
 var init_schema = __esm({
   "backend/drizzle/schema.ts"() {
     "use strict";
@@ -350,6 +350,13 @@ var init_schema = __esm({
       depositAmount: integer("depositAmount"),
       // Amount in cents
       depositPaid: boolean("depositPaid").default(false),
+      cancelledBy: varchar("cancelledBy", { length: 50 }),
+      refundStatus: varchar("refundStatus", { length: 50 }).default("not_requested").notNull(),
+      refundReason: text("refundReason"),
+      refundRequestedAt: timestamp("refundRequestedAt"),
+      refundProcessedAt: timestamp("refundProcessedAt"),
+      stripeRefundId: varchar("stripeRefundId", { length: 255 }),
+      source: varchar("source", { length: 100 }).default("ink_connect").notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
     });
@@ -584,6 +591,23 @@ var init_schema = __esm({
       isRead: boolean("isRead").default(false),
       createdAt: timestamp("createdAt").defaultNow().notNull()
     });
+    flashArt = pgTable("flash_art", {
+      id: serial("id").primaryKey(),
+      artistId: integer("artistId").notNull().references(() => artists.id, { onDelete: "cascade" }),
+      imageUrl: varchar("imageUrl", { length: 1e3 }).notNull(),
+      imageKey: varchar("imageKey", { length: 500 }).notNull(),
+      // Supabase Storage key
+      title: varchar("title", { length: 255 }).notNull(),
+      description: text("description"),
+      price: integer("price").notNull(),
+      // In cents
+      depositAmount: integer("depositAmount").notNull(),
+      // In cents
+      isLocked: boolean("isLocked").default(false).notNull(),
+      lockedByUserId: integer("lockedByUserId").references(() => users.id, { onDelete: "set null" }),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull()
+    });
   }
 });
 
@@ -688,11 +712,15 @@ var db_exports = {};
 __export(db_exports, {
   addFavorite: () => addFavorite,
   addPortfolioImage: () => addPortfolioImage,
+  artistFields: () => artistFields,
   createArtist: () => createArtist,
   createBooking: () => createBooking,
+  createFlashArt: () => createFlashArt,
   createReview: () => createReview,
+  deleteFlashArt: () => deleteFlashArt,
   deletePortfolioImage: () => deletePortfolioImage,
   discoverArtists: () => discoverArtists,
+  getAllActiveFlashArt: () => getAllActiveFlashArt,
   getAllArtists: () => getAllArtists,
   getAllArtistsAdmin: () => getAllArtistsAdmin,
   getAllShops: () => getAllShops,
@@ -704,6 +732,8 @@ __export(db_exports, {
   getDb: () => getDb,
   getFavoritesByUserId: () => getFavoritesByUserId,
   getFlaggedReviews: () => getFlaggedReviews,
+  getFlashArtByArtistId: () => getFlashArtByArtistId,
+  getFlashArtById: () => getFlashArtById,
   getPendingVerificationDocuments: () => getPendingVerificationDocuments,
   getPoolStats: () => getPoolStats,
   getPortfolioByArtistId: () => getPortfolioByArtistId,
@@ -714,6 +744,7 @@ __export(db_exports, {
   getUserByOpenId: () => getUserByOpenId,
   getVerificationDocumentById: () => getVerificationDocumentById,
   isFavorite: () => isFavorite,
+  lockFlashArt: () => lockFlashArt,
   logPoolStats: () => logPoolStats,
   removeFavorite: () => removeFavorite,
   reviewVerificationDocument: () => reviewVerificationDocument,
@@ -854,26 +885,35 @@ async function createArtist(artist) {
   if (!db) throw new Error("Database not available");
   return await db.transaction(async (tx) => {
     await tx.update(users).set(buildArtistOnboardingUserUpdate()).where(eq(users.id, artist.userId));
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: false }).returning();
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
     return created;
   });
 }
 async function getArtistByUserId(userId) {
   const db = await getDb();
   if (!db) return void 0;
-  const result = await db.select().from(artists).where(eq(artists.userId, userId)).limit(1);
+  const result = await db.select({
+    ...artistFields,
+    subscriptionTier: users.subscriptionTier
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.userId, userId)).limit(1);
   return result.length > 0 ? result[0] : void 0;
 }
 async function getArtistById(id) {
   const db = await getDb();
   if (!db) return void 0;
-  const result = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
+  const result = await db.select({
+    ...artistFields,
+    subscriptionTier: users.subscriptionTier
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.id, id)).limit(1);
   return result.length > 0 ? result[0] : void 0;
 }
 async function getAllArtists() {
   const db = await getDb();
   if (!db) return [];
-  return await db.select().from(artists).where(eq(artists.isApproved, true)).orderBy(
+  return await db.select({
+    ...artistFields,
+    subscriptionTier: users.subscriptionTier
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.isApproved, true)).orderBy(
     // Founding artists appear first
     sql`${artists.isFoundingArtist} DESC`,
     desc(artists.createdAt)
@@ -925,7 +965,10 @@ async function searchArtists(filters) {
   if (normalizedState) {
     conditions.push(sql`${artists.state} ILIKE ${`%${normalizedState}%`}`);
   }
-  return await db.select().from(artists).where(and(...conditions)).orderBy(
+  return await db.select({
+    ...artistFields,
+    subscriptionTier: users.subscriptionTier
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(and(...conditions)).orderBy(
     sql`${artists.isFoundingArtist} DESC`,
     desc(artists.averageRating)
   );
@@ -1088,7 +1131,10 @@ async function discoverArtists(intent) {
     ...intent.keywords
   ].filter(Boolean);
   if (allTerms.length === 0 && !intent.vibeDescription) {
-    return (await db.select().from(artists).where(eq(artists.isApproved, true))).map((a) => ({
+    return (await db.select({
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier
+    }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.isApproved, true))).map((a) => ({
       ...a,
       matchedImages: [],
       relevanceScore: 0
@@ -1116,8 +1162,11 @@ async function discoverArtists(intent) {
   }
   const matchingImages = await db.select({
     image: portfolioImages,
-    artist: artists
-  }).from(portfolioImages).innerJoin(artists, eq(portfolioImages.artistId, artists.id)).where(and(eq(artists.isApproved, true), or(...imageConditions))).orderBy(desc(portfolioImages.qualityScore));
+    artist: {
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier
+    }
+  }).from(portfolioImages).innerJoin(artists, eq(portfolioImages.artistId, artists.id)).innerJoin(users, eq(artists.userId, users.id)).where(and(eq(artists.isApproved, true), or(...imageConditions))).orderBy(desc(portfolioImages.qualityScore));
   const artistConditions = [];
   for (const term of allTerms) {
     const likeTerm = `%${term}%`;
@@ -1125,7 +1174,10 @@ async function discoverArtists(intent) {
     artistConditions.push(sql`${artists.specialties} ILIKE ${likeTerm}`);
     artistConditions.push(sql`${artists.bio} ILIKE ${likeTerm}`);
   }
-  const matchingArtistsDirect = artistConditions.length > 0 ? await db.select().from(artists).where(and(eq(artists.isApproved, true), or(...artistConditions))) : [];
+  const matchingArtistsDirect = artistConditions.length > 0 ? await db.select({
+    ...artistFields,
+    subscriptionTier: users.subscriptionTier
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(and(eq(artists.isApproved, true), or(...artistConditions))) : [];
   const artistMap = /* @__PURE__ */ new Map();
   for (const row of matchingImages) {
     const existing = artistMap.get(row.artist.id);
@@ -1235,7 +1287,61 @@ async function getReviewById(id) {
   const result = await db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
   return result[0] || null;
 }
-var _db, _sqlClient, _poolStats;
+async function createFlashArt(flash) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [created] = await db.insert(flashArt).values(flash).returning();
+  return created;
+}
+async function deleteFlashArt(id, artistId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [deleted] = await db.delete(flashArt).where(and(eq(flashArt.id, id), eq(flashArt.artistId, artistId))).returning();
+  return deleted;
+}
+async function getFlashArtByArtistId(artistId) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(flashArt).where(eq(flashArt.artistId, artistId)).orderBy(desc(flashArt.createdAt));
+}
+async function getAllActiveFlashArt() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select({
+    id: flashArt.id,
+    artistId: flashArt.artistId,
+    imageUrl: flashArt.imageUrl,
+    imageKey: flashArt.imageKey,
+    title: flashArt.title,
+    description: flashArt.description,
+    price: flashArt.price,
+    depositAmount: flashArt.depositAmount,
+    isLocked: flashArt.isLocked,
+    createdAt: flashArt.createdAt,
+    artistShopName: artists.shopName,
+    artistCity: artists.city,
+    artistState: artists.state
+  }).from(flashArt).innerJoin(artists, eq(flashArt.artistId, artists.id)).innerJoin(users, eq(artists.userId, users.id)).where(
+    and(
+      eq(flashArt.isLocked, false),
+      eq(artists.isApproved, true),
+      eq(users.subscriptionTier, "artist_elite")
+    )
+  ).orderBy(desc(flashArt.createdAt));
+}
+async function getFlashArtById(id) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(flashArt).where(eq(flashArt.id, id)).limit(1);
+  return result[0] || null;
+}
+async function lockFlashArt(id, userId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [updated] = await db.update(flashArt).set({ isLocked: true, lockedByUserId: userId, updatedAt: /* @__PURE__ */ new Date() }).where(eq(flashArt.id, id)).returning();
+  return updated;
+}
+var _db, _sqlClient, _poolStats, artistFields;
 var init_db = __esm({
   "backend/server/db.ts"() {
     "use strict";
@@ -1251,6 +1357,310 @@ var init_db = __esm({
       waitingRequests: 0,
       lastChecked: /* @__PURE__ */ new Date()
     };
+    artistFields = {
+      id: artists.id,
+      userId: artists.userId,
+      shopName: artists.shopName,
+      bio: artists.bio,
+      specialties: artists.specialties,
+      styles: artists.styles,
+      experience: artists.experience,
+      address: artists.address,
+      city: artists.city,
+      state: artists.state,
+      zipCode: artists.zipCode,
+      phone: artists.phone,
+      website: artists.website,
+      instagram: artists.instagram,
+      facebook: artists.facebook,
+      lat: artists.lat,
+      lng: artists.lng,
+      averageRating: artists.averageRating,
+      totalReviews: artists.totalReviews,
+      isApproved: artists.isApproved,
+      bidsUsed: artists.bidsUsed,
+      bidsThisMonth: artists.bidsThisMonth,
+      bidsMonthYear: artists.bidsMonthYear,
+      bidTokens: artists.bidTokens,
+      chatTokens: artists.chatTokens,
+      aiCredits: artists.aiCredits,
+      isFoundingArtist: artists.isFoundingArtist,
+      foundingTrialEndsAt: artists.foundingTrialEndsAt,
+      createdAt: artists.createdAt,
+      updatedAt: artists.updatedAt
+    };
+  }
+});
+
+// backend/server/_core/circuitBreaker.ts
+function getOrCreateCircuit(name) {
+  if (!circuits.has(name)) {
+    circuits.set(name, {
+      state: "CLOSED" /* CLOSED */,
+      failures: 0,
+      successes: 0,
+      lastFailureTime: null,
+      nextAttemptTime: null
+    });
+  }
+  return circuits.get(name);
+}
+var circuits, CircuitBreaker, stripeCircuit, supabaseCircuit, emailCircuit;
+var init_circuitBreaker = __esm({
+  "backend/server/_core/circuitBreaker.ts"() {
+    "use strict";
+    init_logger();
+    circuits = /* @__PURE__ */ new Map();
+    CircuitBreaker = class {
+      name;
+      failureThreshold;
+      successThreshold;
+      timeout;
+      constructor(options) {
+        this.name = options.name;
+        this.failureThreshold = options.failureThreshold ?? 5;
+        this.successThreshold = options.successThreshold ?? 2;
+        this.timeout = options.timeout ?? 3e4;
+      }
+      async execute(fn) {
+        const circuit = getOrCreateCircuit(this.name);
+        if (circuit.state === "OPEN" /* OPEN */) {
+          if (Date.now() >= (circuit.nextAttemptTime ?? 0)) {
+            circuit.state = "HALF_OPEN" /* HALF_OPEN */;
+            circuit.successes = 0;
+            logger.info(`Circuit ${this.name} transitioning to HALF_OPEN`);
+          } else {
+            throw new Error(`Circuit ${this.name} is OPEN. Service unavailable.`);
+          }
+        }
+        try {
+          const result = await fn();
+          this.onSuccess(circuit);
+          return result;
+        } catch (error) {
+          this.onFailure(circuit);
+          throw error;
+        }
+      }
+      onSuccess(circuit) {
+        if (circuit.state === "HALF_OPEN" /* HALF_OPEN */) {
+          circuit.successes++;
+          if (circuit.successes >= this.successThreshold) {
+            circuit.state = "CLOSED" /* CLOSED */;
+            circuit.failures = 0;
+            circuit.successes = 0;
+            logger.info(`Circuit ${this.name} CLOSED - service recovered`);
+          }
+        } else if (circuit.state === "CLOSED" /* CLOSED */) {
+          circuit.failures = 0;
+        }
+      }
+      onFailure(circuit) {
+        circuit.failures++;
+        circuit.lastFailureTime = Date.now();
+        if (circuit.state === "HALF_OPEN" /* HALF_OPEN */) {
+          circuit.state = "OPEN" /* OPEN */;
+          circuit.nextAttemptTime = Date.now() + this.timeout;
+          logger.warn(`Circuit ${this.name} OPEN - service still failing`);
+        } else if (circuit.failures >= this.failureThreshold) {
+          circuit.state = "OPEN" /* OPEN */;
+          circuit.nextAttemptTime = Date.now() + this.timeout;
+          logger.warn(
+            `Circuit ${this.name} OPEN - threshold reached (${circuit.failures} failures)`
+          );
+        }
+      }
+      getState() {
+        return getOrCreateCircuit(this.name).state;
+      }
+      getStats() {
+        const circuit = getOrCreateCircuit(this.name);
+        return {
+          state: circuit.state,
+          failures: circuit.failures,
+          successes: circuit.successes
+        };
+      }
+      // Manual reset for admin/testing
+      reset() {
+        const circuit = getOrCreateCircuit(this.name);
+        circuit.state = "CLOSED" /* CLOSED */;
+        circuit.failures = 0;
+        circuit.successes = 0;
+        circuit.lastFailureTime = null;
+        circuit.nextAttemptTime = null;
+        logger.info(`Circuit ${this.name} manually reset`);
+      }
+    };
+    stripeCircuit = new CircuitBreaker({
+      name: "stripe",
+      failureThreshold: 5,
+      timeout: 6e4
+      // 1 minute
+    });
+    supabaseCircuit = new CircuitBreaker({
+      name: "supabase",
+      failureThreshold: 5,
+      timeout: 3e4
+    });
+    emailCircuit = new CircuitBreaker({
+      name: "email",
+      failureThreshold: 3,
+      timeout: 12e4
+      // 2 minutes - email services can be slow to recover
+    });
+  }
+});
+
+// backend/server/stripe.ts
+var stripe_exports = {};
+__export(stripe_exports, {
+  constructWebhookEvent: () => constructWebhookEvent,
+  createArtistSubscriptionCheckout: () => createArtistSubscriptionCheckout,
+  createCheckoutSession: () => createCheckoutSession,
+  createFoundingArtistCheckout: () => createFoundingArtistCheckout,
+  refundPaymentIntent: () => refundPaymentIntent,
+  stripe: () => stripe,
+  stripePriceToArtistTier: () => stripePriceToArtistTier
+});
+import Stripe from "stripe";
+async function createCheckoutSession({
+  priceInCents,
+  productName,
+  productDescription,
+  customerEmail,
+  metadata,
+  successUrl,
+  cancelUrl
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: productName,
+              description: productDescription
+            },
+            unit_amount: priceInCents
+          },
+          quantity: 1
+        }
+      ],
+      mode: "payment",
+      customer_email: customerEmail,
+      metadata,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true
+    });
+    return session;
+  });
+}
+function stripePriceToArtistTier(priceId) {
+  const {
+    stripeArtistAmateurPriceIdMonth,
+    stripeArtistAmateurPriceIdYear,
+    stripeArtistProPriceIdMonth,
+    stripeArtistProPriceIdYear,
+    stripeArtistIconPriceIdMonth,
+    stripeArtistIconPriceIdYear
+  } = ENV;
+  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+    return "artist_pro";
+  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
+    return "artist_elite";
+  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
+    return "artist_paygo";
+  return null;
+}
+async function createArtistSubscriptionCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
+      metadata,
+      subscription_data: { metadata },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: true
+    });
+    return session;
+  });
+}
+async function createFoundingArtistCheckout({
+  priceId,
+  customerEmail,
+  stripeCustomerId,
+  metadata,
+  successUrl,
+  cancelUrl
+}) {
+  return stripeCircuit.execute(async () => {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
+      metadata: { ...metadata, isFoundingArtist: "true" },
+      subscription_data: {
+        trial_period_days: 180,
+        metadata: { ...metadata, isFoundingArtist: "true" }
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      allow_promotion_codes: false
+      // Founding offer IS the promo — no stacking
+    });
+    return session;
+  });
+}
+async function constructWebhookEvent(payload, signature) {
+  if (!ENV.stripeWebhookSecret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET is required");
+  }
+  return stripe.webhooks.constructEvent(
+    payload,
+    signature,
+    ENV.stripeWebhookSecret
+  );
+}
+async function refundPaymentIntent(paymentIntentId, amount) {
+  return stripeCircuit.execute(async () => {
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      ...amount ? { amount } : {}
+    });
+    return refund;
+  });
+}
+var stripe;
+var init_stripe = __esm({
+  "backend/server/stripe.ts"() {
+    "use strict";
+    init_env();
+    init_circuitBreaker();
+    if (!ENV.stripeSecretKey) {
+      throw new Error("STRIPE_SECRET_KEY is required");
+    }
+    stripe = new Stripe(ENV.stripeSecretKey, {
+      apiVersion: "2025-10-29.clover",
+      timeout: 3e4,
+      // 30 second timeout
+      maxNetworkRetries: 2
+      // Stripe's built-in retry
+    });
   }
 });
 
@@ -1506,10 +1916,9 @@ var ARTIST_TIER_LIMITS = {
   artist_free: {
     name: "Directory Profile",
     portfolioPhotos: 10,
-    canBid: false,
-    freeBidsPerMonth: 0,
-    transactionFeePercent: 0,
-    // Cannot book
+    canBid: true,
+    freeBidsPerMonth: 3,
+    transactionFeePercent: 15,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
     sponsoredListing: false,
@@ -1692,6 +2101,178 @@ function sanitizePhone(phone) {
 init_db();
 import { z as z7 } from "zod";
 
+// backend/server/email.ts
+init_env();
+init_circuitBreaker();
+init_logger();
+import { Resend } from "resend";
+var resend = new Resend(ENV.resendApiKey);
+var MAX_RETRIES = 3;
+var INITIAL_RETRY_DELAY = 1e3;
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function sanitizeErrorForLogging(error) {
+  if (!error) return error;
+  const sanitized = { ...error };
+  const sensitiveKeys = ["to", "from", "email", "recipient", "address"];
+  for (const key of sensitiveKeys) {
+    if (key in sanitized && typeof sanitized[key] === "string") {
+      sanitized[key] = sanitized[key].replace(
+        /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+        "[REDACTED]"
+      );
+    }
+  }
+  if (error.message) {
+    sanitized.message = error.message.replace(
+      /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+      "[REDACTED]"
+    );
+  }
+  return sanitized;
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function sendEmail(options) {
+  const {
+    to,
+    subject,
+    html,
+    from = "Ink Connect <noreply@theinkednetwork.website>"
+  } = options;
+  return emailCircuit.execute(async () => {
+    let lastError = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { data, error } = await resend.emails.send({
+          from,
+          to: Array.isArray(to) ? to : [to],
+          subject,
+          html
+        });
+        if (error) {
+          throw new Error(`Resend API error: ${error.message}`);
+        }
+        logger.info("Email sent successfully", { id: data?.id, attempt });
+        return { success: true, id: data?.id };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMessage = lastError.message.toLowerCase();
+        if (errorMessage.includes("invalid") || errorMessage.includes("unauthorized") || errorMessage.includes("forbidden")) {
+          logger.error(
+            "Email send failed (non-retryable)",
+            sanitizeErrorForLogging({ error: lastError.message })
+          );
+          throw lastError;
+        }
+        if (attempt < MAX_RETRIES) {
+          const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
+          logger.warn(`Email send failed, retrying in ${delay}ms`, {
+            attempt,
+            maxRetries: MAX_RETRIES,
+            error: sanitizeErrorForLogging({ message: lastError.message })
+          });
+          await sleep(delay);
+        }
+      }
+    }
+    logger.error(
+      "Email send failed after all retries",
+      sanitizeErrorForLogging({ error: lastError?.message })
+    );
+    throw lastError;
+  });
+}
+async function sendBookingIntakeNotification(to, details) {
+  const {
+    artistName,
+    clientName,
+    clientEmail,
+    clientPhone,
+    tattooDescription,
+    preferredDate,
+    placement,
+    size,
+    budget = "N/A",
+    additionalNotes = "N/A"
+  } = details;
+  const escapedArtistName = escapeHtml(artistName);
+  const escapedClientName = escapeHtml(clientName);
+  const escapedClientEmail = escapeHtml(clientEmail);
+  const escapedClientPhone = escapeHtml(clientPhone);
+  const escapedTattooDescription = escapeHtml(tattooDescription);
+  const escapedPreferredDate = escapeHtml(preferredDate);
+  const escapedPlacement = escapeHtml(placement);
+  const escapedSize = escapeHtml(size);
+  const escapedBudget = escapeHtml(budget);
+  const escapedAdditionalNotes = escapeHtml(additionalNotes);
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #6366f1, #3b82f6); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
+    .booking-details { background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0; border: 1px solid #f3f4f6; }
+    .booking-details h3 { margin-top: 0; color: #1e1b4b; border-bottom: 2px solid #e0e7ff; padding-bottom: 8px; }
+    .booking-details p { margin: 12px 0; }
+    .brand-stamp { text-align: center; font-size: 13px; color: #6366f1; font-weight: bold; margin-top: 25px; text-transform: uppercase; letter-spacing: 1px; }
+    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>\u{1F4C5} New Booking Request!</h2>
+      <p style="margin: 0; font-size: 15px; opacity: 0.9;">via The Inked Network</p>
+    </div>
+    <div class="content">
+      <p>Hi ${escapedArtistName},</p>
+      
+      <p>Great news! You have received a new booking inquiry. We've captured the client details for you below:</p>
+      
+      <div class="booking-details">
+        <h3>Client & Tattoo Details:</h3>
+        <p><strong>Client Name:</strong> ${escapedClientName}</p>
+        <p><strong>Client Email:</strong> <a href="mailto:${escapedClientEmail}">${escapedClientEmail}</a></p>
+        <p><strong>Client Phone:</strong> <a href="tel:${escapedClientPhone}">${escapedClientPhone}</a></p>
+        <p><strong>Preferred Date & Time:</strong> ${escapedPreferredDate}</p>
+        <p><strong>Tattoo Concept:</strong> ${escapedTattooDescription}</p>
+        <p><strong>Placement:</strong> ${escapedPlacement}</p>
+        <p><strong>Size:</strong> ${escapedSize}</p>
+        <p><strong>Budget:</strong> ${escapedBudget}</p>
+        <p><strong>Additional Notes:</strong> ${escapedAdditionalNotes}</p>
+      </div>
+
+      <p>Please reach out to the client directly via email or phone to confirm the appointment, finalize the design, and set up deposits/calendar bookings as needed.</p>
+
+      <div class="brand-stamp">
+        \u26A1 Lead Sent via The Inked Network
+      </div>
+
+      <p style="margin-top: 30px; font-size: 13px; text-align: center; color: #9ca3af;">
+        Thank you for being a valued member of our platform!
+      </p>
+    </div>
+    <div class="footer">
+      <p>The Inked Network &mdash; Helping Tattoo Artists Grow Their Studios</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  return sendEmail({
+    to,
+    subject: `New booking request from ${clientName} via The Inked Network`,
+    html
+  });
+}
+
 // backend/server/_core/supabaseStorage.ts
 var BUCKETS = {
   PORTFOLIO_IMAGES: "portfolio-images",
@@ -1834,7 +2415,7 @@ var groqClient = new OpenAI({
   apiKey: ENV.groqApiKey,
   baseURL: GROQ_BASE_URL
 });
-function sleep(ms) {
+function sleep2(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 function stripCodeFences(text2) {
@@ -1886,9 +2467,9 @@ async function huggingFaceRequest(model, init2, retries = 2) {
         1e4,
         Math.max(1e3, Math.round((loading.estimated_time ?? 1) * 1e3))
       );
-      await sleep(waitMs);
+      await sleep2(waitMs);
     } catch {
-      await sleep(1500);
+      await sleep2(1500);
     }
     return huggingFaceRequest(model, init2, retries - 1);
   }
@@ -2112,249 +2693,8 @@ ${artistContext}`,
   }
 }
 
-// backend/server/stripe.ts
-init_env();
-import Stripe from "stripe";
-
-// backend/server/_core/circuitBreaker.ts
-init_logger();
-var circuits = /* @__PURE__ */ new Map();
-function getOrCreateCircuit(name) {
-  if (!circuits.has(name)) {
-    circuits.set(name, {
-      state: "CLOSED" /* CLOSED */,
-      failures: 0,
-      successes: 0,
-      lastFailureTime: null,
-      nextAttemptTime: null
-    });
-  }
-  return circuits.get(name);
-}
-var CircuitBreaker = class {
-  name;
-  failureThreshold;
-  successThreshold;
-  timeout;
-  constructor(options) {
-    this.name = options.name;
-    this.failureThreshold = options.failureThreshold ?? 5;
-    this.successThreshold = options.successThreshold ?? 2;
-    this.timeout = options.timeout ?? 3e4;
-  }
-  async execute(fn) {
-    const circuit = getOrCreateCircuit(this.name);
-    if (circuit.state === "OPEN" /* OPEN */) {
-      if (Date.now() >= (circuit.nextAttemptTime ?? 0)) {
-        circuit.state = "HALF_OPEN" /* HALF_OPEN */;
-        circuit.successes = 0;
-        logger.info(`Circuit ${this.name} transitioning to HALF_OPEN`);
-      } else {
-        throw new Error(`Circuit ${this.name} is OPEN. Service unavailable.`);
-      }
-    }
-    try {
-      const result = await fn();
-      this.onSuccess(circuit);
-      return result;
-    } catch (error) {
-      this.onFailure(circuit);
-      throw error;
-    }
-  }
-  onSuccess(circuit) {
-    if (circuit.state === "HALF_OPEN" /* HALF_OPEN */) {
-      circuit.successes++;
-      if (circuit.successes >= this.successThreshold) {
-        circuit.state = "CLOSED" /* CLOSED */;
-        circuit.failures = 0;
-        circuit.successes = 0;
-        logger.info(`Circuit ${this.name} CLOSED - service recovered`);
-      }
-    } else if (circuit.state === "CLOSED" /* CLOSED */) {
-      circuit.failures = 0;
-    }
-  }
-  onFailure(circuit) {
-    circuit.failures++;
-    circuit.lastFailureTime = Date.now();
-    if (circuit.state === "HALF_OPEN" /* HALF_OPEN */) {
-      circuit.state = "OPEN" /* OPEN */;
-      circuit.nextAttemptTime = Date.now() + this.timeout;
-      logger.warn(`Circuit ${this.name} OPEN - service still failing`);
-    } else if (circuit.failures >= this.failureThreshold) {
-      circuit.state = "OPEN" /* OPEN */;
-      circuit.nextAttemptTime = Date.now() + this.timeout;
-      logger.warn(
-        `Circuit ${this.name} OPEN - threshold reached (${circuit.failures} failures)`
-      );
-    }
-  }
-  getState() {
-    return getOrCreateCircuit(this.name).state;
-  }
-  getStats() {
-    const circuit = getOrCreateCircuit(this.name);
-    return {
-      state: circuit.state,
-      failures: circuit.failures,
-      successes: circuit.successes
-    };
-  }
-  // Manual reset for admin/testing
-  reset() {
-    const circuit = getOrCreateCircuit(this.name);
-    circuit.state = "CLOSED" /* CLOSED */;
-    circuit.failures = 0;
-    circuit.successes = 0;
-    circuit.lastFailureTime = null;
-    circuit.nextAttemptTime = null;
-    logger.info(`Circuit ${this.name} manually reset`);
-  }
-};
-var stripeCircuit = new CircuitBreaker({
-  name: "stripe",
-  failureThreshold: 5,
-  timeout: 6e4
-  // 1 minute
-});
-var supabaseCircuit = new CircuitBreaker({
-  name: "supabase",
-  failureThreshold: 5,
-  timeout: 3e4
-});
-var emailCircuit = new CircuitBreaker({
-  name: "email",
-  failureThreshold: 3,
-  timeout: 12e4
-  // 2 minutes - email services can be slow to recover
-});
-
-// backend/server/stripe.ts
-if (!ENV.stripeSecretKey) {
-  throw new Error("STRIPE_SECRET_KEY is required");
-}
-var stripe = new Stripe(ENV.stripeSecretKey, {
-  apiVersion: "2025-10-29.clover",
-  timeout: 3e4,
-  // 30 second timeout
-  maxNetworkRetries: 2
-  // Stripe's built-in retry
-});
-async function createCheckoutSession({
-  priceInCents,
-  productName,
-  productDescription,
-  customerEmail,
-  metadata,
-  successUrl,
-  cancelUrl
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: productName,
-              description: productDescription
-            },
-            unit_amount: priceInCents
-          },
-          quantity: 1
-        }
-      ],
-      mode: "payment",
-      customer_email: customerEmail,
-      metadata,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: true
-    });
-    return session;
-  });
-}
-function stripePriceToArtistTier(priceId) {
-  const {
-    stripeArtistAmateurPriceIdMonth,
-    stripeArtistAmateurPriceIdYear,
-    stripeArtistProPriceIdMonth,
-    stripeArtistProPriceIdYear,
-    stripeArtistIconPriceIdMonth,
-    stripeArtistIconPriceIdYear
-  } = ENV;
-  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
-    return "artist_pro";
-  if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
-    return "artist_elite";
-  if (priceId === stripeArtistAmateurPriceIdMonth || priceId === stripeArtistAmateurPriceIdYear)
-    return "artist_paygo";
-  return null;
-}
-async function createArtistSubscriptionCheckout({
-  priceId,
-  customerEmail,
-  stripeCustomerId,
-  metadata,
-  successUrl,
-  cancelUrl
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
-      metadata,
-      subscription_data: { metadata },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: true
-    });
-    return session;
-  });
-}
-async function createFoundingArtistCheckout({
-  priceId,
-  customerEmail,
-  stripeCustomerId,
-  metadata,
-  successUrl,
-  cancelUrl
-}) {
-  return stripeCircuit.execute(async () => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
-      metadata: { ...metadata, isFoundingArtist: "true" },
-      subscription_data: {
-        trial_period_days: 180,
-        metadata: { ...metadata, isFoundingArtist: "true" }
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: false
-      // Founding offer IS the promo — no stacking
-    });
-    return session;
-  });
-}
-async function constructWebhookEvent(payload, signature) {
-  if (!ENV.stripeWebhookSecret) {
-    throw new Error("STRIPE_WEBHOOK_SECRET is required");
-  }
-  return stripe.webhooks.constructEvent(
-    payload,
-    signature,
-    ENV.stripeWebhookSecret
-  );
-}
-
 // backend/server/clientRouters.ts
+init_stripe();
 init_env();
 
 // backend/shared/tierCompat.ts
@@ -2500,6 +2840,18 @@ var clientsRouter = router({
     return updated;
   })
 });
+function maskContactInfo(request, client, userClientId, isAdmin) {
+  const isOwner = userClientId !== null && request.clientId === userClientId;
+  const shouldMask = !isOwner && !isAdmin;
+  return {
+    ...request,
+    guestEmail: shouldMask ? "[Masked - Use platform chat]" : request.guestEmail,
+    client: client ? {
+      ...client,
+      phone: shouldMask ? "[Masked - Use platform chat]" : client.phone
+    } : null
+  };
+}
 var requestsRouter = router({
   // Get all open requests (for artists to browse)
   getOpen: publicProcedure.input(
@@ -2510,9 +2862,21 @@ var requestsRouter = router({
       limit: z3.number().min(1).max(50).default(20),
       offset: z3.number().min(0).default(0)
     }).optional()
-  ).query(async ({ input }) => {
+  ).query(async ({ ctx, input }) => {
     const db = await requireDb();
     const filters = input || { limit: 20, offset: 0 };
+    let userClientId = null;
+    let isAdmin = false;
+    let isArtist = false;
+    if (ctx?.user) {
+      isAdmin = ctx.user.role === "admin";
+      const [client] = await db.select().from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
+      if (client) {
+        userClientId = client.id;
+      }
+      const [artist] = await db.select().from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
+      isArtist = !!artist;
+    }
     const whereConditions = [eq2(tattooRequests.status, "open")];
     if (filters?.style) {
       whereConditions.push(
@@ -2546,12 +2910,14 @@ var requestsRouter = router({
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
-    return results.map((r) => ({
-      ...r.request,
-      client: r.client,
-      images: r.images ? JSON.parse(r.images) : [],
-      bidCount: Number(r.bidCount)
-    }));
+    return results.map((r) => {
+      const requestData = {
+        ...r.request,
+        images: r.images ? JSON.parse(r.images) : [],
+        bidCount: Number(r.bidCount)
+      };
+      return maskContactInfo(requestData, r.client, userClientId, isAdmin);
+    });
   }),
   // Get open requests for paid artists' dashboard
   listForArtistDashboard: protectedProcedure.input(
@@ -2614,8 +2980,17 @@ var requestsRouter = router({
     }));
   }),
   // Get recent open requests for the homepage feed
-  listForHomepage: publicProcedure.query(async () => {
+  listForHomepage: publicProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
+    let userClientId = null;
+    let isAdmin = false;
+    if (ctx?.user) {
+      isAdmin = ctx.user.role === "admin";
+      const [client] = await db.select().from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
+      if (client) {
+        userClientId = client.id;
+      }
+    }
     const results = await db.select({
       request: tattooRequests,
       client: clients,
@@ -2633,15 +3008,17 @@ var requestsRouter = router({
       ),
       desc2(tattooRequests.createdAt)
     ).limit(8);
-    return results.map((r) => ({
-      ...r.request,
-      client: r.client,
-      images: r.images ? JSON.parse(r.images) : [],
-      bidCount: Number(r.bidCount)
-    }));
+    return results.map((r) => {
+      const requestData = {
+        ...r.request,
+        images: r.images ? JSON.parse(r.images) : [],
+        bidCount: Number(r.bidCount)
+      };
+      return maskContactInfo(requestData, r.client, userClientId, isAdmin);
+    });
   }),
   // Get request by ID
-  getById: publicProcedure.input(z3.object({ id: z3.number() })).query(async ({ input }) => {
+  getById: publicProcedure.input(z3.object({ id: z3.number() })).query(async ({ ctx, input }) => {
     const db = await requireDb();
     const [result] = await db.select({
       request: tattooRequests,
@@ -2659,15 +3036,24 @@ var requestsRouter = router({
       artist: artists
     }).from(bids).innerJoin(artists, eq2(bids.artistId, artists.id)).where(eq2(bids.requestId, input.id)).orderBy(desc2(bids.createdAt));
     await db.update(tattooRequests).set({ viewCount: sql2`${tattooRequests.viewCount} + 1` }).where(eq2(tattooRequests.id, input.id));
-    return {
+    let userClientId = null;
+    let isAdmin = false;
+    if (ctx?.user) {
+      isAdmin = ctx.user.role === "admin";
+      const [client] = await db.select().from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
+      if (client) {
+        userClientId = client.id;
+      }
+    }
+    const requestData = {
       ...result.request,
-      client: result.client,
       images,
       bids: requestBids.map((b) => ({
         ...b.bid,
         artist: b.artist
       }))
     };
+    return maskContactInfo(requestData, result.client, userClientId, isAdmin);
   }),
   // Get my requests (for clients)
   getMyRequests: protectedProcedure.query(async ({ ctx }) => {
@@ -3157,10 +3543,11 @@ var bidsRouter = router({
 });
 
 // backend/server/routers.ts
+init_stripe();
 init_schema();
 init_db();
 init_env();
-import { eq as eq5 } from "drizzle-orm";
+import { eq as eq5, and as and4, desc as desc3 } from "drizzle-orm";
 
 // backend/server/verificationRouter.ts
 import { z as z4 } from "zod";
@@ -4338,7 +4725,7 @@ var appRouter = router({
       if (!sanitizedEmail) {
         throw new TRPCError6({ code: "BAD_REQUEST", message: "Invalid email address" });
       }
-      return await createBooking({
+      const booking = await createBooking({
         ...input,
         userId: ctx.user.id,
         customerName: sanitizeInput(input.customerName, 255),
@@ -4350,6 +4737,34 @@ var appRouter = router({
         budget: input.budget ? sanitizeInput(input.budget, 100) : void 0,
         additionalNotes: input.additionalNotes ? sanitizeInput(input.additionalNotes, 2e3) : void 0
       });
+      try {
+        const database = await getDb();
+        if (database) {
+          const [artistWithUser] = await database.select({
+            artistId: artists.id,
+            shopName: artists.shopName,
+            userEmail: users.email,
+            userName: users.name
+          }).from(artists).innerJoin(users, eq5(artists.userId, users.id)).where(eq5(artists.id, input.artistId)).limit(1);
+          if (artistWithUser && artistWithUser.userEmail) {
+            await sendBookingIntakeNotification(artistWithUser.userEmail, {
+              artistName: artistWithUser.userName || artistWithUser.shopName,
+              clientName: booking.customerName,
+              clientEmail: booking.customerEmail,
+              clientPhone: booking.customerPhone,
+              tattooDescription: booking.tattooDescription,
+              preferredDate: new Date(booking.preferredDate).toLocaleString(),
+              placement: booking.placement,
+              size: booking.size,
+              budget: booking.budget || "N/A",
+              additionalNotes: booking.additionalNotes || "N/A"
+            });
+          }
+        }
+      } catch (err) {
+        logger.error("Failed to send booking intake notification email:", err);
+      }
+      return booking;
     }),
     getByUserId: protectedProcedure.query(async ({ ctx }) => {
       return await getBookingsByUserId(ctx.user.id);
@@ -4369,9 +4784,9 @@ var appRouter = router({
       }
       const isCustomer = booking.userId === ctx.user.id;
       let isArtist = false;
-      if (!isCustomer) {
-        const artist = await getArtistById(booking.artistId);
-        isArtist = !!(artist && artist.userId === ctx.user.id);
+      const artist = await getArtistById(booking.artistId);
+      if (artist && artist.userId === ctx.user.id) {
+        isArtist = true;
       }
       if (!isCustomer && !isArtist) {
         throw new TRPCError6({
@@ -4379,7 +4794,123 @@ var appRouter = router({
           message: "You can only update your own bookings or bookings for your artist profile"
         });
       }
+      if (input.status === "cancelled") {
+        let refundProcessed = false;
+        let refundId = void 0;
+        if (isArtist) {
+          if (booking.depositPaid && booking.stripePaymentIntentId) {
+            try {
+              const { refundPaymentIntent: refundPaymentIntent2 } = await Promise.resolve().then(() => (init_stripe(), stripe_exports));
+              const refund = await refundPaymentIntent2(booking.stripePaymentIntentId);
+              refundProcessed = true;
+              refundId = refund.id;
+            } catch (err) {
+              logger.error("Failed to auto-refund deposit on artist cancellation:", err);
+            }
+          }
+          await updateBooking(input.id, {
+            status: "cancelled",
+            cancelledBy: "artist",
+            refundStatus: refundProcessed ? "refunded" : "not_requested",
+            stripeRefundId: refundId,
+            refundProcessedAt: refundProcessed ? /* @__PURE__ */ new Date() : null
+          });
+          return { success: true };
+        } else if (isCustomer) {
+          await updateBooking(input.id, {
+            status: "cancelled",
+            cancelledBy: "client"
+          });
+          return { success: true };
+        }
+      }
       return await updateBooking(input.id, { status: input.status });
+    }),
+    requestRefund: protectedProcedure.input(
+      z7.object({
+        bookingId: z7.number(),
+        reason: z7.string().min(5).max(1e3)
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const booking = await getBookingById(input.bookingId);
+      if (!booking) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Booking not found" });
+      }
+      if (booking.userId !== ctx.user.id) {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "You can only request refunds for your own bookings"
+        });
+      }
+      if (!booking.depositPaid) {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "No deposit has been paid for this booking"
+        });
+      }
+      if (booking.refundStatus !== "not_requested") {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "A refund has already been requested or processed for this booking"
+        });
+      }
+      await updateBooking(input.bookingId, {
+        refundStatus: "requested",
+        refundReason: sanitizeInput(input.reason, 1e3),
+        refundRequestedAt: /* @__PURE__ */ new Date()
+      });
+      return { success: true };
+    }),
+    adminGetRefundRequests: adminProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      }
+      const results = await database.select({
+        booking: bookings,
+        artistName: artists.shopName,
+        clientName: users.name
+      }).from(bookings).leftJoin(artists, eq5(bookings.artistId, artists.id)).leftJoin(users, eq5(bookings.userId, users.id)).where(eq5(bookings.refundStatus, "requested")).orderBy(desc3(bookings.refundRequestedAt));
+      return results;
+    }),
+    adminReviewRefund: adminProcedure.input(
+      z7.object({
+        bookingId: z7.number(),
+        approve: z7.boolean()
+      })
+    ).mutation(async ({ input }) => {
+      const booking = await getBookingById(input.bookingId);
+      if (!booking) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Booking not found" });
+      }
+      if (input.approve) {
+        let refundProcessed = false;
+        let refundId = void 0;
+        if (booking.depositPaid && booking.stripePaymentIntentId) {
+          try {
+            const { refundPaymentIntent: refundPaymentIntent2 } = await Promise.resolve().then(() => (init_stripe(), stripe_exports));
+            const refund = await refundPaymentIntent2(booking.stripePaymentIntentId);
+            refundProcessed = true;
+            refundId = refund.id;
+          } catch (err) {
+            throw new TRPCError6({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Stripe refund failed: ${err instanceof Error ? err.message : String(err)}`
+            });
+          }
+        }
+        await updateBooking(input.bookingId, {
+          status: "cancelled",
+          refundStatus: "refunded",
+          stripeRefundId: refundId,
+          refundProcessedAt: /* @__PURE__ */ new Date()
+        });
+      } else {
+        await updateBooking(input.bookingId, {
+          refundStatus: "rejected"
+        });
+      }
+      return { success: true };
     })
   }),
   favorites: router({
@@ -4457,6 +4988,141 @@ var appRouter = router({
         moderatedAt: /* @__PURE__ */ new Date()
       });
       return analysis;
+    })
+  }),
+  flash: router({
+    getUploadUrl: artistOwnerProcedure.input(
+      z7.object({
+        artistId: z7.number(),
+        fileName: z7.string(),
+        contentType: z7.string()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const tier = ctx.user?.subscriptionTier ?? "artist_free";
+      if (tier !== "artist_elite") {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "Only Elite Icon tier artists can post flash art on the front page."
+        });
+      }
+      const sanitizedFileName = sanitizeFileName3(input.fileName);
+      const fileKey = `public/${input.artistId}/flash-${Date.now()}-${sanitizedFileName}`;
+      return await createSignedUploadUrl(BUCKETS.PORTFOLIO_IMAGES, fileKey);
+    }),
+    create: artistOwnerProcedure.input(
+      z7.object({
+        artistId: z7.number(),
+        imageUrl: z7.string().url(),
+        imageKey: z7.string(),
+        title: z7.string().min(1).max(255),
+        description: z7.string().max(2e3).optional(),
+        price: z7.number().int().positive(),
+        depositAmount: z7.number().int().positive()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const tier = ctx.user?.subscriptionTier ?? "artist_free";
+      if (tier !== "artist_elite") {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "Only Elite Icon tier artists can post flash art."
+        });
+      }
+      if (input.depositAmount > input.price) {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "Deposit amount cannot exceed the total price."
+        });
+      }
+      return await createFlashArt({
+        ...input,
+        title: sanitizeInput(input.title, 255),
+        description: input.description ? sanitizeInput(input.description, 2e3) : void 0
+      });
+    }),
+    delete: artistOwnerProcedure.input(
+      z7.object({
+        id: z7.number(),
+        artistId: z7.number()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const tier = ctx.user?.subscriptionTier ?? "artist_free";
+      if (tier !== "artist_elite") {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "Only Elite Icon tier artists can manage flash art."
+        });
+      }
+      const flash = await getFlashArtById(input.id);
+      if (!flash || flash.artistId !== input.artistId) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Flash art not found" });
+      }
+      const deleted = await deleteFlashArt(input.id, input.artistId);
+      if (deleted) {
+        try {
+          await deleteFile(BUCKETS.PORTFOLIO_IMAGES, deleted.imageKey);
+        } catch (err) {
+          logger.warn("Failed to delete flash art image from storage", { key: deleted.imageKey, err });
+        }
+      }
+      return { success: true };
+    }),
+    getMyFlash: artistOwnerProcedure.input(z7.object({ artistId: z7.number() })).query(async ({ ctx, input }) => {
+      const tier = ctx.user?.subscriptionTier ?? "artist_free";
+      if (tier !== "artist_elite") {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "Only Elite Icon tier artists have access to flash art management."
+        });
+      }
+      return await getFlashArtByArtistId(input.artistId);
+    }),
+    getAllActive: publicProcedure.query(async () => {
+      return await getAllActiveFlashArt();
+    }),
+    getByArtistId: publicProcedure.input(z7.object({ artistId: z7.number() })).query(async ({ input }) => {
+      const database = await getDb();
+      if (!database) return [];
+      return await database.select().from(flashArt).where(and4(eq5(flashArt.artistId, input.artistId), eq5(flashArt.isLocked, false))).orderBy(desc3(flashArt.createdAt));
+    }),
+    createLockCheckout: protectedProcedure.input(
+      z7.object({
+        flashId: z7.number(),
+        preferredDate: z7.string(),
+        // ISO String
+        customerPhone: z7.string().min(1).max(50),
+        successUrl: z7.string().url(),
+        cancelUrl: z7.string().url()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const flash = await getFlashArtById(input.flashId);
+      if (!flash) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Flash art not found" });
+      }
+      if (flash.isLocked) {
+        throw new TRPCError6({ code: "BAD_REQUEST", message: "This flash piece is already locked." });
+      }
+      const artist = await getArtistById(flash.artistId);
+      if (!artist) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Artist not found" });
+      }
+      const session = await createCheckoutSession({
+        priceInCents: flash.depositAmount,
+        productName: `Lock Flash: "${flash.title}"`,
+        productDescription: `Non-refundable deposit to claim and book this custom flash art by ${artist.shopName}.`,
+        customerEmail: ctx.user.email ?? "",
+        metadata: {
+          paymentType: "flash_deposit",
+          flashId: String(flash.id),
+          userId: String(ctx.user.id),
+          preferredDate: input.preferredDate,
+          customerPhone: input.customerPhone,
+          customerName: ctx.user.name || "",
+          customerEmail: ctx.user.email || ""
+        },
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl
+      });
+      return { checkoutUrl: session.url };
     })
   }),
   // ── AI Tattoo Generation ──────────────────────
@@ -4624,6 +5290,7 @@ function serveStatic(app2) {
 }
 
 // backend/server/webhookHandler.ts
+init_stripe();
 init_db();
 init_db();
 init_schema();
@@ -4634,7 +5301,7 @@ import { eq as eq8 } from "drizzle-orm";
 init_db();
 init_schema();
 init_logger();
-import { eq as eq7, and as and4, lte, inArray } from "drizzle-orm";
+import { eq as eq7, and as and5, lte, inArray } from "drizzle-orm";
 var RETRY_DELAYS = [
   1 * 60 * 1e3,
   // 1 minute
@@ -4647,7 +5314,7 @@ var RETRY_DELAYS = [
   4 * 60 * 60 * 1e3
   // 4 hours
 ];
-var MAX_RETRIES = 5;
+var MAX_RETRIES2 = 5;
 var PROCESSING_TIMEOUT_MS = 3e4;
 async function queueWebhookForRetry(eventId, eventType, payload, error) {
   const db = await getDb();
@@ -4665,7 +5332,7 @@ async function queueWebhookForRetry(eventId, eventType, payload, error) {
       payload: JSON.stringify(payload),
       status: "pending",
       retryCount: 0,
-      maxRetries: MAX_RETRIES,
+      maxRetries: MAX_RETRIES2,
       nextRetryAt,
       lastError: error ?? null
     });
@@ -4688,7 +5355,7 @@ async function processWebhookQueue(processor) {
   let processedCount = 0;
   try {
     const pendingEvents = await db.select().from(webhookQueue).where(
-      and4(
+      and5(
         eq7(webhookQueue.status, "pending"),
         lte(webhookQueue.nextRetryAt, now)
       )
@@ -4721,7 +5388,7 @@ async function processWebhookQueue(processor) {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         const newRetryCount = event.retryCount + 1;
-        if (newRetryCount >= MAX_RETRIES) {
+        if (newRetryCount >= MAX_RETRIES2) {
           await db.update(webhookQueue).set({
             status: "failed",
             retryCount: newRetryCount,
@@ -4819,7 +5486,6 @@ function startQueueProcessor(processor, intervalMs = 6e4) {
 }
 
 // backend/server/webhookHandler.ts
-init_schema();
 var processorStarted = false;
 function initWebhookProcessor() {
   if (processorStarted) return;
@@ -4835,6 +5501,10 @@ async function processWebhookEvent(eventType, event) {
       const session = event.data.object;
       if (session.metadata?.paymentType === "request_addons") {
         await handleRequestAddonCheckoutCompleted(session);
+        break;
+      }
+      if (session.metadata?.paymentType === "flash_deposit") {
+        await handleFlashDepositCheckoutCompleted(session);
         break;
       }
       if (session.mode === "subscription") {
@@ -4911,6 +5581,78 @@ async function processWebhookEvent(eventType, event) {
     }
     default:
       logger.debug("Received unhandled webhook event type", { eventType });
+  }
+}
+async function handleFlashDepositCheckoutCompleted(session) {
+  const flashId = parseInt(session.metadata?.flashId || "0", 10);
+  const userId = parseInt(session.metadata?.userId || "0", 10);
+  const preferredDate = session.metadata?.preferredDate ? new Date(session.metadata.preferredDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3);
+  const customerPhone = session.metadata?.customerPhone || "";
+  const customerName = session.metadata?.customerName || "";
+  const customerEmail = session.metadata?.customerEmail || "";
+  if (!flashId || isNaN(flashId) || flashId <= 0) {
+    logger.warn("Flash deposit checkout missing valid flashId", {
+      sessionId: session.id
+    });
+    return;
+  }
+  const flash = await getFlashArtById(flashId);
+  if (!flash) {
+    logger.warn("Flash art piece not found in database", { flashId });
+    return;
+  }
+  if (flash.isLocked) {
+    logger.debug("Flash art piece is already locked, skipping processing", { flashId });
+    return;
+  }
+  const depositAmount = session.amount_total ? Number(session.amount_total) : flash.depositAmount;
+  const database = await getDb();
+  if (!database) throw new Error("Database not available for flash locking");
+  await database.transaction(async (tx) => {
+    await tx.update(flashArt).set({ isLocked: true, lockedByUserId: userId, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(flashArt.id, flashId));
+    const [booking] = await tx.insert(bookings).values({
+      artistId: flash.artistId,
+      userId: userId || null,
+      customerName: customerName || "Guest Collector",
+      customerEmail: customerEmail || "guest@theinkednetwork.website",
+      customerPhone: customerPhone || "N/A",
+      preferredDate,
+      tattooDescription: `Locked Flash Art: "${flash.title}" (ID: ${flash.id})`,
+      placement: "See Flash Art",
+      size: "Custom (Flash Art)",
+      depositAmount,
+      depositPaid: true,
+      status: "confirmed",
+      stripePaymentIntentId: session.payment_intent || null
+    }).returning();
+    logger.info("Flash art locked and booking created successfully", {
+      flashId,
+      bookingId: booking.id
+    });
+  });
+  try {
+    const [artistWithUser] = await database.select({
+      artistId: artists.id,
+      shopName: artists.shopName,
+      userEmail: users.email,
+      userName: users.name
+    }).from(artists).innerJoin(users, eq8(artists.userId, users.id)).where(eq8(artists.id, flash.artistId)).limit(1);
+    if (artistWithUser && artistWithUser.userEmail) {
+      await sendBookingIntakeNotification(artistWithUser.userEmail, {
+        artistName: artistWithUser.userName || artistWithUser.shopName,
+        clientName: customerName || "Guest Collector",
+        clientEmail: customerEmail || "guest@theinkednetwork.website",
+        clientPhone: customerPhone || "N/A",
+        tattooDescription: `Locked Flash Art: "${flash.title}"`,
+        preferredDate: preferredDate.toLocaleString(),
+        placement: "See Flash Art",
+        size: "Custom (Flash Art)",
+        budget: String(flash.price / 100) + " USD",
+        additionalNotes: `Flash piece total price is $${(flash.price / 100).toFixed(2)}. Deposit paid is $${(depositAmount / 100).toFixed(2)}.`
+      });
+    }
+  } catch (err) {
+    logger.error("Failed to send booking intake notification email for locked flash:", err);
   }
 }
 async function handleRequestAddonCheckoutCompleted(session) {
@@ -5168,7 +5910,7 @@ init_logger();
 import * as Sentry from "@sentry/node";
 var initialized = false;
 function initSentry() {
-  const dsn = process.env.SENTRY_DSN;
+  const dsn = process.env.SENTRY_DSN || "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752";
   if (!dsn) {
     logger.warn("SENTRY_DSN not configured - error tracking disabled");
     return;

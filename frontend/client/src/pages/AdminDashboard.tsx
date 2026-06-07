@@ -24,6 +24,8 @@ import {
   MapPin,
   Mail,
   ExternalLink,
+  CreditCard,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -582,6 +584,124 @@ function ScorePill({ label, score }: { label: string; score: number }) {
 }
 
 // ──────────────────────────────────────────────
+// Refund Requests Tab
+// ──────────────────────────────────────────────
+
+function RefundRequestsPanel() {
+  const { data: requests, isLoading, refetch } = trpc.bookings.adminGetRefundRequests.useQuery();
+
+  const reviewMutation = trpc.bookings.adminReviewRefund.useMutation({
+    onSuccess: (_, vars) => {
+      toast.success(vars.approve ? "Refund approved and processed" : "Refund request rejected");
+      refetch();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!requests || requests.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <CreditCard className="w-12 h-12 mx-auto mb-4 opacity-40" />
+        <p className="text-lg font-medium">No pending refund requests</p>
+        <p className="text-sm">All requests have been processed.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {requests.map((item) => {
+        const booking = item.booking;
+        const requestedAt = booking.refundRequestedAt
+          ? new Date(booking.refundRequestedAt).toLocaleDateString()
+          : "Unknown date";
+
+        return (
+          <Card key={booking.id} className="p-6">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-semibold text-lg">
+                    Refund Request #{booking.id}
+                  </span>
+                  <Badge className="bg-yellow-500 text-white text-xs">
+                    Pending Review
+                  </Badge>
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Requested: {requestedAt}
+                  </span>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-lg border">
+                  <div>
+                    <h4 className="font-semibold text-muted-foreground mb-1">Client Details</h4>
+                    <p className="font-medium text-foreground">{item.clientName || "Unknown Client"}</p>
+                    <p className="text-muted-foreground text-xs">{booking.customerEmail || "No customer email"}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-muted-foreground mb-1">Artist Details</h4>
+                    <p className="font-medium text-foreground">{item.artistName || "Unknown Artist"}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-1">
+                    Refund Reason
+                  </h4>
+                  <p className="text-sm text-foreground bg-muted/30 p-3 rounded border italic">
+                    "{booking.refundReason || "No reason provided."}"
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-green-600">
+                  <CreditCard className="w-4 h-4" />
+                  <span className="font-medium">
+                    Deposit Amount to Refund: ${(booking.depositAmount || 0) / 100}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex md:flex-col items-stretch gap-2 shrink-0 md:w-48">
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                  disabled={reviewMutation.isPending}
+                  onClick={() =>
+                    reviewMutation.mutate({ bookingId: booking.id, approve: true })
+                  }
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                  Approve Refund
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  disabled={reviewMutation.isPending}
+                  onClick={() =>
+                    reviewMutation.mutate({ bookingId: booking.id, approve: false })
+                  }
+                >
+                  <XCircle className="w-4 h-4 mr-1.5" />
+                  Reject Request
+                </Button>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
 // Admin Dashboard Page
 // ──────────────────────────────────────────────
 
@@ -589,10 +709,12 @@ export default function AdminDashboard() {
   const { data: artists } = trpc.artists.adminGetAll.useQuery();
   const { data: pendingDocs } = trpc.verification.getPending.useQuery();
   const { data: flaggedReviews } = trpc.moderation.getFlaggedReviews.useQuery();
+  const { data: refundRequests } = trpc.bookings.adminGetRefundRequests.useQuery();
 
   const pendingArtists = artists?.filter((a) => !a.isApproved).length ?? 0;
   const pendingVerifications = pendingDocs?.length ?? 0;
   const pendingReviews = flaggedReviews?.length ?? 0;
+  const pendingRefunds = refundRequests?.length ?? 0;
 
   return (
     <DashboardLayout>
@@ -608,7 +730,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-4 gap-4 mb-8">
           <Card className="p-4 text-center">
             <p className="text-3xl font-bold text-yellow-500">{pendingArtists}</p>
             <p className="text-sm text-muted-foreground mt-1">Artists Pending</p>
@@ -621,10 +743,14 @@ export default function AdminDashboard() {
             <p className="text-3xl font-bold text-orange-500">{pendingReviews}</p>
             <p className="text-sm text-muted-foreground mt-1">Flagged Reviews</p>
           </Card>
+          <Card className="p-4 text-center">
+            <p className="text-3xl font-bold text-red-500">{pendingRefunds}</p>
+            <p className="text-sm text-muted-foreground mt-1">Refund Requests</p>
+          </Card>
         </div>
 
         <Tabs defaultValue="artists" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="artists" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Artists
@@ -652,6 +778,15 @@ export default function AdminDashboard() {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="refunds" className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              Refunds
+              {pendingRefunds > 0 && (
+                <Badge className="bg-red-500 text-white text-xs ml-1 h-5 px-1.5">
+                  {pendingRefunds}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="artists">
@@ -664,6 +799,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="reviews">
             <FlaggedReviewsPanel />
+          </TabsContent>
+
+          <TabsContent value="refunds">
+            <RefundRequestsPanel />
           </TabsContent>
         </Tabs>
       </div>

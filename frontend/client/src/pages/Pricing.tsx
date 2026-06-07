@@ -129,7 +129,7 @@ export default function Pricing() {
                     <FeatureRow
                       enabled
                       label={`${limits.transactionFeePercent}% booking fee`}
-                      neutral={limits.transactionFeePercent === 0}
+                      neutral={(limits.transactionFeePercent as number) === 0}
                     />
                   </div>
                 </Card>

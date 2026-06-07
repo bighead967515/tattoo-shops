@@ -253,6 +253,13 @@ export const bookings = pgTable("bookings", {
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }), // For deposit payments
   depositAmount: integer("depositAmount"), // Amount in cents
   depositPaid: boolean("depositPaid").default(false),
+  cancelledBy: varchar("cancelledBy", { length: 50 }),
+  refundStatus: varchar("refundStatus", { length: 50 }).default("not_requested").notNull(),
+  refundReason: text("refundReason"),
+  refundRequestedAt: timestamp("refundRequestedAt"),
+  refundProcessedAt: timestamp("refundProcessedAt"),
+  stripeRefundId: varchar("stripeRefundId", { length: 255 }),
+  source: varchar("source", { length: 100 }).default("ink_connect").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -535,3 +542,27 @@ export const requestMessages = pgTable("requestMessages", {
 
 export type RequestMessage = typeof requestMessages.$inferSelect;
 export type InsertRequestMessage = typeof requestMessages.$inferInsert;
+
+/**
+ * Flash Art pieces created by Elite Icon artists
+ */
+export const flashArt = pgTable("flash_art", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artistId")
+    .notNull()
+    .references(() => artists.id, { onDelete: "cascade" }),
+  imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
+  imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  price: integer("price").notNull(),          // In cents
+  depositAmount: integer("depositAmount").notNull(),  // In cents
+  isLocked: boolean("isLocked").default(false).notNull(),
+  lockedByUserId: integer("lockedByUserId").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type FlashArt = typeof flashArt.$inferSelect;
+export type InsertFlashArt = typeof flashArt.$inferInsert;
+

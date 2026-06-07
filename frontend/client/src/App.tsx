@@ -46,7 +46,6 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path="/artist-finder" component={ArtistFinder} />
       <Route path="/artists" component={ArtistBrowse} />
-      <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/for-artists" component={ForArtists} />
       <Route path="/cover-ups" component={CoverUps} />
       <Route path="/tattoo-planning" component={CoverUps} />
@@ -80,6 +79,8 @@ function Router() {
       {/* Artist billing routes */}
       <Route path="/artist/billing" component={ArtistBilling} />
       <Route path="/artist/billing/success" component={SubscriptionSuccess} />
+      {/* Artist Profile (parameterized) */}
+      <Route path="/artist/:id" component={ArtistProfile} />
       {/* Admin routes */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/moderation" component={AdminModeration} />

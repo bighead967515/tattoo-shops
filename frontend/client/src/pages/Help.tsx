@@ -12,6 +12,7 @@ import {
   Phone,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -346,6 +347,28 @@ export default function Help() {
               </form>
             </Card>
           </div>
+        </div>
+      </div>
+
+      {/* Sentry Testing Utility */}
+      <div className="container py-8 border-t border-muted/50 mt-4">
+        <div className="max-w-md mx-auto text-center bg-card border border-destructive/20 rounded-xl p-8 shadow-sm bg-gradient-to-br from-destructive/5 to-background">
+          <h3 className="text-lg font-bold text-foreground mb-2 flex items-center justify-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            Sentry Integration Test
+          </h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            Verify real-time error tracking and telemetry in the Sentry dashboard by triggering a test error.
+          </p>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              throw new Error("This is your first error!");
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-medium"
+          >
+            Break the world
+          </Button>
         </div>
       </div>
 

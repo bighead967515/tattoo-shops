@@ -17,6 +17,9 @@ import {
   InsertReview,
   InsertBooking,
   InsertFavorite,
+  flashArt,
+  type FlashArt,
+  type InsertFlashArt,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { logger } from "./_core/logger";
@@ -46,6 +49,40 @@ let _poolStats: PoolStats = {
 export function getPoolStats(): PoolStats {
   return { ..._poolStats };
 }
+
+export const artistFields = {
+  id: artists.id,
+  userId: artists.userId,
+  shopName: artists.shopName,
+  bio: artists.bio,
+  specialties: artists.specialties,
+  styles: artists.styles,
+  experience: artists.experience,
+  address: artists.address,
+  city: artists.city,
+  state: artists.state,
+  zipCode: artists.zipCode,
+  phone: artists.phone,
+  website: artists.website,
+  instagram: artists.instagram,
+  facebook: artists.facebook,
+  lat: artists.lat,
+  lng: artists.lng,
+  averageRating: artists.averageRating,
+  totalReviews: artists.totalReviews,
+  isApproved: artists.isApproved,
+  bidsUsed: artists.bidsUsed,
+  bidsThisMonth: artists.bidsThisMonth,
+  bidsMonthYear: artists.bidsMonthYear,
+  bidTokens: artists.bidTokens,
+  chatTokens: artists.chatTokens,
+  aiCredits: artists.aiCredits,
+  isFoundingArtist: artists.isFoundingArtist,
+  foundingTrialEndsAt: artists.foundingTrialEndsAt,
+  createdAt: artists.createdAt,
+  updatedAt: artists.updatedAt,
+};
+
 
 /**
  * Log pool statistics periodically (call from health check or monitoring)
@@ -207,8 +244,8 @@ export async function createArtist(artist: InsertArtist) {
       .set(buildArtistOnboardingUserUpdate())
       .where(eq(users.id, artist.userId));
 
-    // NEW ARTISTS MUST BE APPROVED BY ADMIN BEFORE APPEARING IN PUBLIC LISTINGS
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: false }).returning();
+    // NEW ARTISTS HAVE IMMEDIATE ACCESS AND APPEAR IN PUBLIC LISTINGS IMMEDIATELY
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
     return created;
   });
 }
@@ -218,8 +255,12 @@ export async function getArtistByUserId(userId: number) {
   if (!db) return undefined;
 
   const result = await db
-    .select()
+    .select({
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier,
+    })
     .from(artists)
+    .innerJoin(users, eq(artists.userId, users.id))
     .where(eq(artists.userId, userId))
     .limit(1);
   return result.length > 0 ? result[0] : undefined;
@@ -230,8 +271,12 @@ export async function getArtistById(id: number) {
   if (!db) return undefined;
 
   const result = await db
-    .select()
+    .select({
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier,
+    })
     .from(artists)
+    .innerJoin(users, eq(artists.userId, users.id))
     .where(eq(artists.id, id))
     .limit(1);
   return result.length > 0 ? result[0] : undefined;
@@ -242,8 +287,12 @@ export async function getAllArtists() {
   if (!db) return [];
 
   return await db
-    .select()
+    .select({
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier,
+    })
     .from(artists)
+    .innerJoin(users, eq(artists.userId, users.id))
     .where(eq(artists.isApproved, true))
     .orderBy(
       // Founding artists appear first
@@ -326,8 +375,12 @@ export async function searchArtists(filters: {
   }
 
   return await db
-    .select()
+    .select({
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier,
+    })
     .from(artists)
+    .innerJoin(users, eq(artists.userId, users.id))
     .where(and(...conditions))
     .orderBy(
       sql`${artists.isFoundingArtist} DESC`,
@@ -637,7 +690,14 @@ export async function discoverArtists(intent: {
   if (allTerms.length === 0 && !intent.vibeDescription) {
     // No useful search terms — fall back to all approved artists
     return (
-      await db.select().from(artists).where(eq(artists.isApproved, true))
+      await db
+        .select({
+          ...artistFields,
+          subscriptionTier: users.subscriptionTier,
+        })
+        .from(artists)
+        .innerJoin(users, eq(artists.userId, users.id))
+        .where(eq(artists.isApproved, true))
     ).map((a) => ({
       ...a,
       matchedImages: [] as Array<typeof portfolioImages.$inferSelect>,
@@ -677,10 +737,14 @@ export async function discoverArtists(intent: {
   const matchingImages = await db
     .select({
       image: portfolioImages,
-      artist: artists,
+      artist: {
+        ...artistFields,
+        subscriptionTier: users.subscriptionTier,
+      },
     })
     .from(portfolioImages)
     .innerJoin(artists, eq(portfolioImages.artistId, artists.id))
+    .innerJoin(users, eq(artists.userId, users.id))
     .where(and(eq(artists.isApproved, true), or(...imageConditions)))
     .orderBy(desc(portfolioImages.qualityScore));
 
@@ -696,8 +760,12 @@ export async function discoverArtists(intent: {
   const matchingArtistsDirect =
     artistConditions.length > 0
       ? await db
-          .select()
+          .select({
+            ...artistFields,
+            subscriptionTier: users.subscriptionTier,
+          })
           .from(artists)
+          .innerJoin(users, eq(artists.userId, users.id))
           .where(and(eq(artists.isApproved, true), or(...artistConditions)))
       : [];
 
@@ -705,7 +773,7 @@ export async function discoverArtists(intent: {
   const artistMap = new Map<
     number,
     {
-      artist: typeof artists.$inferSelect;
+      artist: typeof artists.$inferSelect & { subscriptionTier: string | null };
       matchedImages: Array<typeof portfolioImages.$inferSelect>;
       relevanceScore: number;
     }
@@ -941,3 +1009,106 @@ export async function getReviewById(id: number) {
     .limit(1);
   return result[0] || null;
 }
+
+/**
+ * Create a new Flash Art piece.
+ */
+export async function createFlashArt(flash: InsertFlashArt) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [created] = await db.insert(flashArt).values(flash).returning();
+  return created;
+}
+
+/**
+ * Delete a Flash Art piece.
+ */
+export async function deleteFlashArt(id: number, artistId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [deleted] = await db
+    .delete(flashArt)
+    .where(and(eq(flashArt.id, id), eq(flashArt.artistId, artistId)))
+    .returning();
+  return deleted;
+}
+
+/**
+ * Get Flash Art pieces for an artist.
+ */
+export async function getFlashArtByArtistId(artistId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select()
+    .from(flashArt)
+    .where(eq(flashArt.artistId, artistId))
+    .orderBy(desc(flashArt.createdAt));
+}
+
+/**
+ * Get all active (unlocked) Flash Art pieces.
+ * Filters to only show pieces by Elite Icon artists.
+ */
+export async function getAllActiveFlashArt() {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Flash Art must be active and the artist must be on the Elite Icon tier (artist_elite)
+  return await db
+    .select({
+      id: flashArt.id,
+      artistId: flashArt.artistId,
+      imageUrl: flashArt.imageUrl,
+      imageKey: flashArt.imageKey,
+      title: flashArt.title,
+      description: flashArt.description,
+      price: flashArt.price,
+      depositAmount: flashArt.depositAmount,
+      isLocked: flashArt.isLocked,
+      createdAt: flashArt.createdAt,
+      artistShopName: artists.shopName,
+      artistCity: artists.city,
+      artistState: artists.state,
+    })
+    .from(flashArt)
+    .innerJoin(artists, eq(flashArt.artistId, artists.id))
+    .innerJoin(users, eq(artists.userId, users.id))
+    .where(
+      and(
+        eq(flashArt.isLocked, false),
+        eq(artists.isApproved, true),
+        eq(users.subscriptionTier, "artist_elite")
+      )
+    )
+    .orderBy(desc(flashArt.createdAt));
+}
+
+/**
+ * Get Flash Art by ID.
+ */
+export async function getFlashArtById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db
+    .select()
+    .from(flashArt)
+    .where(eq(flashArt.id, id))
+    .limit(1);
+  return result[0] || null;
+}
+
+/**
+ * Lock a Flash Art piece by ID.
+ */
+export async function lockFlashArt(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [updated] = await db
+    .update(flashArt)
+    .set({ isLocked: true, lockedByUserId: userId, updatedAt: new Date() })
+    .where(eq(flashArt.id, id))
+    .returning();
+  return updated;
+}
+

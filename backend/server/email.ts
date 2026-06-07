@@ -300,3 +300,113 @@ export async function sendBookingConfirmation(
     html,
   });
 }
+
+/**
+ * Send booking request intake notification email to the artist
+ */
+export async function sendBookingIntakeNotification(
+  to: string,
+  details: {
+    artistName: string;
+    clientName: string;
+    clientEmail: string;
+    clientPhone: string;
+    tattooDescription: string;
+    preferredDate: string;
+    placement: string;
+    size: string;
+    budget?: string;
+    additionalNotes?: string;
+  },
+) {
+  const {
+    artistName,
+    clientName,
+    clientEmail,
+    clientPhone,
+    tattooDescription,
+    preferredDate,
+    placement,
+    size,
+    budget = "N/A",
+    additionalNotes = "N/A",
+  } = details;
+
+  // Escape all user inputs to prevent injection
+  const escapedArtistName = escapeHtml(artistName);
+  const escapedClientName = escapeHtml(clientName);
+  const escapedClientEmail = escapeHtml(clientEmail);
+  const escapedClientPhone = escapeHtml(clientPhone);
+  const escapedTattooDescription = escapeHtml(tattooDescription);
+  const escapedPreferredDate = escapeHtml(preferredDate);
+  const escapedPlacement = escapeHtml(placement);
+  const escapedSize = escapeHtml(size);
+  const escapedBudget = escapeHtml(budget);
+  const escapedAdditionalNotes = escapeHtml(additionalNotes);
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #6366f1, #3b82f6); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
+    .booking-details { background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0; border: 1px solid #f3f4f6; }
+    .booking-details h3 { margin-top: 0; color: #1e1b4b; border-bottom: 2px solid #e0e7ff; padding-bottom: 8px; }
+    .booking-details p { margin: 12px 0; }
+    .brand-stamp { text-align: center; font-size: 13px; color: #6366f1; font-weight: bold; margin-top: 25px; text-transform: uppercase; letter-spacing: 1px; }
+    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>📅 New Booking Request!</h2>
+      <p style="margin: 0; font-size: 15px; opacity: 0.9;">via The Inked Network</p>
+    </div>
+    <div class="content">
+      <p>Hi ${escapedArtistName},</p>
+      
+      <p>Great news! You have received a new booking inquiry. We've captured the client details for you below:</p>
+      
+      <div class="booking-details">
+        <h3>Client & Tattoo Details:</h3>
+        <p><strong>Client Name:</strong> ${escapedClientName}</p>
+        <p><strong>Client Email:</strong> <a href="mailto:${escapedClientEmail}">${escapedClientEmail}</a></p>
+        <p><strong>Client Phone:</strong> <a href="tel:${escapedClientPhone}">${escapedClientPhone}</a></p>
+        <p><strong>Preferred Date & Time:</strong> ${escapedPreferredDate}</p>
+        <p><strong>Tattoo Concept:</strong> ${escapedTattooDescription}</p>
+        <p><strong>Placement:</strong> ${escapedPlacement}</p>
+        <p><strong>Size:</strong> ${escapedSize}</p>
+        <p><strong>Budget:</strong> ${escapedBudget}</p>
+        <p><strong>Additional Notes:</strong> ${escapedAdditionalNotes}</p>
+      </div>
+
+      <p>Please reach out to the client directly via email or phone to confirm the appointment, finalize the design, and set up deposits/calendar bookings as needed.</p>
+
+      <div class="brand-stamp">
+        ⚡ Lead Sent via The Inked Network
+      </div>
+
+      <p style="margin-top: 30px; font-size: 13px; text-align: center; color: #9ca3af;">
+        Thank you for being a valued member of our platform!
+      </p>
+    </div>
+    <div class="footer">
+      <p>The Inked Network &mdash; Helping Tattoo Artists Grow Their Studios</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return sendEmail({
+    to,
+    subject: `New booking request from ${clientName} via The Inked Network`,
+    html,
+  });
+}
+

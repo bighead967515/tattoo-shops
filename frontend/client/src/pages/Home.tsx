@@ -14,7 +14,24 @@ import {
   Star,
   Award,
   Wallet,
+  Crown,
+  Sparkles,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const audienceLanes = [
   {
@@ -129,6 +146,58 @@ const faqs = [
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const { isAuthenticated } = useAuth();
+
+  const [selectedFlash, setSelectedFlash] = useState<any | null>(null);
+  const [preferredDate, setPreferredDate] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  const { data: activeFlash, isLoading: flashLoading } =
+    trpc.flash.getAllActive.useQuery();
+
+  const createCheckoutMutation = trpc.flash.createLockCheckout.useMutation({
+    onSuccess: (res) => {
+      if (res && res.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+      } else {
+        toast.error("Failed to initiate checkout session.");
+      }
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to start deposit payment.");
+    },
+  });
+
+  const handleLockFlashClick = (flash: any) => {
+    if (!isAuthenticated) {
+      toast.info("Please log in to purchase and lock flash art.");
+      setLocation("/login");
+      return;
+    }
+    setSelectedFlash(flash);
+  };
+
+  const handleConfirmLock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFlash) return;
+
+    if (!preferredDate) {
+      toast.error("Please select a preferred date and time.");
+      return;
+    }
+    if (!customerPhone.trim()) {
+      toast.error("Please enter a contact phone number.");
+      return;
+    }
+
+    createCheckoutMutation.mutate({
+      flashId: selectedFlash.id,
+      preferredDate: new Date(preferredDate).toISOString(),
+      customerPhone,
+      successUrl: `${window.location.origin}/client/dashboard?booking_success=true`,
+      cancelUrl: `${window.location.origin}/`,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -299,6 +368,183 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Premium Available Flash Art Section */}
+      <section className="container py-20 bg-gradient-to-b from-background via-amber-500/5 to-background border-y">
+        <div className="mb-12 text-center">
+          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-xs font-semibold uppercase tracking-wider mb-4">
+            <Crown className="w-3.5 h-3.5" />
+            Elite Icon Exclusives
+          </div>
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Available Custom Flash Designs
+          </h2>
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+            Lock down an exclusive, original design from our top-tier artists. A small deposit secures the design and automatically starts your booking.
+          </p>
+        </div>
+
+        {flashLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : !activeFlash || activeFlash.length === 0 ? (
+          <div className="text-center py-12 border border-dashed rounded-2xl max-w-xl mx-auto bg-muted/20">
+            <p className="text-muted-foreground">
+              No custom flash designs are currently available. Check back soon!
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {activeFlash.map((item) => (
+              <Card key={item.id} className="overflow-hidden bg-card border-border hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/5 transition-all duration-300 group flex flex-col h-full">
+                <div className="aspect-square relative overflow-hidden bg-muted">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none font-semibold flex items-center gap-1 shadow-md">
+                      <Crown className="w-3 h-3" /> Exclusive
+                    </Badge>
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-lg leading-tight text-foreground group-hover:text-primary transition-colors">
+                        {item.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
+                        by <span className="text-foreground hover:underline cursor-pointer">{item.artistShopName}</span>
+                      </p>
+                    </div>
+                    {item.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between border-t pt-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total Price</p>
+                        <p className="font-extrabold text-xl text-foreground">
+                          ${(item.price / 100).toFixed(0)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">To Lock</p>
+                        <p className="font-bold text-sm text-amber-600 dark:text-amber-400">
+                          ${(item.depositAmount / 100).toFixed(0)} Deposit
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-md shadow-amber-500/10 gap-1.5"
+                      onClick={() => handleLockFlashClick(item)}
+                    >
+                      <Sparkles className="w-4 h-4 fill-current" />
+                      Lock with Deposit
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Lock Flash Art Booking Dialog */}
+      <Dialog open={!!selectedFlash} onOpenChange={(open) => { if (!open) setSelectedFlash(null); }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-1.5 font-bold text-xl">
+              <Crown className="w-5 h-5 text-amber-500" />
+              Lock Flash Design
+            </DialogTitle>
+          </DialogHeader>
+          {selectedFlash && (
+            <form onSubmit={handleConfirmLock} className="space-y-4 pt-4">
+              <div className="flex gap-4 items-start border-b pb-4">
+                <img
+                  src={selectedFlash.imageUrl}
+                  alt={selectedFlash.title}
+                  className="w-16 h-16 object-cover rounded-lg border flex-shrink-0"
+                />
+                <div className="space-y-1">
+                  <h4 className="font-bold text-foreground leading-tight">{selectedFlash.title}</h4>
+                  <p className="text-xs text-muted-foreground">by {selectedFlash.artistShopName}</p>
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    ${(selectedFlash.depositAmount / 100).toFixed(0)} deposit required
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="lock-date">Preferred Appointment Date & Time</Label>
+                <Input
+                  id="lock-date"
+                  type="datetime-local"
+                  required
+                  value={preferredDate}
+                  onChange={(e) => setPreferredDate(e.target.value)}
+                  disabled={createCheckoutMutation.isPending}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Choose a tentative date. The artist will verify and confirm final scheduling with you.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lock-phone">Your Phone Number</Label>
+                <Input
+                  id="lock-phone"
+                  type="tel"
+                  placeholder="(555) 555-5555"
+                  required
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  disabled={createCheckoutMutation.isPending}
+                />
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Paying the <strong>${(selectedFlash.depositAmount / 100).toFixed(0)} deposit</strong> locks this custom design exclusively for you. Other users will no longer be able to purchase it, and a pending booking will be created on the artist's schedule.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSelectedFlash(null)}
+                  disabled={createCheckoutMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+                  disabled={createCheckoutMutation.isPending}
+                >
+                  {createCheckoutMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    "Proceed to Deposit"
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <section className="container py-20 border-b">
         <div className="mb-12 text-center">

@@ -18,6 +18,7 @@ export interface TattooShop {
   /** Indicates whether this entry came from the artists table or the shops table */
   source: TattooShopSource;
   isVerified?: boolean;
+  subscriptionTier?: string | null;
 }
 
 /** Shape returned by trpc.shop.getAll — mirrors the shops table columns */
@@ -50,6 +51,7 @@ export interface ArtistShopSource {
   totalReviews: number | null;
   lat: string | null;
   lng: string | null;
+  subscriptionTier?: string | null;
 }
 
 function toRatingString(
@@ -90,6 +92,7 @@ export function mapArtistsToTattooShops(
     lat: parseCoordinate(artist.lat),
     lng: parseCoordinate(artist.lng),
     source: "artist" as TattooShopSource,
+    subscriptionTier: artist.subscriptionTier ?? "artist_free",
   }));
 }
 

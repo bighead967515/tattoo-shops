@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,11 +75,135 @@ export default function ArtistDashboard() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const [showAddFlashDialog, setShowAddFlashDialog] = useState(false);
+  const [flashTitle, setFlashTitle] = useState("");
+  const [flashDescription, setFlashDescription] = useState("");
+  const [flashPrice, setFlashPrice] = useState("");
+  const [flashDeposit, setFlashDeposit] = useState("");
+  const [flashFile, setFlashFile] = useState<File | null>(null);
+  const [isUploadingFlash, setIsUploadingFlash] = useState(false);
+  const [flashUploadProgress, setFlashUploadProgress] = useState<number | null>(null);
+  const [flashUploadError, setFlashUploadError] = useState<string | null>(null);
+
   const {
     data: artist,
     isLoading: artistLoading,
     refetch: refetchArtist,
   } = trpc.artists.getByUserId.useQuery(undefined, { enabled: !!user });
+
+  const {
+    data: flashArtItems,
+    isLoading: flashLoading,
+    refetch: refetchFlash,
+  } = trpc.flash.getMyFlash.useQuery(
+    { artistId: artist?.id || 0 },
+    { enabled: !!artist && user?.subscriptionTier === "artist_elite" },
+  );
+
+  const getFlashUploadUrlMutation = trpc.flash.getUploadUrl.useMutation();
+  const createFlashMutation = trpc.flash.create.useMutation({
+    onSuccess: () => {
+      refetchFlash();
+      setShowAddFlashDialog(false);
+      setFlashTitle("");
+      setFlashDescription("");
+      setFlashPrice("");
+      setFlashDeposit("");
+      setFlashFile(null);
+      setIsUploadingFlash(false);
+      setFlashUploadProgress(null);
+      toast.success("Flash art added successfully!");
+    },
+    onError: (err) => {
+      setIsUploadingFlash(false);
+      setFlashUploadProgress(null);
+      setFlashUploadError(err.message || "Failed to create flash art.");
+    },
+  });
+
+  const deleteFlashMutation = trpc.flash.delete.useMutation({
+    onSuccess: () => {
+      refetchFlash();
+      toast.success("Flash art piece removed.");
+    },
+    onError: (err) => {
+      toast.error(`Error deleting: ${err.message}`);
+    },
+  });
+
+  const handleCreateFlash = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!flashFile || !artist) {
+      toast.error("Please select an image file first.");
+      return;
+    }
+    const priceNum = parseFloat(flashPrice);
+    const depositNum = parseFloat(flashDeposit);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      toast.error("Please enter a valid price.");
+      return;
+    }
+    if (isNaN(depositNum) || depositNum <= 0) {
+      toast.error("Please enter a valid deposit amount.");
+      return;
+    }
+    if (depositNum > priceNum) {
+      toast.error("Deposit amount cannot exceed the total price.");
+      return;
+    }
+
+    setIsUploadingFlash(true);
+    setFlashUploadProgress(0);
+    setFlashUploadError(null);
+
+    try {
+      // 1. Get signed upload URL
+      const { signedUrl, path } = await getFlashUploadUrlMutation.mutateAsync({
+        artistId: artist.id,
+        fileName: flashFile.name,
+        contentType: flashFile.type,
+      });
+
+      // 2. Upload file directly to Supabase Storage
+      await axios.put(signedUrl, flashFile, {
+        headers: { "Content-Type": flashFile.type },
+        onUploadProgress: (progressEvent) => {
+          if (
+            typeof progressEvent.total === "number" &&
+            progressEvent.total > 0
+          ) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
+            setFlashUploadProgress(percentCompleted);
+          }
+        },
+      });
+
+      // 3. Construct the public URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const imageUrl = `${supabaseUrl}/storage/v1/object/public/portfolio_images/${path}`;
+
+      // 4. Create database entry
+      await createFlashMutation.mutateAsync({
+        artistId: artist.id,
+        imageUrl,
+        imageKey: path,
+        title: flashTitle,
+        description: flashDescription || undefined,
+        price: Math.round(priceNum * 100),
+        depositAmount: Math.round(depositNum * 100),
+      });
+    } catch (error) {
+      console.error(error);
+      setIsUploadingFlash(false);
+      setFlashUploadProgress(null);
+      const message = error instanceof Error ? error.message : "Upload failed";
+      setFlashUploadError(message);
+      toast.error(`Failed to add flash art: ${message}`);
+    }
+  };
+
 
   const { data: bookings, isLoading: bookingsLoading } =
     trpc.bookings.getByArtistId.useQuery(
@@ -240,6 +371,8 @@ export default function ArtistDashboard() {
       );
     }
   };
+
+  const isElite = user?.subscriptionTier === "artist_elite";
 
   return (
     <div className="min-h-screen bg-background">
@@ -415,11 +548,17 @@ export default function ArtistDashboard() {
         })()}
 
         <Tabs defaultValue="portfolio" className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-6">
+          <TabsList className={`grid w-full max-w-4xl ${isElite ? "grid-cols-7" : "grid-cols-6"}`}>
             <TabsTrigger value="portfolio">
               <ImageIcon className="w-4 h-4 mr-2" />
               Portfolio
             </TabsTrigger>
+            {isElite && (
+              <TabsTrigger value="flash">
+                <Crown className="w-4 h-4 mr-2 text-amber-500" />
+                Flash Art
+              </TabsTrigger>
+            )}
             <TabsTrigger value="requests">
               <Briefcase className="w-4 h-4 mr-2" />
               Requests
@@ -637,6 +776,199 @@ export default function ArtistDashboard() {
             </div>
           </TabsContent>
 
+          {/* Flash Art Tab */}
+          {isElite && (
+            <TabsContent value="flash" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold">Flash Art Feed Manager</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Upload custom flash designs. Users can purchase and lock them instantly from the homepage with a deposit.
+                  </p>
+                </div>
+                <Dialog open={showAddFlashDialog} onOpenChange={setShowAddFlashDialog}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Flash Piece
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Add New Flash Art</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateFlash} className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="flash-image">Flash Design Image</Label>
+                        <Input
+                          id="flash-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setFlashFile(e.target.files?.[0] || null)}
+                          required
+                          disabled={isUploadingFlash}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="flash-title">Design Title</Label>
+                        <Input
+                          id="flash-title"
+                          placeholder="e.g., Traditional Dagger"
+                          value={flashTitle}
+                          onChange={(e) => setFlashTitle(e.target.value)}
+                          required
+                          disabled={isUploadingFlash}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="flash-desc">Description (Optional)</Label>
+                        <Textarea
+                          id="flash-desc"
+                          placeholder="Include size limits, placement details, style, etc..."
+                          value={flashDescription}
+                          onChange={(e) => setFlashDescription(e.target.value)}
+                          className="h-20"
+                          disabled={isUploadingFlash}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="flash-price">Total Price ($)</Label>
+                          <Input
+                            id="flash-price"
+                            type="number"
+                            placeholder="300"
+                            min="1"
+                            value={flashPrice}
+                            onChange={(e) => setFlashPrice(e.target.value)}
+                            required
+                            disabled={isUploadingFlash}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="flash-deposit">Lock Deposit ($)</Label>
+                          <Input
+                            id="flash-deposit"
+                            type="number"
+                            placeholder="50"
+                            min="1"
+                            value={flashDeposit}
+                            onChange={(e) => setFlashDeposit(e.target.value)}
+                            required
+                            disabled={isUploadingFlash}
+                          />
+                        </div>
+                      </div>
+                      {isUploadingFlash && flashUploadProgress !== null && (
+                        <div className="space-y-2">
+                          <Label>Uploading Design... {flashUploadProgress}%</Label>
+                          <Progress value={flashUploadProgress} className="w-full" />
+                        </div>
+                      )}
+                      {flashUploadError && (
+                        <p className="text-xs text-destructive">{flashUploadError}</p>
+                      )}
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowAddFlashDialog(false)}
+                          disabled={isUploadingFlash}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isUploadingFlash}>
+                          {isUploadingFlash ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            "Upload Flash"
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {flashLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !flashArtItems || flashArtItems.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
+                  <Crown className="w-10 h-10 mx-auto mb-3 text-amber-500 opacity-40" />
+                  <p className="font-medium">No Flash Art uploaded yet</p>
+                  <p className="text-sm mt-1">Upload your first custom flash piece to display it on the homepage!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {flashArtItems.map((item) => (
+                    <Card key={item.id} className="overflow-hidden relative group">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title}
+                        className="w-full aspect-square object-cover"
+                      />
+                      {item.isLocked && (
+                        <Badge className="absolute top-2 left-2 bg-red-600 text-white font-semibold">
+                          Locked
+                        </Badge>
+                      )}
+                      <div className="p-3 space-y-1">
+                        <h4 className="font-semibold text-sm truncate">{item.title}</h4>
+                        {item.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
+                        )}
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <span className="font-bold text-foreground">
+                            ${(item.price / 100).toFixed(0)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            ${(item.depositAmount / 100).toFixed(0)} deposit
+                          </span>
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete this flash design?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently remove "{item.title}" from your flash board and the homepage.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  deleteFlashMutation.mutate({
+                                    id: item.id,
+                                    artistId: artist.id,
+                                  })
+                                }
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
+
           {/* Requests Tab */}
           <TabsContent value="requests" className="space-y-4">
             <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
@@ -752,20 +1084,33 @@ export default function ArtistDashboard() {
                   <Card key={booking.id}>
                     <CardHeader className="flex flex-row items-center justify-between py-4">
                       <div>
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-lg flex items-center gap-2">
                           {booking.customerName}
+                          {booking.source === "ink_connect" && (
+                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1 py-0.5 border border-primary/20 shrink-0">
+                              <img src="/logo.png" alt="logo" className="w-3.5 h-3.5 object-contain" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider">Ink Connect</span>
+                            </Badge>
+                          )}
                         </CardTitle>
                         <CardDescription>
                           {booking.customerEmail} • {booking.customerPhone}
                         </CardDescription>
                       </div>
-                      <Badge
-                        variant={
-                          booking.status === "confirmed" ? "default" : "outline"
-                        }
-                      >
-                        {booking.status}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge
+                          variant={
+                            booking.status === "confirmed" ? "default" : booking.status === "cancelled" ? "destructive" : "outline"
+                          }
+                        >
+                          {booking.status}
+                        </Badge>
+                        {booking.refundStatus === "refunded" && (
+                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-[10px] py-0">
+                            Deposit Refunded
+                          </Badge>
+                        )}
+                      </div>
                     </CardHeader>
                     <CardContent className="py-2">
                       <div className="grid md:grid-cols-2 gap-4 text-sm">
