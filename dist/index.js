@@ -139,7 +139,7 @@ import {
   unique,
   jsonb
 } from "drizzle-orm/pg-core";
-var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, flashArt;
+var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, flashArt, invitations;
 var init_schema = __esm({
   "backend/drizzle/schema.ts"() {
     "use strict";
@@ -607,6 +607,20 @@ var init_schema = __esm({
       lockedByUserId: integer("lockedByUserId").references(() => users.id, { onDelete: "set null" }),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
+    });
+    invitations = pgTable("invitations", {
+      id: serial("id").primaryKey(),
+      email: varchar("email", { length: 320 }).notNull(),
+      shopName: varchar("shopName", { length: 255 }).notNull(),
+      state: varchar("state", { length: 100 }),
+      // The US state where the artist is located
+      inviteCode: varchar("inviteCode", { length: 128 }).notNull().unique(),
+      sentAt: timestamp("sentAt").defaultNow().notNull(),
+      openedAt: timestamp("openedAt"),
+      registeredAt: timestamp("registeredAt"),
+      status: varchar("status", { length: 50 }).default("sent").notNull(),
+      // 'sent', 'opened', 'registered', 'approved'
+      userId: integer("userId").references(() => users.id, { onDelete: "set null" })
     });
   }
 });
@@ -2202,6 +2216,93 @@ async function sendEmail(options) {
     throw lastError;
   });
 }
+async function sendArtistInvitation(to, shopName, inviteCode) {
+  const escapedShopName = escapeHtml(shopName);
+  const baseUrl = ENV.publicBaseUrl || "https://theinkednetwork.website";
+  const inviteQuery = inviteCode ? `?invite=${encodeURIComponent(inviteCode)}` : "";
+  const inviteUrl = `${baseUrl}/for-artists${inviteQuery}`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #8b5cf6 0%, #10b981 100%); padding: 40px 20px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; }
+    .content { padding: 40px 30px; }
+    .content h2 { color: #8b5cf6; margin-top: 0; }
+    .cta-button { display: inline-block; background: linear-gradient(135deg, #8b5cf6, #10b981); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    .features { background: #f9fafb; padding: 20px; border-radius: 6px; margin: 20px 0; }
+    .features ul { margin: 10px 0; padding-left: 20px; }
+    .features li { margin: 8px 0; }
+    .footer { background: #f9fafb; padding: 20px; text-align: center; font-size: 14px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>\u{1F3A8} You're Invited to Join Ink Connect</h1>
+    </div>
+    
+    <div class="content">
+      <h2>Hello ${escapedShopName}!</h2>
+      
+      <p>We're excited to invite you to join <strong>Ink Connect</strong>, the premier platform connecting tattoo artists and shops with clients looking for their perfect artist.</p>
+      
+      <p>We've noticed your excellent work and reputation in the tattoo community, and we'd love to have you as part of our growing network.</p>
+      
+      <div class="features">
+        <h3>\u2728 What You Get with a FREE Basic Listing:</h3>
+        <ul>
+          <li>\u{1F4F8} Showcase up to 3 portfolio photos</li>
+          <li>\u2B50 Display your shop information and location</li>
+          <li>\u{1F4AC} Receive and display customer reviews</li>
+          <li>\u{1F50D} Appear in artist search results</li>
+          <li>\u{1F4F1} Mobile-optimized profile page</li>
+        </ul>
+        
+        <h3>\u{1F680} Upgrade to Premium ($49/month) for:</h3>
+        <ul>
+          <li>\u{1F4C5} Real-time booking system with calendar sync</li>
+          <li>\u{1F4DE} Display direct contact information</li>
+          <li>\u{1F5BC}\uFE0F Unlimited portfolio photos & videos</li>
+          <li>\u2B50 Featured artist placement & higher search ranking</li>
+          <li>\u{1F4AC} Respond to customer reviews</li>
+          <li>\u{1F4CA} Access to analytics and lead reports</li>
+        </ul>
+      </div>
+      
+      <p style="text-align: center;">
+        <a href="${inviteUrl}" class="cta-button">
+          Create Your FREE Profile Now \u2192
+        </a>
+      </p>
+      
+      <p>Join hundreds of tattoo artists and shops who are already growing their business with Ink Connect. It takes less than 5 minutes to get started!</p>
+      
+      <p>Questions? Just reply to this email and we'll be happy to help.</p>
+      
+      <p>Best regards,<br>
+      <strong>The Ink Connect Team</strong></p>
+    </div>
+    
+    <div class="footer">
+      <p>Ink Connect &mdash; Find Tattoo Artists &amp; Shops Near You</p>
+      <p>This is a one-time invitation. You can unsubscribe by replying to this email.</p>
+    </div>
+  </div>
+ </body>
+</html>
+  `;
+  return sendEmail({
+    to,
+    subject: `${shopName} - You're Invited to Join Ink Connect! \u{1F3A8}`,
+    html
+  });
+}
 async function sendBookingIntakeNotification(to, details) {
   const {
     artistName,
@@ -3577,6 +3678,7 @@ init_schema();
 init_db();
 init_env();
 import { eq as eq5, and as and4, desc as desc3 } from "drizzle-orm";
+import crypto2 from "crypto";
 
 // backend/server/verificationRouter.ts
 import { z as z4 } from "zod";
@@ -4485,6 +4587,22 @@ var appRouter = router({
     /** Admin: approve or reject an artist */
     adminSetApproval: adminProcedure.input(z7.object({ artistId: z7.number(), approved: z7.boolean() })).mutation(async ({ input }) => {
       await updateArtist(input.artistId, { isApproved: input.approved });
+      if (input.approved) {
+        const database = await getDb();
+        if (database) {
+          try {
+            const [artist] = await database.select({ userId: artists.userId }).from(artists).where(eq5(artists.id, input.artistId)).limit(1);
+            if (artist?.userId) {
+              await database.update(invitations).set({ status: "approved" }).where(eq5(invitations.userId, artist.userId));
+            }
+          } catch (err) {
+            logger.error("Failed to update invitation status on artist approval", {
+              artistId: input.artistId,
+              error: err instanceof Error ? err.message : String(err)
+            });
+          }
+        }
+      }
       if (ENV.n8nWebhookUrl && ENV.n8nWebhookSecret) {
         try {
           const webhookUrl = `${ENV.n8nWebhookUrl}/webhook/artist-approval`;
@@ -4513,6 +4631,174 @@ var appRouter = router({
           });
         }
       }
+      return { success: true };
+    }),
+    adminSendInvitations: adminProcedure.input(
+      z7.object({
+        invitations: z7.array(
+          z7.object({
+            email: z7.string().email(),
+            shopName: z7.string().min(1, "Shop name is required"),
+            state: z7.string().optional()
+          })
+        ).max(50, "Maximum 50 invitations per batch allowed")
+      })
+    ).mutation(async ({ input }) => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable"
+        });
+      }
+      const results = [];
+      for (const invite of input.invitations) {
+        try {
+          const inviteCode = crypto2.randomBytes(8).toString("hex");
+          const [existing] = await database.select().from(invitations).where(eq5(invitations.email, invite.email)).limit(1);
+          if (existing) {
+            await database.update(invitations).set({
+              shopName: invite.shopName,
+              state: invite.state ?? null,
+              inviteCode,
+              sentAt: /* @__PURE__ */ new Date(),
+              status: "sent",
+              openedAt: null,
+              registeredAt: null
+            }).where(eq5(invitations.id, existing.id));
+          } else {
+            await database.insert(invitations).values({
+              email: invite.email,
+              shopName: invite.shopName,
+              state: invite.state ?? null,
+              inviteCode,
+              status: "sent",
+              sentAt: /* @__PURE__ */ new Date()
+            });
+          }
+          await sendArtistInvitation(invite.email, invite.shopName, inviteCode);
+          results.push({ email: invite.email, status: "success" });
+        } catch (err) {
+          logger.error("Failed to send batch invitation to " + invite.email, {
+            error: err instanceof Error ? err.message : String(err)
+          });
+          results.push({
+            email: invite.email,
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+      return results;
+    }),
+    adminResendInvitation: adminProcedure.input(z7.object({ id: z7.number() })).mutation(async ({ input }) => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable"
+        });
+      }
+      const [invite] = await database.select().from(invitations).where(eq5(invitations.id, input.id)).limit(1);
+      if (!invite) {
+        throw new TRPCError6({
+          code: "NOT_FOUND",
+          message: "Invitation not found"
+        });
+      }
+      const newCode = crypto2.randomBytes(8).toString("hex");
+      await database.update(invitations).set({
+        inviteCode: newCode,
+        sentAt: /* @__PURE__ */ new Date(),
+        status: "sent",
+        openedAt: null,
+        registeredAt: null
+      }).where(eq5(invitations.id, invite.id));
+      await sendArtistInvitation(invite.email, invite.shopName, newCode);
+      return { success: true };
+    }),
+    adminGetInvitations: adminProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable"
+        });
+      }
+      return await database.select().from(invitations).orderBy(desc3(invitations.sentAt));
+    }),
+    adminGetInvitationMetrics: adminProcedure.input(z7.object({ state: z7.string().optional() }).optional()).query(async ({ input }) => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable"
+        });
+      }
+      let query = database.select().from(invitations);
+      if (input?.state) {
+        query = query.where(eq5(invitations.state, input.state));
+      }
+      const allInvites = await query;
+      let sent = 0;
+      let opened = 0;
+      let registered = 0;
+      let approved = 0;
+      for (const inv of allInvites) {
+        sent++;
+        if (inv.openedAt || inv.status === "opened" || inv.status === "registered" || inv.status === "approved") {
+          opened++;
+        }
+        if (inv.registeredAt || inv.status === "registered" || inv.status === "approved") {
+          registered++;
+        }
+        if (inv.status === "approved") {
+          approved++;
+        }
+      }
+      return { sent, opened, registered, approved };
+    }),
+    trackInviteOpen: publicProcedure.input(z7.object({ inviteCode: z7.string() })).mutation(async ({ input }) => {
+      const database = await getDb();
+      if (!database) return { success: false };
+      const [invite] = await database.select().from(invitations).where(eq5(invitations.inviteCode, input.inviteCode)).limit(1);
+      if (!invite) return { success: false };
+      if (invite.status === "sent") {
+        await database.update(invitations).set({
+          status: "opened",
+          openedAt: /* @__PURE__ */ new Date()
+        }).where(eq5(invitations.id, invite.id));
+      }
+      return { success: true };
+    }),
+    linkInviteCode: protectedProcedure.input(z7.object({ inviteCode: z7.string() })).mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError6({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable"
+        });
+      }
+      const [invite] = await database.select().from(invitations).where(eq5(invitations.inviteCode, input.inviteCode)).limit(1);
+      if (!invite) {
+        throw new TRPCError6({
+          code: "NOT_FOUND",
+          message: "Invitation not found"
+        });
+      }
+      const updateData = {
+        userId: ctx.user.id
+      };
+      if (!invite.registeredAt) {
+        updateData.registeredAt = /* @__PURE__ */ new Date();
+      }
+      const [artistProfile] = await database.select({ isApproved: artists.isApproved }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
+      if (artistProfile?.isApproved) {
+        updateData.status = "approved";
+      } else if (invite.status === "sent" || invite.status === "opened") {
+        updateData.status = "registered";
+      }
+      await database.update(invitations).set(updateData).where(eq5(invitations.id, invite.id));
       return { success: true };
     }),
     /**

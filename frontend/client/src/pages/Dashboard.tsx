@@ -84,6 +84,14 @@ export default function Dashboard() {
 function OnboardingSelector() {
   const [mode, setMode] = useState<"select" | "client" | "artist">("select");
 
+  useEffect(() => {
+    const inviteCode = localStorage.getItem("artist_invite_code");
+    if (inviteCode) {
+      setMode("artist");
+      toast.success("Welcome! We've automatically loaded the Artist Registration form based on your invitation.");
+    }
+  }, []);
+
   if (mode === "client") {
     return (
       <div>

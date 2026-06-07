@@ -14,7 +14,7 @@ import {
 import { sanitizeInput, sanitizeEmail, sanitizePhone } from "./_core/sanitize";
 import { z } from "zod";
 import * as db from "./db";
-import { sendBookingIntakeNotification } from "./email";
+import { sendBookingIntakeNotification, sendArtistInvitation } from "./email";
 import {
   createSignedUploadUrl,
   deleteFile,
@@ -23,8 +23,10 @@ import {
 } from "./_core/supabaseStorage";
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
 import { createArtistSubscriptionCheckout, createFoundingArtistCheckout, createCheckoutSession } from "./stripe";
-import { artists, users, flashArt, bookings } from "../drizzle/schema";
+import { artists, users, flashArt, bookings, invitations } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
+import crypto from "crypto";
+
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { verificationRouter } from "./verificationRouter";
@@ -89,6 +91,32 @@ export const appRouter = router({
       .input(z.object({ artistId: z.number(), approved: z.boolean() }))
       .mutation(async ({ input }) => {
         await db.updateArtist(input.artistId, { isApproved: input.approved });
+
+        // Update associated invitation status if approved
+        if (input.approved) {
+          const database = await getDb();
+          if (database) {
+            try {
+              const [artist] = await database
+                .select({ userId: artists.userId })
+                .from(artists)
+                .where(eq(artists.id, input.artistId))
+                .limit(1);
+
+              if (artist?.userId) {
+                await database
+                  .update(invitations)
+                  .set({ status: "approved" })
+                  .where(eq(invitations.userId, artist.userId));
+              }
+            } catch (err) {
+              logger.error("Failed to update invitation status on artist approval", {
+                artistId: input.artistId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+        }
         
         // P1-3: Trigger n8n workflow for approval notification email
         if (ENV.n8nWebhookUrl && ENV.n8nWebhookSecret) {
@@ -124,6 +152,266 @@ export const appRouter = router({
         
         return { success: true };
       }),
+
+    adminSendInvitations: adminProcedure
+      .input(
+        z.object({
+          invitations: z
+            .array(
+              z.object({
+                email: z.string().email(),
+                shopName: z.string().min(1, "Shop name is required"),
+                state: z.string().optional(),
+              }),
+            )
+            .max(50, "Maximum 50 invitations per batch allowed"),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database unavailable",
+          });
+        }
+
+        const results: { email: string; status: "success" | "failed"; error?: string }[] = [];
+
+        for (const invite of input.invitations) {
+          try {
+            const inviteCode = crypto.randomBytes(8).toString("hex");
+
+            // Look for existing invitation
+            const [existing] = await database
+              .select()
+              .from(invitations)
+              .where(eq(invitations.email, invite.email))
+              .limit(1);
+
+            if (existing) {
+              // Update existing invitation
+              await database
+                .update(invitations)
+                .set({
+                  shopName: invite.shopName,
+                  state: invite.state ?? null,
+                  inviteCode,
+                  sentAt: new Date(),
+                  status: "sent",
+                  openedAt: null,
+                  registeredAt: null,
+                })
+                .where(eq(invitations.id, existing.id));
+            } else {
+              // Insert new
+              await database.insert(invitations).values({
+                email: invite.email,
+                shopName: invite.shopName,
+                state: invite.state ?? null,
+                inviteCode,
+                status: "sent",
+                sentAt: new Date(),
+              });
+            }
+
+            // Send email
+            await sendArtistInvitation(invite.email, invite.shopName, inviteCode);
+            results.push({ email: invite.email, status: "success" });
+          } catch (err) {
+            logger.error("Failed to send batch invitation to " + invite.email, {
+              error: err instanceof Error ? err.message : String(err),
+            });
+            results.push({
+              email: invite.email,
+              status: "failed",
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
+        return results;
+      }),
+
+    adminResendInvitation: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database unavailable",
+          });
+        }
+
+        const [invite] = await database
+          .select()
+          .from(invitations)
+          .where(eq(invitations.id, input.id))
+          .limit(1);
+
+        if (!invite) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Invitation not found",
+          });
+        }
+
+        // Generate a new invite code to refresh it
+        const newCode = crypto.randomBytes(8).toString("hex");
+
+        await database
+          .update(invitations)
+          .set({
+            inviteCode: newCode,
+            sentAt: new Date(),
+            status: "sent",
+            openedAt: null,
+            registeredAt: null,
+          })
+          .where(eq(invitations.id, invite.id));
+
+        await sendArtistInvitation(invite.email, invite.shopName, newCode);
+        return { success: true };
+      }),
+
+    adminGetInvitations: adminProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database unavailable",
+        });
+      }
+
+      return await database
+        .select()
+        .from(invitations)
+        .orderBy(desc(invitations.sentAt));
+    }),
+
+    adminGetInvitationMetrics: adminProcedure
+      .input(z.object({ state: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database unavailable",
+          });
+        }
+
+        // We can query all invitations or filter by state
+        let query = database.select().from(invitations);
+        if (input?.state) {
+          // @ts-ignore
+          query = query.where(eq(invitations.state, input.state));
+        }
+
+        const allInvites = await query;
+        
+        let sent = 0;
+        let opened = 0;
+        let registered = 0;
+        let approved = 0;
+
+        for (const inv of allInvites) {
+          sent++;
+          if (inv.openedAt || inv.status === "opened" || inv.status === "registered" || inv.status === "approved") {
+            opened++;
+          }
+          if (inv.registeredAt || inv.status === "registered" || inv.status === "approved") {
+            registered++;
+          }
+          if (inv.status === "approved") {
+            approved++;
+          }
+        }
+
+        return { sent, opened, registered, approved };
+      }),
+
+    trackInviteOpen: publicProcedure
+      .input(z.object({ inviteCode: z.string() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) return { success: false };
+
+        const [invite] = await database
+          .select()
+          .from(invitations)
+          .where(eq(invitations.inviteCode, input.inviteCode))
+          .limit(1);
+
+        if (!invite) return { success: false };
+
+        if (invite.status === "sent") {
+          await database
+            .update(invitations)
+            .set({
+              status: "opened",
+              openedAt: new Date(),
+            })
+            .where(eq(invitations.id, invite.id));
+        }
+
+        return { success: true };
+      }),
+
+    linkInviteCode: protectedProcedure
+      .input(z.object({ inviteCode: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database unavailable",
+          });
+        }
+
+        const [invite] = await database
+          .select()
+          .from(invitations)
+          .where(eq(invitations.inviteCode, input.inviteCode))
+          .limit(1);
+
+        if (!invite) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Invitation not found",
+          });
+        }
+
+        // Link the invitation to this user
+        const updateData: any = {
+          userId: ctx.user.id,
+        };
+
+        if (!invite.registeredAt) {
+          updateData.registeredAt = new Date();
+        }
+
+        // Check if user is already an approved artist in the DB
+        const [artistProfile] = await database
+          .select({ isApproved: artists.isApproved })
+          .from(artists)
+          .where(eq(artists.userId, ctx.user.id))
+          .limit(1);
+
+        if (artistProfile?.isApproved) {
+          updateData.status = "approved";
+        } else if (invite.status === "sent" || invite.status === "opened") {
+          updateData.status = "registered";
+        }
+
+        await database
+          .update(invitations)
+          .set(updateData)
+          .where(eq(invitations.id, invite.id));
+
+        return { success: true };
+      }),
+
 
     /**
      * Create a Stripe Checkout Session for an artist subscription upgrade.

@@ -15,11 +15,14 @@ import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+
 
 function Redirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
   useEffect(() => {
-    setLocation(to);
+    setLocation(to + window.location.search);
   }, [to, setLocation]);
   return null;
 }
@@ -93,6 +96,39 @@ function App() {
   const [location] = useLocation();
   const showMarketingHomeHeader = location === "/";
   const showSidebarShell = !showMarketingHomeHeader && !usesPageHeader(location);
+
+  const { user } = useAuth();
+  const trackInviteOpenMutation = trpc.artists.trackInviteOpen.useMutation();
+  const linkInviteCodeMutation = trpc.artists.linkInviteCode.useMutation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const invite = params.get("invite");
+    if (invite) {
+      localStorage.setItem("artist_invite_code", invite);
+      const trackedKey = `invite_tracked_${invite}`;
+      if (!sessionStorage.getItem(trackedKey)) {
+        trackInviteOpenMutation.mutate({ inviteCode: invite }, {
+          onSuccess: () => {
+            sessionStorage.setItem(trackedKey, "true");
+          }
+        });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      const inviteCode = localStorage.getItem("artist_invite_code");
+      if (inviteCode) {
+        linkInviteCodeMutation.mutate({ inviteCode }, {
+          onSuccess: () => {
+            localStorage.removeItem("artist_invite_code");
+          }
+        });
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     const win = window as Window & {

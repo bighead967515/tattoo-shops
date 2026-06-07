@@ -126,8 +126,12 @@ export async function sendEmail(options: EmailOptions) {
 /**
  * Send artist invitation email
  */
-export async function sendArtistInvitation(to: string, shopName: string) {
+export async function sendArtistInvitation(to: string, shopName: string, inviteCode?: string) {
   const escapedShopName = escapeHtml(shopName);
+  const baseUrl = ENV.publicBaseUrl || "https://theinkednetwork.website";
+  const inviteQuery = inviteCode ? `?invite=${encodeURIComponent(inviteCode)}` : "";
+  const inviteUrl = `${baseUrl}/for-artists${inviteQuery}`;
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -183,7 +187,7 @@ export async function sendArtistInvitation(to: string, shopName: string) {
       </div>
       
       <p style="text-align: center;">
-        <a href="https://theinkednetwork.website/for-artists" class="cta-button">
+        <a href="${inviteUrl}" class="cta-button">
           Create Your FREE Profile Now →
         </a>
       </p>
@@ -201,7 +205,7 @@ export async function sendArtistInvitation(to: string, shopName: string) {
       <p>This is a one-time invitation. You can unsubscribe by replying to this email.</p>
     </div>
   </div>
-</body>
+ </body>
 </html>
   `;
 
@@ -211,6 +215,7 @@ export async function sendArtistInvitation(to: string, shopName: string) {
     html,
   });
 }
+
 
 /**
  * Send booking confirmation email

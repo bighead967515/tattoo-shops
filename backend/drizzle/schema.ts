@@ -566,3 +566,23 @@ export const flashArt = pgTable("flash_art", {
 export type FlashArt = typeof flashArt.$inferSelect;
 export type InsertFlashArt = typeof flashArt.$inferInsert;
 
+/**
+ * Artist invitations sent by admins, with tracking and attribution.
+ */
+export const invitations = pgTable("invitations", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  shopName: varchar("shopName", { length: 255 }).notNull(),
+  state: varchar("state", { length: 100 }), // The US state where the artist is located
+  inviteCode: varchar("inviteCode", { length: 128 }).notNull().unique(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+  openedAt: timestamp("openedAt"),
+  registeredAt: timestamp("registeredAt"),
+  status: varchar("status", { length: 50 }).default("sent").notNull(), // 'sent', 'opened', 'registered', 'approved'
+  userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
+});
+
+export type Invitation = typeof invitations.$inferSelect;
+export type InsertInvitation = typeof invitations.$inferInsert;
+
+
