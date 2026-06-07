@@ -57,24 +57,26 @@ export default function ArtistProfile() {
     "recent",
   );
 
+  const isValidArtistId = !isNaN(artistId) && artistId > 0;
+
   const { data: artist, isLoading: artistLoading } =
-    trpc.artists.getById.useQuery({ id: artistId });
+    trpc.artists.getById.useQuery({ id: artistId }, { enabled: isValidArtistId });
   const { data: portfolio, isLoading: portfolioLoading } =
-    trpc.portfolio.get.useQuery({ artistId });
+    trpc.portfolio.get.useQuery({ artistId }, { enabled: isValidArtistId });
   const {
     data: reviews,
     isLoading: reviewsLoading,
     refetch: refetchReviews,
-  } = trpc.reviews.getByArtistId.useQuery({ artistId });
+  } = trpc.reviews.getByArtistId.useQuery({ artistId }, { enabled: isValidArtistId });
   const { data: isFav, refetch: refetchFavorite } =
-    trpc.favorites.isFavorite.useQuery({ artistId }, { enabled: !!user });
+    trpc.favorites.isFavorite.useQuery({ artistId }, { enabled: !!user && isValidArtistId });
 
   const [selectedFlash, setSelectedFlash] = useState<any | null>(null);
   const [preferredDate, setPreferredDate] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
 
   const { data: flashItems, isLoading: flashItemsLoading } =
-    trpc.flash.getByArtistId.useQuery({ artistId });
+    trpc.flash.getByArtistId.useQuery({ artistId }, { enabled: isValidArtistId });
 
   const createCheckoutMutation = trpc.flash.createLockCheckout.useMutation({
     onSuccess: (res) => {
