@@ -46,16 +46,10 @@ export default function Sidebar() {
   const navLinks = isAuthenticated
     ? [
         { href: "/artists", label: "Browse Artists", icon: Users },
-        { href: "/requests", label: "Request Board", icon: ClipboardList },
-        { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
-        { href: "/for-artists", label: "For Artists", icon: Palette },
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       ]
     : [
         { href: "/artists", label: "Browse Artists", icon: Users },
-        { href: "/requests", label: "Request Board", icon: ClipboardList },
-        { href: "/#how-it-works", label: "How It Works", icon: HelpCircle },
-        { href: "/for-artists", label: "For Artists", icon: Palette },
         { href: "/login", label: "Sign In", icon: LogIn },
       ];
 
@@ -78,10 +72,10 @@ export default function Sidebar() {
       {/* Primary CTA */}
       <div className="px-3 py-4 border-b border-border/40">
         {isAuthenticated ? (
-          <Link href="/client/new-request" onClick={() => setMobileOpen(false)}>
+          <Link href="/artists" onClick={() => setMobileOpen(false)}>
             <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-[0_0_15px_rgba(112,255,112,0.35)] hover:shadow-[0_0_25px_rgba(112,255,112,0.6)] transition-all duration-300">
-              <UserPlus className="h-4 w-4" />
-              Post Your Idea
+              <Users className="h-4 w-4" />
+              Browse Artists
             </Button>
           </Link>
         ) : (
@@ -177,15 +171,7 @@ export default function Sidebar() {
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </button>
 
-            {/* Help */}
-            <Link
-              href="/help"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Help
-            </Link>
+            {/* Help link removed */}
 
             {/* Auth */}
             {isAuthenticated ? (
@@ -245,13 +231,13 @@ export default function Sidebar() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          <Link href={isAuthenticated ? "/client/new-request" : "/login?mode=signup"}>
+          <Link href={isAuthenticated ? "/artists" : "/login?mode=signup"}>
             <Button
               size="sm"
               className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold"
             >
-              <UserPlus className="h-3.5 w-3.5" />
-              {isAuthenticated ? "Post Idea" : "Sign Up Free"}
+              {isAuthenticated ? <Users className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+              {isAuthenticated ? "Browse Artists" : "Sign Up Free"}
             </Button>
           </Link>
           <Button

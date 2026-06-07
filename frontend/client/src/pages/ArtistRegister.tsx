@@ -81,7 +81,7 @@ export default function ArtistRegister() {
 
   useEffect(() => {
     if (user?.role === "artist") {
-      setLocation("/artist-dashboard");
+      setLocation("/dashboard");
     }
   }, [user, setLocation]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -211,7 +211,7 @@ export default function ArtistRegister() {
 
       await refresh();
       toast.success("🎉 Welcome to Ink Connect! Your profile is under review.");
-      setLocation("/artist-dashboard");
+      setLocation("/dashboard");
     } catch (err: any) {
       toast.error(err.message || "Registration failed. Please try again.");
     } finally {

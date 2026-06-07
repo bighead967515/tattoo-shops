@@ -8,111 +8,78 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import HomeHeader from "./components/HomeHeader";
 import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
-import ArtistFinder from "./pages/ArtistFinder";
 import ArtistBrowse from "./pages/ArtistBrowse";
 import ArtistProfile from "./pages/ArtistProfile";
-import ForArtists from "./pages/ForArtists";
 import Dashboard from "./pages/Dashboard";
-import ArtistDashboard from "./pages/ArtistDashboard";
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
-import Help from "./pages/Help";
-import CancellationPolicy from "./pages/CancellationPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Pricing from "./pages/Pricing";
-import LicenseUpload from "./pages/LicenseUpload";
-// Client marketplace pages
-import ClientOnboarding from "./pages/ClientOnboarding";
-import ClientDashboard from "./pages/ClientDashboard";
-import NewRequest from "./pages/NewRequest";
-import RequestBoard from "./pages/RequestBoard";
-import RequestDetail from "./pages/RequestDetail";
-import AdminModeration from "./pages/AdminModeration";
-import AdminDashboard from "./pages/AdminDashboard";
-import DesignLab from "./pages/DesignLab";
-import ArtistDesignLab from "./pages/ArtistDesignLab";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import ArtistBilling from "./pages/ArtistBilling";
-import SubscriptionSuccess from "./pages/SubscriptionSuccess";
-import ArtistRegister from "./pages/ArtistRegister";
-import CoverUps from "./pages/CoverUps";
-import RequestFlow from "./pages/RequestFlow";
+
+function Redirect({ to }: { to: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation(to);
+  }, [to, setLocation]);
+  return null;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path="/artist-finder" component={ArtistFinder} />
+      {/* 5 Core Pages */}
+      <Route path="/" component={Home} />
       <Route path="/artists" component={ArtistBrowse} />
-      <Route path="/for-artists" component={ForArtists} />
-      <Route path="/cover-ups" component={CoverUps} />
-      <Route path="/tattoo-planning" component={CoverUps} />
-      <Route path="/request-flow" component={RequestFlow} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/artist-dashboard" component={ArtistDashboard} />
+      <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Login} />
+      <Route path="/dashboard" component={Dashboard} />
+
+      {/* Supporting Auth routes */}
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/auth/reset-password" component={ResetPassword} />
-      <Route path="/help" component={Help} />
-      <Route path="/cancellation-policy" component={CancellationPolicy} />
-      <Route path="/terms-of-service" component={TermsOfService} />
-      {/* Alias routes for footer links */}
-      <Route path="/terms" component={TermsOfService} />
-      <Route path="/privacy-policy" component={PrivacyPolicy} />
-      <Route path="/privacy" component={PrivacyPolicy} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/license-upload" component={LicenseUpload} />
-      {/* Client marketplace routes */}
-      <Route path="/client/onboarding" component={ClientOnboarding} />
-      <Route path="/client/dashboard" component={ClientDashboard} />
-      <Route path="/client/new-request" component={NewRequest} />
-      <Route path="/requests" component={RequestBoard} />
-      <Route path="/requests/:id" component={RequestDetail} />
-      <Route path="/client/design-lab" component={DesignLab} />
-      {/* Artist registration flow */}
-      <Route path="/artist/register" component={ArtistRegister} />
-      <Route path="/artist/design-lab" component={ArtistDesignLab} />
-      {/* Artist billing routes */}
-      <Route path="/artist/billing" component={ArtistBilling} />
-      <Route path="/artist/billing/success" component={SubscriptionSuccess} />
-      {/* Artist Profile (parameterized) */}
-      <Route path="/artist/:id" component={ArtistProfile} />
-      {/* Admin routes */}
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/moderation" component={AdminModeration} />
-      <Route path={"/404"} component={NotFound} />
+
+      {/* Redirects for retired pages */}
+      <Route path="/artist-finder"><Redirect to="/artists" /></Route>
+      <Route path="/for-artists"><Redirect to="/" /></Route>
+      <Route path="/cover-ups"><Redirect to="/" /></Route>
+      <Route path="/tattoo-planning"><Redirect to="/" /></Route>
+      <Route path="/request-flow"><Redirect to="/dashboard" /></Route>
+      <Route path="/artist-dashboard"><Redirect to="/dashboard" /></Route>
+      <Route path="/client/onboarding"><Redirect to="/dashboard" /></Route>
+      <Route path="/client/dashboard"><Redirect to="/dashboard" /></Route>
+      <Route path="/client/new-request"><Redirect to="/dashboard" /></Route>
+      <Route path="/requests"><Redirect to="/dashboard" /></Route>
+      <Route path="/requests/:id"><Redirect to="/dashboard" /></Route>
+      <Route path="/client/design-lab"><Redirect to="/dashboard" /></Route>
+      <Route path="/artist/register"><Redirect to="/dashboard" /></Route>
+      <Route path="/artist/design-lab"><Redirect to="/dashboard" /></Route>
+      <Route path="/artist/billing"><Redirect to="/dashboard" /></Route>
+      <Route path="/artist/billing/success"><Redirect to="/dashboard" /></Route>
+      <Route path="/admin"><Redirect to="/dashboard" /></Route>
+      <Route path="/admin/moderation"><Redirect to="/dashboard" /></Route>
+      <Route path="/help"><Redirect to="/" /></Route>
+      <Route path="/pricing"><Redirect to="/" /></Route>
+      <Route path="/cancellation-policy"><Redirect to="/" /></Route>
+      <Route path="/terms-of-service"><Redirect to="/" /></Route>
+      <Route path="/terms"><Redirect to="/" /></Route>
+      <Route path="/privacy-policy"><Redirect to="/" /></Route>
+      <Route path="/privacy"><Redirect to="/" /></Route>
+      <Route path="/license-upload"><Redirect to="/dashboard" /></Route>
+
+      <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
-      <Route component={NotFound} />
+      <Route><Redirect to="/" /></Route>
     </Switch>
   );
 }
 
 function usesPageHeader(path: string) {
   return (
-    path === "/artist-finder" ||
     path === "/artists" ||
     path.startsWith("/artist/") ||
-    path === "/for-artists" ||
-    path === "/cover-ups" ||
-    path === "/tattoo-planning" ||
-    path === "/request-flow" ||
     path === "/dashboard" ||
-    path === "/artist-dashboard" ||
-    path === "/help" ||
-    path === "/cancellation-policy" ||
-    path === "/terms-of-service" ||
-    path === "/terms" ||
-    path === "/privacy-policy" ||
-    path === "/privacy" ||
-    path === "/pricing" ||
-    path === "/client/design-lab" ||
-    path === "/artist/design-lab" ||
-    path === "/artist/billing" ||
-    path === "/artist/billing/success" ||
     path === "/404"
   );
 }

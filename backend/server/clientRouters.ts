@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
-import { getDb } from "./db";
+import { getDb, isAiEnabled } from "./db";
 import {
   clients,
   tattooRequests,
@@ -702,6 +702,12 @@ export const requestsRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
+      if (!(await isAiEnabled())) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "AI features are disabled until there are 100 registered users.",
+        });
+      }
       const { description, ...context } = input;
       try {
         return await refineRequestPrompt(description, context);
@@ -944,6 +950,12 @@ export const bidsRouter = router({
   draftBid: protectedProcedure
     .input(z.object({ requestId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      if (!(await isAiEnabled())) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "AI features are disabled until there are 100 registered users.",
+        });
+      }
       const db = await requireDb();
 
       // 1. Verify artist and tier

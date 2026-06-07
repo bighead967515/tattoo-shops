@@ -739,10 +739,12 @@ __export(db_exports, {
   getPortfolioByArtistId: () => getPortfolioByArtistId,
   getPortfolioCountByArtistId: () => getPortfolioCountByArtistId,
   getPortfolioImageById: () => getPortfolioImageById,
+  getRealUserCount: () => getRealUserCount,
   getReviewById: () => getReviewById,
   getReviewsByArtistId: () => getReviewsByArtistId,
   getUserByOpenId: () => getUserByOpenId,
   getVerificationDocumentById: () => getVerificationDocumentById,
+  isAiEnabled: () => isAiEnabled,
   isFavorite: () => isFavorite,
   lockFlashArt: () => lockFlashArt,
   logPoolStats: () => logPoolStats,
@@ -1341,6 +1343,21 @@ async function lockFlashArt(id, userId) {
   const [updated] = await db.update(flashArt).set({ isLocked: true, lockedByUserId: userId, updatedAt: /* @__PURE__ */ new Date() }).where(eq(flashArt.id, id)).returning();
   return updated;
 }
+async function getRealUserCount() {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql`count(*)::int` }).from(users);
+  return result[0]?.count ?? 0;
+}
+async function isAiEnabled() {
+  try {
+    const count = await getRealUserCount();
+    return count >= 100;
+  } catch (error) {
+    logger.error("Failed to check user count for AI gating:", error);
+    return false;
+  }
+}
 var _db, _sqlClient, _poolStats, artistFields;
 var init_db = __esm({
   "backend/server/db.ts"() {
@@ -1710,7 +1727,7 @@ var SubscriptionTiers = z2.enum([
 ]);
 var TIER_LIMITS = {
   // Free: strictly a directory listing.
-  artist_free: { portfolioMax: 10, aiCredits: 0, canBook: false },
+  artist_free: { portfolioMax: Number.MAX_SAFE_INTEGER, aiCredits: 0, canBook: true },
   // Pay-as-you-go: booking unlocked, 15% fee, limited free bids.
   artist_paygo: { portfolioMax: 20, aiCredits: 0, canBook: true },
   // Pro: $49/mo, 5% fee, unlimited bids, 50 AI credits.
@@ -1915,9 +1932,9 @@ function readRuntimeEnv(key) {
 var ARTIST_TIER_LIMITS = {
   artist_free: {
     name: "Directory Profile",
-    portfolioPhotos: 10,
+    portfolioPhotos: Number.MAX_SAFE_INTEGER,
     canBid: true,
-    freeBidsPerMonth: 3,
+    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
     transactionFeePercent: 15,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
@@ -3195,6 +3212,12 @@ var requestsRouter = router({
       colorPreference: z3.string().max(50).optional()
     })
   ).mutation(async ({ input }) => {
+    if (!await isAiEnabled()) {
+      throw new TRPCError2({
+        code: "FORBIDDEN",
+        message: "AI features are disabled until there are 100 registered users."
+      });
+    }
     const { description, ...context } = input;
     try {
       return await refineRequestPrompt(description, context);
@@ -3341,6 +3364,12 @@ var bidsRouter = router({
   }),
   // AI Bid Assistant — draft a bid response (Pro subscription/Icon tier only)
   draftBid: protectedProcedure.input(z3.object({ requestId: z3.number() })).mutation(async ({ ctx, input }) => {
+    if (!await isAiEnabled()) {
+      throw new TRPCError2({
+        code: "FORBIDDEN",
+        message: "AI features are disabled until there are 100 registered users."
+      });
+    }
     const db = await requireDb();
     const [artist] = await db.select().from(artists).where(eq2(artists.userId, ctx.user.id)).limit(1);
     if (!artist) {
@@ -3698,6 +3727,7 @@ var healthRouter = router({
 import dns from "dns";
 import { isIPv4, isIPv6 } from "net";
 init_logger();
+init_db();
 var ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. You will receive an image caption and technical metadata produced by an upstream vision model. Infer likely tattoo attributes and return a JSON object with the following fields. Be precise and concise.
 
 {
@@ -3718,6 +3748,13 @@ var DEFAULT_ANALYSIS = {
   description: "",
   qualityScore: 0,
   qualityIssues: ["analysis-failed"]
+};
+var DEFAULT_GATED_ANALYSIS = {
+  styles: [],
+  tags: [],
+  description: "Tattoo portfolio design",
+  qualityScore: 90,
+  qualityIssues: []
 };
 function sanitizeUrlForLogging(url) {
   try {
@@ -3755,6 +3792,10 @@ function isPrivateOrReservedIp(ip) {
   return true;
 }
 async function analyzePortfolioImage(imageUrl) {
+  if (!await isAiEnabled()) {
+    logger.info("AI features gated (< 100 users). Skipping portfolio image analysis.");
+    return DEFAULT_GATED_ANALYSIS;
+  }
   try {
     let parsedUrl;
     try {
@@ -3836,6 +3877,7 @@ Return the JSON object only.`,
 
 // backend/server/geminiDiscovery.ts
 init_logger();
+init_db();
 var DISCOVERY_PROMPT = `You are a tattoo industry expert. A user is describing the tattoo they want. Parse their description and extract structured search criteria as a JSON object.
 
 Return ONLY a raw JSON object (no markdown fences, no explanation) with these fields:
@@ -3864,7 +3906,153 @@ var DEFAULT_INTENT = {
   size: null,
   vibeDescription: ""
 };
+function parseDiscoveryQueryFallback(query) {
+  const normalized = query.toLowerCase();
+  const styles = [];
+  const tags = [];
+  const keywords = [];
+  let placement = null;
+  let size = null;
+  const knownStyles = [
+    "Traditional",
+    "Neo-Traditional",
+    "Realism",
+    "Hyperrealism",
+    "Watercolor",
+    "Tribal",
+    "Japanese",
+    "Biomechanical",
+    "Geometric",
+    "Dotwork",
+    "Pointillism",
+    "Fine-line",
+    "Minimalist",
+    "Blackwork",
+    "Trash Polka",
+    "New School",
+    "Old School",
+    "Illustrative",
+    "Surrealism",
+    "Lettering",
+    "Chicano",
+    "Ornamental",
+    "Abstract",
+    "Sketch",
+    "Portrait"
+  ];
+  for (const s of knownStyles) {
+    if (normalized.includes(s.toLowerCase())) {
+      styles.push(s);
+    }
+  }
+  if (normalized.includes("line drawing") || normalized.includes("linework")) {
+    if (!styles.includes("Fine-line")) styles.push("Fine-line");
+    if (!styles.includes("Sketch")) styles.push("Sketch");
+  }
+  const knownPlacements = [
+    "forearm",
+    "upper arm",
+    "wrist",
+    "hand",
+    "finger",
+    "shoulder",
+    "chest",
+    "back",
+    "ribs",
+    "hip",
+    "thigh",
+    "calf",
+    "ankle",
+    "foot",
+    "neck",
+    "behind ear",
+    "collarbone",
+    "spine",
+    "arm",
+    "sleeve"
+  ];
+  for (const p of knownPlacements) {
+    if (normalized.includes(p)) {
+      placement = p;
+      break;
+    }
+  }
+  const knownSizes = ["tiny", "small", "medium", "large", "sleeve", "backpiece"];
+  for (const sz of knownSizes) {
+    if (normalized.includes(sz)) {
+      size = sz;
+      break;
+    }
+  }
+  const knownTags = [
+    "floral",
+    "rose",
+    "flower",
+    "skull",
+    "dragon",
+    "butterfly",
+    "lion",
+    "clock",
+    "compass",
+    "mandala",
+    "snake",
+    "eagle",
+    "wolf",
+    "heart",
+    "dagger",
+    "anchor",
+    "phoenix",
+    "eye",
+    "tree",
+    "mountain",
+    "moon",
+    "sun",
+    "cross",
+    "angel",
+    "demon",
+    "samurai",
+    "koi fish",
+    "octopus",
+    "waves",
+    "clouds",
+    "fire",
+    "sacred geometry",
+    "lettering",
+    "script",
+    "portrait",
+    "animal",
+    "nature",
+    "mythology"
+  ];
+  for (const t2 of knownTags) {
+    if (normalized.includes(t2)) {
+      tags.push(t2);
+    }
+  }
+  const words = normalized.split(/\s+/);
+  const commonTrivial = ["i", "want", "a", "the", "on", "my", "to", "and", "in", "like", "looks", "is", "for", "with", "that", "of"];
+  for (const word of words) {
+    const cleanWord = word.replace(/[^a-z]/g, "");
+    if (cleanWord.length > 3 && !commonTrivial.includes(cleanWord)) {
+      if (!tags.includes(cleanWord) && !styles.map((s) => s.toLowerCase()).includes(cleanWord)) {
+        keywords.push(cleanWord);
+      }
+    }
+  }
+  return {
+    styles: styles.length > 0 ? styles : ["Traditional"],
+    tags: tags.length > 0 ? tags : ["nature"],
+    keywords: keywords.slice(0, 5),
+    placement,
+    size,
+    vibeDescription: query
+  };
+}
 async function parseDiscoveryQuery(query) {
+  if (!await isAiEnabled()) {
+    logger.info("AI features gated (< 100 users). Using local heuristic parser for discovery query.");
+    return parseDiscoveryQueryFallback(query);
+  }
   try {
     const parsed2 = await groqGenerateJson(
       DISCOVERY_PROMPT,
@@ -3891,6 +4079,7 @@ async function parseDiscoveryQuery(query) {
 
 // backend/server/geminiSafety.ts
 init_logger();
+init_db();
 var REVIEW_ANALYSIS_PROMPT = `You are a content moderation specialist for a tattoo artist booking platform. Analyze this review for potential issues that warrant human moderation.
 
 Review details:
@@ -3939,6 +4128,19 @@ var DEFAULT_REVIEW_ANALYSIS = {
   summary: "Review analysis could not be completed"
 };
 async function analyzeReviewSentiment(review) {
+  if (!await isAiEnabled()) {
+    logger.info("AI features gated (< 100 users). Skipping review sentiment analysis.");
+    return {
+      overallSentiment: "neutral",
+      toxicityScore: 0,
+      spamScore: 0,
+      fraudScore: 0,
+      flags: [],
+      moderationAction: "approve",
+      moderationReason: "AI moderation gated (< 100 users) \u2014 approved automatically",
+      summary: "Sentiment analysis bypassed"
+    };
+  }
   if (!review.comment || review.comment.trim().length === 0) {
     return {
       ...DEFAULT_REVIEW_ANALYSIS,
@@ -4079,6 +4281,12 @@ var aiRouter = router({
       style: z5.string().max(50).optional()
     })
   ).mutation(async ({ ctx, input }) => {
+    if (!await isAiEnabled()) {
+      throw new TRPCError4({
+        code: "FORBIDDEN",
+        message: "AI Design Lab features are disabled until there are 100 registered users."
+      });
+    }
     const db = await requireDb3();
     const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
     let profileId;
@@ -4152,8 +4360,17 @@ var aiRouter = router({
    * Get the current user's AI generation credits and tier info.
    */
   getCredits: protectedProcedure.query(async ({ ctx }) => {
-    const db = await requireDb3();
     const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
+    if (!await isAiEnabled()) {
+      return {
+        tier: isArtist ? ctx.user.subscriptionTier || "artist_free" : "client_free",
+        tierName: isArtist ? "Directory Profile" : "Collector",
+        aiCredits: 0,
+        maxCredits: 0,
+        isUnlimited: false
+      };
+    }
+    const db = await requireDb3();
     if (isArtist) {
       const [artistProfile] = await db.select().from(artists).where(eq4(artists.userId, ctx.user.id)).limit(1);
       if (!artistProfile) return { tier: "artist_free", tierName: "Directory Profile", aiCredits: 0, maxCredits: 0, isUnlimited: false };

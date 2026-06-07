@@ -27,7 +27,7 @@ export const TIER_LIMITS: Record<
   { portfolioMax: number; aiCredits: number; canBook: boolean }
 > = {
   // Free: strictly a directory listing.
-  artist_free: { portfolioMax: 10, aiCredits: 0, canBook: false },
+  artist_free: { portfolioMax: Number.MAX_SAFE_INTEGER, aiCredits: 0, canBook: true },
   
   // Pay-as-you-go: booking unlocked, 15% fee, limited free bids.
   artist_paygo: { portfolioMax: 20, aiCredits: 0, canBook: true },

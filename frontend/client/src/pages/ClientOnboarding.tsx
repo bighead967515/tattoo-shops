@@ -45,7 +45,7 @@ export default function ClientOnboarding() {
 
   useEffect(() => {
     if (user?.role === "client") {
-      setLocation("/client/dashboard");
+      setLocation("/dashboard");
     }
   }, [user, setLocation]);
 
@@ -61,7 +61,7 @@ export default function ClientOnboarding() {
     onSuccess: async () => {
       await refresh();
       toast.success("Your client profile has been created successfully!");
-      setLocation("/client/dashboard");
+      setLocation("/dashboard");
     },
     onError: (error: { message?: string }) => {
       toast.error(error.message || "Failed to create profile");

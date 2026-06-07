@@ -253,16 +253,6 @@ export default function ArtistDashboard() {
     },
   });
 
-  const { data: myBids, isLoading: bidsLoading, refetch: refetchBids } =
-    trpc.bids.getMyBids.useQuery(undefined, { enabled: !!artist });
-
-  const withdrawBidMutation = trpc.bids.withdraw.useMutation({
-    onSuccess: () => {
-      toast.success("Bid withdrawn");
-      refetchBids();
-    },
-    onError: (err) => toast.error(err.message),
-  });
 
   const updateBookingStatusMutation = trpc.bookings.updateStatus.useMutation({
     onSuccess: () => {
@@ -412,15 +402,10 @@ export default function ArtistDashboard() {
           const hasPortfolio = portfolioCount >= 3;
           const hasBio = !!(artist.bio && artist.bio.trim().length > 20);
           const hasInstagram = !!artist.instagram;
-          const hasSubscription = !!(
-            user.subscriptionTier &&
-            user.subscriptionTier !== "artist_free"
-          );
           const steps = [
             { id: "portfolio", label: "Upload 3+ portfolio photos", done: hasPortfolio, cta: "Add Photos", tab: "portfolio" },
             { id: "bio", label: "Write a bio (20+ characters)", done: hasBio, cta: "Edit Profile", tab: "settings" },
             { id: "instagram", label: "Add your Instagram handle", done: hasInstagram, cta: "Add Instagram", tab: "settings" },
-            { id: "subscription", label: "Upgrade for booking access", done: hasSubscription, cta: "Upgrade", tab: "billing" },
           ];
           const completedCount = steps.filter(s => s.done).length;
           const allDone = completedCount === steps.length;
@@ -474,73 +459,38 @@ export default function ArtistDashboard() {
           );
         })()}
 
-        {/* Lost Revenue Widget for Pay-as-you-go Artists */}
+        {/* Lost Revenue Widget bypassed */}
+
+        {/* Bookings Analytics strip */}
         {(() => {
-          const tier = (user.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
-          if (tier !== "artist_paygo") return null;
-
-          const acceptedBidsRevenue = myBids?.filter((b) => b.status === "accepted").reduce((acc, bid) => acc + (bid.priceEstimate ?? 0), 0) ?? 0;
-          const lostRevenueCents = acceptedBidsRevenue * 0.10; // 10% difference between paygo (15%) and pro (5%)
-          
-          if (lostRevenueCents <= 0) return null;
-          
-          const lostRevenueStr = (lostRevenueCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-
-          return (
-            <Card className="mb-8 p-6 border-red-500/50 bg-red-500/10">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-full bg-red-500/20">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">
-                    You lost {lostRevenueStr} to platform fees this month!
-                  </h3>
-                  <p className="text-red-900/80 dark:text-red-200/80 mb-4 font-medium">
-                    You are on the Pay-as-you-go tier (15% fee). If you were on the $49/mo Pro Tier (5% fee), you would have kept {lostRevenueStr} of that money.
-                  </p>
-                  <Link href="/artist/billing">
-                    <Button className="bg-red-600 hover:bg-red-700 text-white gap-2 font-bold shadow-lg shadow-red-500/20">
-                      <Zap className="h-4 w-4 fill-current" />
-                      Upgrade to Pro to Stop Losing Money
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </Card>
-          );
-        })()}
-
-        {/* Analytics strip */}
-        {(() => {
-          const totalBids = myBids?.length ?? 0;
-          const acceptedBids = myBids?.filter((b) => b.status === "accepted").length ?? 0;
-          const pendingBids = myBids?.filter((b) => b.status === "pending").length ?? 0;
-          const winRate = totalBids > 0 ? Math.round((acceptedBids / totalBids) * 100) : 0;
+          const totalBookings = bookings?.length ?? 0;
+          const confirmedBookings = bookings?.filter((b) => b.status === "confirmed").length ?? 0;
+          const pendingBookings = bookings?.filter((b) => b.status === "pending").length ?? 0;
+          const completedBookings = bookings?.filter((b) => b.status === "completed").length ?? 0;
           return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <Card className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg"><Gavel className="w-5 h-5 text-primary" /></div>
-                  <div><p className="text-2xl font-bold">{totalBids}</p><p className="text-xs text-muted-foreground">Total Bids</p></div>
+                  <div className="p-2 bg-primary/10 rounded-lg"><Calendar className="w-5 h-5 text-primary" /></div>
+                  <div><p className="text-2xl font-bold">{totalBookings}</p><p className="text-xs text-muted-foreground">Total Inquiries</p></div>
                 </div>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-yellow-500/10 rounded-lg"><Clock className="w-5 h-5 text-yellow-600" /></div>
-                  <div><p className="text-2xl font-bold">{pendingBids}</p><p className="text-xs text-muted-foreground">Pending</p></div>
+                  <div><p className="text-2xl font-bold">{pendingBookings}</p><p className="text-xs text-muted-foreground">Pending Review</p></div>
                 </div>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-500/10 rounded-lg"><CheckCircle2 className="w-5 h-5 text-green-600" /></div>
-                  <div><p className="text-2xl font-bold">{acceptedBids}</p><p className="text-xs text-muted-foreground">Accepted</p></div>
+                  <div><p className="text-2xl font-bold">{confirmedBookings}</p><p className="text-xs text-muted-foreground">Confirmed</p></div>
                 </div>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500/10 rounded-lg"><TrendingUp className="w-5 h-5 text-blue-600" /></div>
-                  <div><p className="text-2xl font-bold">{winRate}%</p><p className="text-xs text-muted-foreground">Win Rate</p></div>
+                  <div className="p-2 bg-blue-500/10 rounded-lg"><CheckCircle2 className="w-5 h-5 text-blue-600" /></div>
+                  <div><p className="text-2xl font-bold">{completedBookings}</p><p className="text-xs text-muted-foreground">Completed</p></div>
                 </div>
               </Card>
             </div>
@@ -548,37 +498,14 @@ export default function ArtistDashboard() {
         })()}
 
         <Tabs defaultValue="portfolio" className="space-y-6">
-          <TabsList className={`grid w-full max-w-4xl ${isElite ? "grid-cols-7" : "grid-cols-6"}`}>
+          <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="portfolio">
               <ImageIcon className="w-4 h-4 mr-2" />
               Portfolio
             </TabsTrigger>
-            {isElite && (
-              <TabsTrigger value="flash">
-                <Crown className="w-4 h-4 mr-2 text-amber-500" />
-                Flash Art
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="requests">
-              <Briefcase className="w-4 h-4 mr-2" />
-              Requests
-            </TabsTrigger>
-            <TabsTrigger value="my-bids">
-              <Gavel className="w-4 h-4 mr-2" />
-              My Bids
-              {(myBids?.filter((b) => b.status === "pending").length ?? 0) > 0 && (
-                <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  {myBids!.filter((b) => b.status === "pending").length}
-                </span>
-              )}
-            </TabsTrigger>
             <TabsTrigger value="bookings">
               <Calendar className="w-4 h-4 mr-2" />
               Bookings
-            </TabsTrigger>
-            <TabsTrigger value="billing">
-              <CreditCard className="w-4 h-4 mr-2" />
-              Billing
             </TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="w-4 h-4 mr-2" />
@@ -776,299 +703,6 @@ export default function ArtistDashboard() {
             </div>
           </TabsContent>
 
-          {/* Flash Art Tab */}
-          {isElite && (
-            <TabsContent value="flash" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold">Flash Art Feed Manager</h2>
-                  <p className="text-muted-foreground text-sm">
-                    Upload custom flash designs. Users can purchase and lock them instantly from the homepage with a deposit.
-                  </p>
-                </div>
-                <Dialog open={showAddFlashDialog} onOpenChange={setShowAddFlashDialog}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Flash Piece
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Add New Flash Art</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateFlash} className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="flash-image">Flash Design Image</Label>
-                        <Input
-                          id="flash-image"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setFlashFile(e.target.files?.[0] || null)}
-                          required
-                          disabled={isUploadingFlash}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="flash-title">Design Title</Label>
-                        <Input
-                          id="flash-title"
-                          placeholder="e.g., Traditional Dagger"
-                          value={flashTitle}
-                          onChange={(e) => setFlashTitle(e.target.value)}
-                          required
-                          disabled={isUploadingFlash}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="flash-desc">Description (Optional)</Label>
-                        <Textarea
-                          id="flash-desc"
-                          placeholder="Include size limits, placement details, style, etc..."
-                          value={flashDescription}
-                          onChange={(e) => setFlashDescription(e.target.value)}
-                          className="h-20"
-                          disabled={isUploadingFlash}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="flash-price">Total Price ($)</Label>
-                          <Input
-                            id="flash-price"
-                            type="number"
-                            placeholder="300"
-                            min="1"
-                            value={flashPrice}
-                            onChange={(e) => setFlashPrice(e.target.value)}
-                            required
-                            disabled={isUploadingFlash}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="flash-deposit">Lock Deposit ($)</Label>
-                          <Input
-                            id="flash-deposit"
-                            type="number"
-                            placeholder="50"
-                            min="1"
-                            value={flashDeposit}
-                            onChange={(e) => setFlashDeposit(e.target.value)}
-                            required
-                            disabled={isUploadingFlash}
-                          />
-                        </div>
-                      </div>
-                      {isUploadingFlash && flashUploadProgress !== null && (
-                        <div className="space-y-2">
-                          <Label>Uploading Design... {flashUploadProgress}%</Label>
-                          <Progress value={flashUploadProgress} className="w-full" />
-                        </div>
-                      )}
-                      {flashUploadError && (
-                        <p className="text-xs text-destructive">{flashUploadError}</p>
-                      )}
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowAddFlashDialog(false)}
-                          disabled={isUploadingFlash}
-                        >
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={isUploadingFlash}>
-                          {isUploadingFlash ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            "Upload Flash"
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {flashLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : !flashArtItems || flashArtItems.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
-                  <Crown className="w-10 h-10 mx-auto mb-3 text-amber-500 opacity-40" />
-                  <p className="font-medium">No Flash Art uploaded yet</p>
-                  <p className="text-sm mt-1">Upload your first custom flash piece to display it on the homepage!</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {flashArtItems.map((item) => (
-                    <Card key={item.id} className="overflow-hidden relative group">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="w-full aspect-square object-cover"
-                      />
-                      {item.isLocked && (
-                        <Badge className="absolute top-2 left-2 bg-red-600 text-white font-semibold">
-                          Locked
-                        </Badge>
-                      )}
-                      <div className="p-3 space-y-1">
-                        <h4 className="font-semibold text-sm truncate">{item.title}</h4>
-                        {item.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
-                        )}
-                        <div className="flex items-center justify-between text-xs pt-1">
-                          <span className="font-bold text-foreground">
-                            ${(item.price / 100).toFixed(0)}
-                          </span>
-                          <span className="text-muted-foreground">
-                            ${(item.depositAmount / 100).toFixed(0)} deposit
-                          </span>
-                        </div>
-                      </div>
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete this flash design?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently remove "{item.title}" from your flash board and the homepage.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  deleteFlashMutation.mutate({
-                                    id: item.id,
-                                    artistId: artist.id,
-                                  })
-                                }
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          )}
-
-          {/* Requests Tab */}
-          <TabsContent value="requests" className="space-y-4">
-            <h2 className="text-2xl font-semibold">Open Tattoo Requests</h2>
-            {user.subscriptionTier === "artist_free" ? (
-              <UpgradePrompt
-                feature="View & Bid on Requests"
-                description="Upgrade to a paid plan to view and bid on new tattoo requests from clients."
-              />
-            ) : (
-              <ArtistDashboardFeed />
-            )}
-          </TabsContent>
-
-          {/* My Bids Tab */}
-          <TabsContent value="my-bids" className="space-y-4">
-            <h2 className="text-2xl font-semibold">My Submitted Bids</h2>
-            {bidsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : !myBids || myBids.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
-                <Gavel className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="font-medium">No bids yet</p>
-                <p className="text-sm mt-1">Browse open requests and submit your first bid.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {myBids.map((bid) => {
-                  const statusColors: Record<string, string> = {
-                    pending: "bg-yellow-500/10 text-yellow-700 border-yellow-400/30",
-                    accepted: "bg-green-500/10 text-green-700 border-green-400/30",
-                    rejected: "bg-red-500/10 text-red-700 border-red-400/30",
-                    withdrawn: "bg-gray-500/10 text-gray-600 border-gray-400/30",
-                  };
-                  const colorClass = statusColors[bid.status] ?? "";
-                  return (
-                    <Card key={bid.id} className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="font-semibold truncate">
-                              {bid.request?.title ?? "Untitled Request"}
-                            </span>
-                            <Badge variant="outline" className={`text-xs ${colorClass}`}>
-                              {bid.status}
-                            </Badge>
-                            {bid.status === "accepted" && (
-                              <Badge className="bg-green-600 text-white text-xs">
-                                <CheckCircle2 className="w-3 h-3 mr-1" /> Won
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              ${((bid.priceEstimate ?? 0) / 100).toLocaleString()}
-                            </span>
-                            {bid.estimatedHours && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {bid.estimatedHours}h estimated
-                              </span>
-                            )}
-                            <span>
-                              Submitted {new Date(bid.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          {bid.message && (
-                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2 bg-muted/30 rounded p-2">
-                              {bid.message}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Link href={`/requests/${bid.requestId}`}>
-                            <Button size="sm" variant="outline">
-                              <ExternalLink className="w-3 h-3 mr-1" /> View
-                            </Button>
-                          </Link>
-                          {bid.status === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:bg-destructive/10"
-                              disabled={withdrawBidMutation.isPending}
-                              onClick={() => withdrawBidMutation.mutate({ bidId: bid.id })}
-                            >
-                              <XCircle className="w-3 h-3 mr-1" /> Withdraw
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-
           {/* Bookings Tab */}
           <TabsContent value="bookings" className="space-y-4">
             <h2 className="text-2xl font-semibold">Inquiries & Bookings</h2>
@@ -1173,93 +807,7 @@ export default function ArtistDashboard() {
             </div>
           </TabsContent>
 
-          {/* Billing Tab */}
-          <TabsContent value="billing" className="space-y-6">
-            <h2 className="text-2xl font-semibold">Subscription & Billing</h2>
-            {(() => {
-              const tier = (user.subscriptionTier ?? "artist_free") as ArtistSubscriptionTier;
-              const limits = getArtistTierLimits(tier);
-              const isFree = tier === "artist_free";
-              const isPayg = tier === "artist_paygo";
-              const isPro = tier === "artist_pro";
-              const isElite = tier === "artist_elite";
-
-              const planName = isFree ? "Directory Profile" : isPayg ? "Pay-as-you-go" : isPro ? "Pro Studio" : "Elite Icon";
-              const planPrice = isFree ? "$0/mo" : isPayg ? "$0/mo" : isPro ? "$49/mo" : "$99/mo";
-              const transactionFee = isFree ? "No bidding access" : isPayg ? "15% platform fee on accepted bids" : isPro ? "5% platform fee on accepted bids" : "3% platform fee on accepted bids";
-
-              return (
-                <>
-                  {/* Current plan card */}
-                  <Card className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full ${isElite ? "bg-amber-100" : "bg-primary/10"}`}>
-                          <Crown className={`h-6 w-6 ${isElite ? "text-amber-500" : "text-primary"}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Current Plan</p>
-                          <h3 className="text-2xl font-bold">{planName}</h3>
-                          <p className="text-muted-foreground text-sm mt-1">{planPrice}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{transactionFee}</p>
-                        </div>
-                      </div>
-                      <Link href="/artist/billing">
-                        <Button variant={isFree ? "default" : "outline"} className="gap-2">
-                          {isFree ? (
-                            <><Zap className="h-4 w-4" /> Upgrade Plan</>
-                          ) : (
-                            <><CreditCard className="h-4 w-4" /> Manage Plan</>
-                          )}
-                        </Button>
-                      </Link>
-                    </div>
-                    {/* Feature summary */}
-                    <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {[
-                        { label: "Portfolio Photos", value: limits.portfolioPhotos === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.portfolioPhotos) },
-                        { label: "Bids / Month", value: isFree ? "0" : limits.freeBidsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.freeBidsPerMonth) },
-                        { label: "AI Generations", value: limits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : String(limits.aiGenerationsPerMonth) },
-                        { label: "Sponsored Listing", value: limits.sponsoredListing ? "Yes" : "No" },
-                      ].map(({ label, value }) => (
-                        <div key={label} className="p-3 rounded-lg bg-muted/40 border">
-                          <p className="text-xs text-muted-foreground">{label}</p>
-                          <p className="font-semibold">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-
-                  {/* Upgrade CTA for free/payg users */}
-                  {(isFree || isPayg) && (
-                    <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30">
-                      <div className="flex items-start gap-4">
-                        <div className="p-3 rounded-full bg-primary/20">
-                          <Sparkles className="h-6 w-6 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold mb-2">
-                            {isPayg ? "Save on fees & get AI Tools — Upgrade to Pro" : "Unlock Your Full Potential"}
-                          </h3>
-                          <p className="text-muted-foreground mb-4">
-                            {isPayg
-                              ? "Pro members pay only 5% on accepted bids (vs. 15% pay-as-you-go). Win 1 mid-size bid and Pro pays for itself! Plus, unlock 50 AI Studio generations per month for walk-ins."
-                              : "Upgrade to start bidding on client posts, accept bookings, get a verified badge, and grow your clientele."}
-                          </p>
-                          <Link href="/artist/billing">
-                            <Button className="gap-2">
-                              <Zap className="h-4 w-4" />
-                              View Plans & Pricing
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </>
-              );
-            })()}
-          </TabsContent>
+          {/* Billing Tab Content removed */}
 
           {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-4">

@@ -15,6 +15,7 @@ import {
   imageToTextWithHuggingFace,
 } from "./_core/aiProviders";
 import { logger } from "./_core/logger";
+import { isAiEnabled } from "./db";
 
 // ============================================
 // LICENSE VERIFICATION OCR
@@ -396,6 +397,21 @@ export async function analyzeReviewSentiment(review: {
   comment: string | null;
   verifiedBooking: boolean;
 }): Promise<ReviewAnalysisResult> {
+  // Gate check: If AI is disabled, bypass and return approved directly
+  if (!(await isAiEnabled())) {
+    logger.info("AI features gated (< 100 users). Skipping review sentiment analysis.");
+    return {
+      overallSentiment: "neutral",
+      toxicityScore: 0,
+      spamScore: 0,
+      fraudScore: 0,
+      flags: [],
+      moderationAction: "approve",
+      moderationReason: "AI moderation gated (< 100 users) — approved automatically",
+      summary: "Sentiment analysis bypassed",
+    };
+  }
+
   // Skip analysis for reviews without comments — nothing to analyze
   if (!review.comment || review.comment.trim().length === 0) {
     return {

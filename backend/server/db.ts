@@ -1112,3 +1112,28 @@ export async function lockFlashArt(id: number, userId: number) {
   return updated;
 }
 
+/**
+ * Get the total count of registered users.
+ */
+export async function getRealUserCount(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`count(*)::int` }).from(users);
+  return result[0]?.count ?? 0;
+}
+
+/**
+ * Verify whether AI capabilities should be enabled.
+ * Gate AI features until there are at least 100 registered users.
+ */
+export async function isAiEnabled(): Promise<boolean> {
+  try {
+    const count = await getRealUserCount();
+    return count >= 100;
+  } catch (error) {
+    logger.error("Failed to check user count for AI gating:", error);
+    return false;
+  }
+}
+
+

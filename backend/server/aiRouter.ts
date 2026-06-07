@@ -9,7 +9,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { eq, sql, and, gt } from "drizzle-orm";
-import { getDb } from "./db";
+import { getDb, isAiEnabled } from "./db";
 import { clients, artists } from "../drizzle/schema";
 import { generateTattooDesign } from "./geminiGeneration";
 import {
@@ -48,6 +48,13 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!(await isAiEnabled())) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "AI Design Lab features are disabled until there are 100 registered users.",
+        });
+      }
+
       const db = await requireDb();
 
       const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
@@ -156,9 +163,19 @@ export const aiRouter = router({
    * Get the current user's AI generation credits and tier info.
    */
   getCredits: protectedProcedure.query(async ({ ctx }) => {
-    const db = await requireDb();
-
     const isArtist = ctx.user.subscriptionTier?.startsWith("artist_");
+
+    if (!(await isAiEnabled())) {
+      return {
+        tier: isArtist ? (ctx.user.subscriptionTier || "artist_free") : "client_free",
+        tierName: isArtist ? "Directory Profile" : "Collector",
+        aiCredits: 0,
+        maxCredits: 0,
+        isUnlimited: false,
+      };
+    }
+
+    const db = await requireDb();
 
     if (isArtist) {
       const [artistProfile] = await db.select().from(artists).where(eq(artists.userId, ctx.user.id)).limit(1);

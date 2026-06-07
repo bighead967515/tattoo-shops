@@ -14,9 +14,9 @@ export function readRuntimeEnv(key: string): string | null {
 export const ARTIST_TIER_LIMITS = {
   artist_free: {
     name: "Directory Profile",
-    portfolioPhotos: 10,
+    portfolioPhotos: Number.MAX_SAFE_INTEGER,
     canBid: true,
-    freeBidsPerMonth: 3,
+    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
     transactionFeePercent: 15,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,

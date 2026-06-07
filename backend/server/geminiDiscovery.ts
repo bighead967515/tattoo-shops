@@ -1,13 +1,6 @@
-/**
- * Tattoo Discovery — Groq-powered Natural Language Search
- *
- * Parses user queries like "I want a small, minimalist mountain range on my
- * inner forearm that looks like a sketch" into structured search criteria that
- * can be matched against AI-tagged portfolio data.
- */
-
 import { groqGenerateJson } from "./_core/aiProviders";
 import { logger } from "./_core/logger";
+import { isAiEnabled } from "./db";
 
 const DISCOVERY_PROMPT = `You are a tattoo industry expert. A user is describing the tattoo they want. Parse their description and extract structured search criteria as a JSON object.
 
@@ -49,6 +42,90 @@ const DEFAULT_INTENT: DiscoveryIntent = {
 };
 
 /**
+ * Local deterministic parser for natural language query search when AI features are gated.
+ */
+function parseDiscoveryQueryFallback(query: string): DiscoveryIntent {
+  const normalized = query.toLowerCase();
+  const styles: string[] = [];
+  const tags: string[] = [];
+  const keywords: string[] = [];
+  let placement: string | null = null;
+  let size: string | null = null;
+
+  const knownStyles = [
+    "Traditional", "Neo-Traditional", "Realism", "Hyperrealism", "Watercolor",
+    "Tribal", "Japanese", "Biomechanical", "Geometric", "Dotwork", "Pointillism",
+    "Fine-line", "Minimalist", "Blackwork", "Trash Polka", "New School",
+    "Old School", "Illustrative", "Surrealism", "Lettering", "Chicano",
+    "Ornamental", "Abstract", "Sketch", "Portrait"
+  ];
+  for (const s of knownStyles) {
+    if (normalized.includes(s.toLowerCase())) {
+      styles.push(s);
+    }
+  }
+  // Sketch aliases
+  if (normalized.includes("line drawing") || normalized.includes("linework")) {
+    if (!styles.includes("Fine-line")) styles.push("Fine-line");
+    if (!styles.includes("Sketch")) styles.push("Sketch");
+  }
+
+  const knownPlacements = [
+    "forearm", "upper arm", "wrist", "hand", "finger", "shoulder",
+    "chest", "back", "ribs", "hip", "thigh", "calf", "ankle", "foot",
+    "neck", "behind ear", "collarbone", "spine", "arm", "sleeve"
+  ];
+  for (const p of knownPlacements) {
+    if (normalized.includes(p)) {
+      placement = p;
+      break;
+    }
+  }
+
+  const knownSizes = ["tiny", "small", "medium", "large", "sleeve", "backpiece"];
+  for (const sz of knownSizes) {
+    if (normalized.includes(sz)) {
+      size = sz;
+      break;
+    }
+  }
+
+  const knownTags = [
+    "floral", "rose", "flower", "skull", "dragon", "butterfly", "lion", "clock", "compass",
+    "mandala", "snake", "eagle", "wolf", "heart", "dagger", "anchor", "phoenix", "eye",
+    "tree", "mountain", "moon", "sun", "cross", "angel", "demon", "samurai", "koi fish",
+    "octopus", "waves", "clouds", "fire", "sacred geometry", "lettering", "script",
+    "portrait", "animal", "nature", "mythology"
+  ];
+  for (const t of knownTags) {
+    if (normalized.includes(t)) {
+      tags.push(t);
+    }
+  }
+
+  // Extract raw words for additional keywords
+  const words = normalized.split(/\s+/);
+  const commonTrivial = ["i", "want", "a", "the", "on", "my", "to", "and", "in", "like", "looks", "is", "for", "with", "that", "of"];
+  for (const word of words) {
+    const cleanWord = word.replace(/[^a-z]/g, "");
+    if (cleanWord.length > 3 && !commonTrivial.includes(cleanWord)) {
+      if (!tags.includes(cleanWord) && !styles.map(s => s.toLowerCase()).includes(cleanWord)) {
+        keywords.push(cleanWord);
+      }
+    }
+  }
+
+  return {
+    styles: styles.length > 0 ? styles : ["Traditional"],
+    tags: tags.length > 0 ? tags : ["nature"],
+    keywords: keywords.slice(0, 5),
+    placement,
+    size,
+    vibeDescription: query,
+  };
+}
+
+/**
  * Parse a natural language tattoo query into structured search criteria using Groq.
  *
  * @param query - The user's natural language description (e.g. "I want a small, minimalist mountain range on my inner forearm that looks like a sketch")
@@ -57,6 +134,12 @@ const DEFAULT_INTENT: DiscoveryIntent = {
 export async function parseDiscoveryQuery(
   query: string,
 ): Promise<DiscoveryIntent> {
+  // Gate check: If AI is disabled, run the local heuristic parser
+  if (!(await isAiEnabled())) {
+    logger.info("AI features gated (< 100 users). Using local heuristic parser for discovery query.");
+    return parseDiscoveryQueryFallback(query);
+  }
+
   try {
     const parsed = await groqGenerateJson<Partial<DiscoveryIntent>>(
       DISCOVERY_PROMPT,
@@ -89,3 +172,4 @@ export async function parseDiscoveryQuery(
     return DEFAULT_INTENT;
   }
 }
+

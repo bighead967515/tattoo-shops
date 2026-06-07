@@ -16,6 +16,7 @@ import {
   imageToTextWithHuggingFace,
 } from "./_core/aiProviders";
 import { logger } from "./_core/logger";
+import { isAiEnabled } from "./db";
 
 const ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. You will receive an image caption and technical metadata produced by an upstream vision model. Infer likely tattoo attributes and return a JSON object with the following fields. Be precise and concise.
 
@@ -46,6 +47,14 @@ const DEFAULT_ANALYSIS: PortfolioAnalysis = {
   description: "",
   qualityScore: 0,
   qualityIssues: ["analysis-failed"],
+};
+
+const DEFAULT_GATED_ANALYSIS: PortfolioAnalysis = {
+  styles: [],
+  tags: [],
+  description: "Tattoo portfolio design",
+  qualityScore: 90,
+  qualityIssues: [],
 };
 
 /**
@@ -107,9 +116,16 @@ function isPrivateOrReservedIp(ip: string): boolean {
 export async function analyzePortfolioImage(
   imageUrl: string,
 ): Promise<PortfolioAnalysis> {
+  // Gate check: If AI is disabled, bypass and return static fallback
+  if (!(await isAiEnabled())) {
+    logger.info("AI features gated (< 100 users). Skipping portfolio image analysis.");
+    return DEFAULT_GATED_ANALYSIS;
+  }
+
   try {
     // Validate URL to prevent SSRF — only allow HTTPS and block private/reserved IPs
     let parsedUrl: URL;
+
     try {
       parsedUrl = new URL(imageUrl);
     } catch {

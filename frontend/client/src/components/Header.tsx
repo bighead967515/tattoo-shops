@@ -48,19 +48,7 @@ export default function Header() {
               Browse Artists
             </Link>
             <Link
-              href="/requests"
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              Request Board
-            </Link>
-            <Link
-              href="/artist-finder"
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              Find Artists & Shops
-            </Link>
-            <Link
-              href="/for-artists"
+              href="/dashboard"
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               For Artists

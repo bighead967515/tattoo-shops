@@ -616,22 +616,7 @@ export default function Home() {
                     </Link>
                   </li>
                   <li>
-                    <Link href="/client/new-request" className="hover:text-primary">
-                      Post a Request
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/tattoo-planning" className="hover:text-primary">
-                      Tattoo Planning Help
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/request-flow" className="hover:text-primary">
-                      Request Flow
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/for-artists" className="hover:text-primary">
+                    <Link href="/dashboard" className="hover:text-primary">
                       For Artists
                     </Link>
                   </li>
@@ -647,19 +632,19 @@ export default function Home() {
                 <h4 className="mb-4 font-semibold">Support</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>
-                    <Link href="/help" className="hover:text-primary">
+                    <a href="#" className="hover:text-primary">
                       Help Center
-                    </Link>
+                    </a>
                   </li>
                   <li>
-                    <Link href="/privacy-policy" className="hover:text-primary">
+                    <a href="#" className="hover:text-primary">
                       Privacy Policy
-                    </Link>
+                    </a>
                   </li>
                   <li>
-                    <Link href="/terms-of-service" className="hover:text-primary">
+                    <a href="#" className="hover:text-primary">
                       Terms of Service
-                    </Link>
+                    </a>
                   </li>
                 </ul>
               </div>

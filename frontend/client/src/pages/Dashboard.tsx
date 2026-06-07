@@ -28,8 +28,15 @@ import {
   Info,
   CheckCircle,
   XCircle,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// Import other dashboards/onboarding flows to render them inline
+import AdminDashboard from "./AdminDashboard";
+import ArtistDashboard from "./ArtistDashboard";
+import ClientOnboarding from "./ClientOnboarding";
+import ArtistRegister from "./ArtistRegister";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -40,6 +47,121 @@ export default function Dashboard() {
       setLocation("/login");
     }
   }, [loading, isAuthenticated, user, setLocation]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container py-20 text-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated after loading completes
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  // Unified Dashboard Router
+  if (user.role === "admin") {
+    return <AdminDashboard />;
+  }
+
+  if (user.role === "artist") {
+    return <ArtistDashboard />;
+  }
+
+  if (user.role === "client") {
+    return <ClientDashboardView />;
+  }
+
+  // If role is "user" (onboarding/registration selector is required)
+  return <OnboardingSelector />;
+}
+
+function OnboardingSelector() {
+  const [mode, setMode] = useState<"select" | "client" | "artist">("select");
+
+  if (mode === "client") {
+    return (
+      <div>
+        <div className="container py-4 flex justify-between items-center border-b">
+          <Button variant="ghost" onClick={() => setMode("select")}>← Back</Button>
+          <span className="font-semibold text-muted-foreground">Client Onboarding</span>
+        </div>
+        <ClientOnboarding />
+      </div>
+    );
+  }
+
+  if (mode === "artist") {
+    return (
+      <div>
+        <div className="container py-4 flex justify-between items-center border-b">
+          <Button variant="ghost" onClick={() => setMode("select")}>← Back</Button>
+          <span className="font-semibold text-muted-foreground">Artist Registration</span>
+        </div>
+        <ArtistRegister />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background animate-fade-in">
+      <Header />
+      <div className="container max-w-4xl py-16 px-4">
+        <div className="text-center mb-12 animate-slide-up">
+          <h1 className="text-4xl font-extrabold tracking-tight mb-4 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+            Welcome to Ink Connect
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Choose how you want to use the platform to get started. You can register as a tattoo client to book appointments, or as a tattoo artist to list your shop and receive requests.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <Card className="p-8 flex flex-col justify-between border-muted hover:border-primary/50 transition-all duration-300 group hover:shadow-[0_0_30px_rgba(112,255,112,0.1)]">
+            <div>
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+              </div>
+              <h2 className="text-2xl font-bold mb-3">I want to get a Tattoo</h2>
+              <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
+                Browse professional artists, save your favorites, and submit booking requests for custom designs or flash art.
+              </p>
+            </div>
+            <Button className="w-full font-bold shadow-md hover:shadow-primary/25 transition-all" onClick={() => setMode("client")}>
+              Become a Client
+            </Button>
+          </Card>
+
+          <Card className="p-8 flex flex-col justify-between border-muted hover:border-purple-500/50 transition-all duration-300 group hover:shadow-[0_0_30px_rgba(168,85,247,0.1)]">
+            <div>
+              <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <UserCheck className="w-6 h-6 text-purple-500" />
+              </div>
+              <h2 className="text-2xl font-bold mb-3">I am a Tattoo Artist</h2>
+              <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
+                Create your shop profile, upload your portfolio, manage your booking calendar, and connect with local clients.
+              </p>
+            </div>
+            <Button variant="secondary" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md hover:shadow-purple-500/25 transition-all" onClick={() => setMode("artist")}>
+              Register as Artist
+            </Button>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientDashboardView() {
+  const [, setLocation] = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  
+  if (!user) return null;
 
   const { data: artist } = trpc.artists.getByUserId.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -79,22 +201,6 @@ export default function Dashboard() {
     },
   });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container py-20 text-center">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated after loading completes
-  if (!isAuthenticated || !user) {
-    return null;
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
@@ -124,21 +230,10 @@ export default function Dashboard() {
             </p>
           </div>
           {artist && (
-            <Link href="/artist-dashboard">
+            <Link href="/dashboard">
               <Button className="w-full md:w-auto bg-gradient-to-r from-primary to-purple-600 hover:shadow-[0_0_20px_rgba(112,255,112,0.4)]">
                 <LayoutDashboard className="w-4 h-4 mr-2" />
                 Artist Dashboard
-              </Button>
-            </Link>
-          )}
-          {!artist && (
-            <Link href="/for-artists">
-              <Button
-                variant="outline"
-                className="w-full md:w-auto border-dashed border-primary/50 text-primary hover:bg-primary/5"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Register as Tattoo Artist
               </Button>
             </Link>
           )}
@@ -165,7 +260,7 @@ export default function Dashboard() {
           <TabsContent value="bookings" className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">My Bookings</h2>
-              <Button onClick={() => setLocation("/artist-finder")}>
+              <Button onClick={() => setLocation("/artists")}>
                 <Calendar className="w-4 h-4 mr-2" />
                 New Booking
               </Button>
@@ -303,7 +398,7 @@ export default function Dashboard() {
                 <p className="text-muted-foreground mb-4">
                   Start by finding an artist and booking your first appointment
                 </p>
-                <Button onClick={() => setLocation("/artist-finder")}>
+                <Button onClick={() => setLocation("/artists")}>
                   Find Artists
                 </Button>
               </Card>
@@ -396,7 +491,7 @@ export default function Dashboard() {
                 <p className="text-muted-foreground mb-4">
                   Save your favorite artists to quickly access them later
                 </p>
-                <Button onClick={() => setLocation("/artist-finder")}>
+                <Button onClick={() => setLocation("/artists")}>
                   Browse Artists
                 </Button>
               </Card>
