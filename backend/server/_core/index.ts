@@ -64,8 +64,8 @@ function parseAllowedOrigins(): string[] {
 
   return ENV.isProduction
     ? [
-        "https://theinkednetwork.website",
-        "https://www.theinkednetwork.website",
+        "https://inkedconnect.com",
+        "https://www.inkedconnect.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
       ]

@@ -210,7 +210,7 @@ async function handleFlashDepositCheckoutCompleted(
         artistId: flash.artistId,
         userId: userId || null,
         customerName: customerName || "Guest Collector",
-        customerEmail: customerEmail || "guest@theinkednetwork.website",
+        customerEmail: customerEmail || "guest@inkedconnect.com",
         customerPhone: customerPhone || "N/A",
         preferredDate,
         tattooDescription: `Locked Flash Art: "${flash.title}" (ID: ${flash.id})`,
@@ -247,7 +247,7 @@ async function handleFlashDepositCheckoutCompleted(
       await sendBookingIntakeNotification(artistWithUser.userEmail, {
         artistName: artistWithUser.userName || artistWithUser.shopName,
         clientName: customerName || "Guest Collector",
-        clientEmail: customerEmail || "guest@theinkednetwork.website",
+        clientEmail: customerEmail || "guest@inkedconnect.com",
         clientPhone: customerPhone || "N/A",
         tattooDescription: `Locked Flash Art: "${flash.title}"`,
         preferredDate: preferredDate.toLocaleString(),

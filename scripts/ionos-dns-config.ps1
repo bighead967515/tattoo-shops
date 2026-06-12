@@ -1,6 +1,6 @@
 param(
     [string]$ApiKey,
-    [string]$Domain = "theinkednetwork.website"
+    [string]$Domain = "inkedconnect.com"
 )
 
 if (-not $ApiKey -or [string]::IsNullOrWhiteSpace($ApiKey)) {

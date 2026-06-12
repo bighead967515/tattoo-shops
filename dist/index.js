@@ -2171,7 +2171,7 @@ async function sendEmail(options) {
     to,
     subject,
     html,
-    from = "Ink Connect <noreply@theinkednetwork.website>"
+    from = "Ink Connect <noreply@inkedconnect.com>"
   } = options;
   return emailCircuit.execute(async () => {
     let lastError = null;
@@ -2218,7 +2218,7 @@ async function sendEmail(options) {
 }
 async function sendArtistInvitation(to, shopName, inviteCode) {
   const escapedShopName = escapeHtml(shopName);
-  const baseUrl = ENV.publicBaseUrl || "https://theinkednetwork.website";
+  const baseUrl = ENV.publicBaseUrl || "https://inkedconnect.com";
   const inviteQuery = inviteCode ? `?invite=${encodeURIComponent(inviteCode)}` : "";
   const inviteUrl = `${baseUrl}/for-artists${inviteQuery}`;
   const html = `
@@ -6117,7 +6117,7 @@ async function handleFlashDepositCheckoutCompleted(session) {
       artistId: flash.artistId,
       userId: userId || null,
       customerName: customerName || "Guest Collector",
-      customerEmail: customerEmail || "guest@theinkednetwork.website",
+      customerEmail: customerEmail || "guest@inkedconnect.com",
       customerPhone: customerPhone || "N/A",
       preferredDate,
       tattooDescription: `Locked Flash Art: "${flash.title}" (ID: ${flash.id})`,
@@ -6144,7 +6144,7 @@ async function handleFlashDepositCheckoutCompleted(session) {
       await sendBookingIntakeNotification(artistWithUser.userEmail, {
         artistName: artistWithUser.userName || artistWithUser.shopName,
         clientName: customerName || "Guest Collector",
-        clientEmail: customerEmail || "guest@theinkednetwork.website",
+        clientEmail: customerEmail || "guest@inkedconnect.com",
         clientPhone: customerPhone || "N/A",
         tattooDescription: `Locked Flash Art: "${flash.title}"`,
         preferredDate: preferredDate.toLocaleString(),
@@ -6500,8 +6500,8 @@ function parseAllowedOrigins() {
     return fromEnv;
   }
   return ENV.isProduction ? [
-    "https://theinkednetwork.website",
-    "https://www.theinkednetwork.website",
+    "https://inkedconnect.com",
+    "https://www.inkedconnect.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000"
   ] : ["http://localhost:3000", "http://localhost:5173"];

@@ -65,7 +65,7 @@ export async function sendEmail(options: EmailOptions) {
     to,
     subject,
     html,
-    from = "Ink Connect <noreply@theinkednetwork.website>",
+    from = "Ink Connect <noreply@inkedconnect.com>",
   } = options;
 
   return emailCircuit.execute(async () => {
@@ -128,7 +128,7 @@ export async function sendEmail(options: EmailOptions) {
  */
 export async function sendArtistInvitation(to: string, shopName: string, inviteCode?: string) {
   const escapedShopName = escapeHtml(shopName);
-  const baseUrl = ENV.publicBaseUrl || "https://theinkednetwork.website";
+  const baseUrl = ENV.publicBaseUrl || "https://inkedconnect.com";
   const inviteQuery = inviteCode ? `?invite=${encodeURIComponent(inviteCode)}` : "";
   const inviteUrl = `${baseUrl}/for-artists${inviteQuery}`;
 

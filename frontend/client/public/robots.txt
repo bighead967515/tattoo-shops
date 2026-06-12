@@ -25,7 +25,7 @@ Disallow: /license-upload
 Disallow: /api/
 
 # Sitemap location
-Sitemap: https://theinkednetwork.website/sitemap.xml
+Sitemap: https://inkedconnect.com/sitemap.xml
 
 # Crawl-delay for polite crawling
 Crawl-delay: 1

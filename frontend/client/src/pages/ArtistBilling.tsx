@@ -499,7 +499,7 @@ export default function ArtistBilling() {
 
           <p className="text-center text-sm text-muted-foreground mt-8">
             All paid plans are billed via Stripe. Cancel anytime. No contracts.{" "}
-            <a href="mailto:support@theinkednetwork.website" className="underline hover:text-foreground">
+            <a href="mailto:support@inkedconnect.com" className="underline hover:text-foreground">
               Contact support
             </a>
           </p>

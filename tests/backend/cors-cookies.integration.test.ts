@@ -79,8 +79,8 @@ describe("CORS and Cookies Integration Tests", () => {
   describe("CORS Header Behavior", () => {
     let server: StartedHttpServer;
     const allowedOrigins = [
-      "https://theinkednetwork.website",
-      "https://www.theinkednetwork.website",
+      "https://inkedconnect.com",
+      "https://www.inkedconnect.com",
       "http://localhost:3000",
     ];
 
@@ -102,7 +102,7 @@ describe("CORS and Cookies Integration Tests", () => {
     });
 
     it("allows requests from allowed origins", async () => {
-      const origin = "https://theinkednetwork.website";
+      const origin = "https://inkedconnect.com";
       const response = await fetch(`${server.baseUrl}/api/test-cors`, {
         headers: {
           Origin: origin,
@@ -133,7 +133,7 @@ describe("CORS and Cookies Integration Tests", () => {
     });
 
     it("handles OPTIONS preflight requests correctly for allowed origins", async () => {
-      const origin = "https://www.theinkednetwork.website";
+      const origin = "https://www.inkedconnect.com";
       const response = await fetch(`${server.baseUrl}/api/test-cors`, {
         method: "OPTIONS",
         headers: {
