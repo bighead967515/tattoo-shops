@@ -71,9 +71,14 @@ export function stripePriceToArtistTier(
     stripeArtistAmateurPriceIdMonth, stripeArtistAmateurPriceIdYear,
     stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
     stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
+    stripeFoundingArtistPriceId,
   } = ENV;
 
-  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+  if (
+    priceId === stripeArtistProPriceIdMonth ||
+    priceId === stripeArtistProPriceIdYear ||
+    priceId === stripeFoundingArtistPriceId
+  )
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
     return "artist_elite";
@@ -85,6 +90,7 @@ export function stripePriceToArtistTier(
 
 /**
  * Create a Stripe Checkout Session for an artist subscription upgrade.
+ * Adds a 30-day free trial for standard monthly Pro Studio tier.
  */
 export async function createArtistSubscriptionCheckout({
   priceId,
@@ -102,6 +108,8 @@ export async function createArtistSubscriptionCheckout({
   cancelUrl: string;
 }) {
   return stripeCircuit.execute(async () => {
+    const isProMonthly = metadata.tier === "artist_pro" && metadata.interval === "month";
+    
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
@@ -110,7 +118,10 @@ export async function createArtistSubscriptionCheckout({
         ? { customer: stripeCustomerId }
         : { customer_email: customerEmail }),
       metadata,
-      subscription_data: { metadata },
+      subscription_data: { 
+        metadata,
+        ...(isProMonthly ? { trial_period_days: 30 } : {}),
+      },
       success_url: successUrl,
       cancel_url: cancelUrl,
       allow_promotion_codes: true,
@@ -121,8 +132,8 @@ export async function createArtistSubscriptionCheckout({
 
 /**
  * Create a Stripe Checkout Session for the Founding Artist offer.
- * - Uses the artist_amateur price ID at $19/mo
- * - Adds a 180-day (6-month) free trial via trial_period_days
+ * - Uses the founding price ID at $19/mo
+ * - Adds a 90-day (3-month) free trial via trial_period_days
  * - Stores isFoundingArtist: "true" in metadata so the webhook can mark the artist
  */
 export async function createFoundingArtistCheckout({
@@ -150,7 +161,7 @@ export async function createFoundingArtistCheckout({
         : { customer_email: customerEmail }),
       metadata: { ...metadata, isFoundingArtist: "true" },
       subscription_data: {
-        trial_period_days: 180,
+        trial_period_days: 90,
         metadata: { ...metadata, isFoundingArtist: "true" },
       },
       success_url: successUrl,

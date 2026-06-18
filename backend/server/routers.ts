@@ -24,7 +24,7 @@ import {
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
 import { createArtistSubscriptionCheckout, createFoundingArtistCheckout, createCheckoutSession } from "./stripe";
 import { artists, users, flashArt, bookings, invitations } from "../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 import { getDb } from "./db";
@@ -484,9 +484,26 @@ export const appRouter = router({
         return { checkoutUrl: session.url };
       }),
 
+    getFoundingStatus: publicProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [res] = await database
+        .select({ count: sql<number>`count(*)::int` })
+        .from(artists)
+        .where(eq(artists.isFoundingArtist, true));
+
+      const count = res?.count ?? 0;
+      return {
+        count,
+        limit: 50,
+        isSoldOut: count >= 50,
+      };
+    }),
+
     /**
      * Start the Founding Artist checkout:
-     * - 180-day free trial then $19/mo locked rate
+     * - 90-day free trial then $19/mo locked rate
      * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
      */
     startFoundingCheckout: protectedProcedure
@@ -499,6 +516,20 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const database = await getDb();
         if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Enforce the 50 artists limit
+        const [foundingCount] = await database
+          .select({ count: sql<number>`count(*)::int` })
+          .from(artists)
+          .where(eq(artists.isFoundingArtist, true));
+
+        const count = foundingCount?.count ?? 0;
+        if (count >= 50) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "The Founding Artist offer is sold out.",
+          });
+        }
 
         const [artist] = await database
           .select({ id: artists.id })

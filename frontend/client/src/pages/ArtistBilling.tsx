@@ -142,6 +142,8 @@ export default function ArtistBilling() {
   const { data: artist, isLoading: artistLoading, refetch: refetchArtist } =
     trpc.artists.getByUserId.useQuery(undefined, { enabled: !!user });
 
+  const { data: foundingStatus } = trpc.artists.getFoundingStatus.useQuery();
+
   const checkoutMutation = trpc.artists.createSubscriptionCheckout.useMutation({
     onSuccess: (data) => {
       if (data.checkoutUrl) {
@@ -150,6 +152,18 @@ export default function ArtistBilling() {
     },
     onError: (err) => {
       toast.error(err.message || "Failed to start checkout. Please try again.");
+      setLoadingTier(null);
+    },
+  });
+
+  const foundingCheckoutMutation = trpc.artists.startFoundingCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to start founding checkout. Please try again.");
       setLoadingTier(null);
     },
   });
@@ -212,12 +226,22 @@ export default function ArtistBilling() {
 
     if (!plan.stripeTierArg) return;
     setLoadingTier(plan.key);
-    await checkoutMutation.mutateAsync({
-      tier: plan.stripeTierArg,
-      interval: yearly ? "year" : "month",
-      successUrl: `${BASE_URL}/artist/billing/success?tier=${plan.canonicalTier}`,
-      cancelUrl: `${BASE_URL}/artist/billing`,
-    });
+
+    const isFoundingActive = plan.key === "pro" && foundingStatus && !foundingStatus.isSoldOut && !yearly;
+
+    if (isFoundingActive) {
+      await foundingCheckoutMutation.mutateAsync({
+        successUrl: `${BASE_URL}/artist/billing/success?tier=artist_pro&founding=true`,
+        cancelUrl: `${BASE_URL}/artist/billing`,
+      });
+    } else {
+      await checkoutMutation.mutateAsync({
+        tier: plan.stripeTierArg,
+        interval: yearly ? "year" : "month",
+        successUrl: `${BASE_URL}/artist/billing/success?tier=${plan.canonicalTier}`,
+        cancelUrl: `${BASE_URL}/artist/billing`,
+      });
+    }
   };
 
   return (
@@ -264,29 +288,51 @@ export default function ArtistBilling() {
 
         {/* Founding Artist Banner */}
         <section className="container mb-2">
-          <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <Crown className="h-8 w-8 text-amber-500 shrink-0" />
-            <div className="flex-1">
-              <p className="font-semibold text-amber-900 dark:text-amber-300">
-                👑 Elite Icon Offer — First 100 Artists Only
-              </p>
-              <p className="text-sm text-amber-800 dark:text-amber-400 mt-0.5">
-                Lock in <strong>Elite sponsored status</strong> with lowest 3% platform fees, unlimited design credits and free messages. Get early-bird pricing today and accelerate your bookings now.
-              </p>
+          {foundingStatus?.isSoldOut ? (
+            <div className="rounded-xl border border-muted bg-muted/30 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 opacity-75">
+              <Crown className="h-8 w-8 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">
+                  👑 Founding Artist Offer — SOLD OUT
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  The Founding Artist offer is now sold out. Standard plans are available below, including a <strong>1-Month Free Trial</strong> on the Pro Studio plan.
+                </p>
+              </div>
+              <Button
+                disabled
+                size="sm"
+                variant="outline"
+                className="border-muted text-muted-foreground shrink-0"
+              >
+                Sold Out
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-400 text-amber-800 hover:bg-amber-100 shrink-0"
-              onClick={() => {
-                document
-                  .getElementById("elite-card")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              Claim Offer
-            </Button>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <Crown className="h-8 w-8 text-amber-500 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-900 dark:text-amber-300">
+                  👑 Founding Artist Pro Offer — First 50 Artists Only
+                </p>
+                <p className="text-sm text-amber-800 dark:text-amber-400 mt-0.5">
+                  Lock in <strong>Pro Studio features</strong> (reduced 5% platform booking fee, unlimited portfolio photos, calendar + deposits, and 50 AI generations/mo) at just <strong>$19/mo</strong> (normally $49/mo) with a <strong>3-Month Free Trial</strong>! Only {50 - (foundingStatus?.count ?? 0)} spots remaining.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-950/40 shrink-0 animate-pulse"
+                onClick={() => {
+                  document
+                    .getElementById("pro-card")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                Claim Pro Offer
+              </Button>
+            </div>
+          )}
         </section>
 
         {/* Plan Cards */}
@@ -295,20 +341,28 @@ export default function ArtistBilling() {
             {PLANS.map((plan) => {
               const isCurrent = plan.key === currentPlan.key;
               const isLoading = loadingTier === plan.key;
-              const price =
+              const isFoundingActive = plan.key === "pro" && foundingStatus && !foundingStatus.isSoldOut;
+              
+              let price =
                 plan.monthlyPrice === 0
                   ? 0
                   : yearly
                   ? plan.yearlyPrice / 100
                   : plan.monthlyPrice / 100;
 
+              if (isFoundingActive && !yearly) {
+                price = 19;
+              }
+
               return (
                 <Card
                   key={plan.key}
-                  id={plan.key === "elite" ? "elite-card" : undefined}
+                  id={plan.key === "elite" ? "elite-card" : plan.key === "pro" ? "pro-card" : undefined}
                   className={cn(
                     "p-6 flex flex-col relative transition-all",
-                    plan.isMostPopular
+                    isFoundingActive && !yearly
+                      ? "border-2 border-emerald-500 bg-gradient-to-br from-emerald-50/60 to-background dark:from-emerald-950/20 shadow-lg scale-[1.02]"
+                      : plan.isMostPopular
                       ? "border-2 border-primary bg-gradient-to-br from-primary/10 to-background shadow-lg scale-[1.02]"
                       : plan.isElite
                       ? "border-2 border-amber-400 bg-amber-50/50 dark:bg-amber-950/10"
@@ -320,7 +374,7 @@ export default function ArtistBilling() {
                   )}
                 >
                   {/* Top badge */}
-                  {plan.badge && !isCurrent && (
+                  {(plan.badge || (isFoundingActive && !yearly)) && !isCurrent && (
                     <div className="absolute top-0 -translate-y-1/2 w-full flex justify-center">
                       <div
                         className={cn(
@@ -330,10 +384,11 @@ export default function ArtistBilling() {
                             : plan.isElite
                             ? "bg-amber-500 text-white"
                             : "bg-blue-500 text-white",
+                          isFoundingActive && !yearly && "bg-emerald-600 text-white",
                         )}
                       >
-                        {plan.isMostPopular && <Crown className="h-3 w-3" />}
-                        {plan.badge}
+                        {isFoundingActive && !yearly ? <Crown className="h-3 w-3" /> : plan.isMostPopular && <Crown className="h-3 w-3" />}
+                        {isFoundingActive && !yearly ? "Founding Offer" : plan.badge}
                       </div>
                     </div>
                   )}
@@ -352,7 +407,9 @@ export default function ArtistBilling() {
                       <div
                         className={cn(
                           "p-3 rounded-full",
-                          plan.isMostPopular
+                          isFoundingActive && !yearly
+                            ? "bg-emerald-100 dark:bg-emerald-950/40"
+                            : plan.isMostPopular
                             ? "bg-primary/20"
                             : plan.isElite
                             ? "bg-amber-100 dark:bg-amber-900/30"
@@ -364,7 +421,9 @@ export default function ArtistBilling() {
                         <plan.Icon
                           className={cn(
                             "h-6 w-6",
-                            plan.isMostPopular
+                            isFoundingActive && !yearly
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : plan.isMostPopular
                               ? "text-primary"
                               : plan.isElite
                               ? "text-amber-500"
@@ -400,6 +459,11 @@ export default function ArtistBilling() {
                             ${(price / 12).toFixed(2)}/mo billed annually
                           </p>
                         )}
+                        {plan.key === "pro" && (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+                            {isFoundingActive && !yearly ? "🔒 Locked-in price + 3-Month Free Trial!" : "🎁 Includes 1-Month Free Trial!"}
+                          </p>
+                        )}
                         {plan.transactionFee && (
                           <p className="text-xs text-muted-foreground mt-1">
                             + {plan.transactionFee}
@@ -413,7 +477,9 @@ export default function ArtistBilling() {
                   <Button
                     className={cn(
                       "w-full mb-5",
-                      plan.isElite && !isCurrent
+                      isFoundingActive && !yearly && !isCurrent
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                        : plan.isElite && !isCurrent
                         ? "bg-amber-500 hover:bg-amber-600 text-white border-0"
                         : plan.key === "payg" && !isCurrent
                         ? "bg-blue-600 hover:bg-blue-700 text-white border-0"
@@ -442,6 +508,8 @@ export default function ArtistBilling() {
                       ? "Start Bidding Free"
                       : isLoading
                       ? "Redirecting..."
+                      : isFoundingActive && !yearly
+                      ? "Claim Pro Offer"
                       : "Upgrade to Pro"}
                   </Button>
 

@@ -1006,8 +1006,8 @@ async function withTransaction(callback) {
   if (!db || !_sqlClient) {
     throw new Error("Database not available for transactions");
   }
-  return _sqlClient.begin(async (sql4) => {
-    const txDb = drizzle(sql4);
+  return _sqlClient.begin(async (sql5) => {
+    const txDb = drizzle(sql5);
     return callback(txDb);
   });
 }
@@ -2084,9 +2084,10 @@ function stripePriceToArtistTier(priceId) {
     stripeArtistProPriceIdMonth,
     stripeArtistProPriceIdYear,
     stripeArtistIconPriceIdMonth,
-    stripeArtistIconPriceIdYear
+    stripeArtistIconPriceIdYear,
+    stripeFoundingArtistPriceId
   } = ENV;
-  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear)
+  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear || priceId === stripeFoundingArtistPriceId)
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
     return "artist_elite";
@@ -2103,13 +2104,17 @@ async function createArtistSubscriptionCheckout({
   cancelUrl
 }) {
   return stripeCircuit.execute(async () => {
+    const isProMonthly = metadata.tier === "artist_pro" && metadata.interval === "month";
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
       metadata,
-      subscription_data: { metadata },
+      subscription_data: {
+        metadata,
+        ...isProMonthly ? { trial_period_days: 30 } : {}
+      },
       success_url: successUrl,
       cancel_url: cancelUrl,
       allow_promotion_codes: true
@@ -2133,7 +2138,7 @@ async function createFoundingArtistCheckout({
       ...stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: customerEmail },
       metadata: { ...metadata, isFoundingArtist: "true" },
       subscription_data: {
-        trial_period_days: 180,
+        trial_period_days: 90,
         metadata: { ...metadata, isFoundingArtist: "true" }
       },
       success_url: successUrl,
@@ -4069,7 +4074,7 @@ init_stripe();
 init_schema();
 init_db();
 init_env();
-import { eq as eq5, and as and4, desc as desc3 } from "drizzle-orm";
+import { eq as eq5, and as and4, desc as desc3, sql as sql4 } from "drizzle-orm";
 import crypto2 from "crypto";
 
 // backend/server/verificationRouter.ts
@@ -5099,9 +5104,20 @@ var appRouter = router({
       });
       return { checkoutUrl: session.url };
     }),
+    getFoundingStatus: publicProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [res] = await database.select({ count: sql4`count(*)::int` }).from(artists).where(eq5(artists.isFoundingArtist, true));
+      const count = res?.count ?? 0;
+      return {
+        count,
+        limit: 50,
+        isSoldOut: count >= 50
+      };
+    }),
     /**
      * Start the Founding Artist checkout:
-     * - 180-day free trial then $19/mo locked rate
+     * - 90-day free trial then $19/mo locked rate
      * - Marks artist with isFoundingArtist=true and sets foundingTrialEndsAt on webhook completion
      */
     startFoundingCheckout: protectedProcedure.input(
@@ -5112,6 +5128,14 @@ var appRouter = router({
     ).mutation(async ({ ctx, input }) => {
       const database = await getDb();
       if (!database) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [foundingCount] = await database.select({ count: sql4`count(*)::int` }).from(artists).where(eq5(artists.isFoundingArtist, true));
+      const count = foundingCount?.count ?? 0;
+      if (count >= 50) {
+        throw new TRPCError6({
+          code: "PRECONDITION_FAILED",
+          message: "The Founding Artist offer is sold out."
+        });
+      }
       const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
       if (!artist) {
         throw new TRPCError6({
@@ -6891,8 +6915,8 @@ app.get("/api/health", async (_req, res) => {
     const db = await Promise.resolve().then(() => (init_db(), db_exports)).then((m) => m.getDb());
     let dbStatus = "disconnected";
     if (db) {
-      const { sql: sql4 } = await import("drizzle-orm");
-      await db.execute(sql4`SELECT 1`);
+      const { sql: sql5 } = await import("drizzle-orm");
+      await db.execute(sql5`SELECT 1`);
       dbStatus = "connected";
     }
     const webhookStats = await getWebhookQueueStats();

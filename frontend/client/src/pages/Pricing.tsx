@@ -6,6 +6,7 @@ import { Check, X, Crown, Zap, Palette } from "lucide-react";
 import { Link } from "wouter";
 import { ARTIST_TIER_LIMITS, ARTIST_TIER_PRICING, type ArtistSubscriptionTier } from "@shared/tierLimits";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 
 const artistTierOrder: ArtistSubscriptionTier[] = [
   "artist_free",
@@ -22,6 +23,8 @@ const ARTIST_TIER_DESCRIPTIONS: Record<ArtistSubscriptionTier, string> = {
 };
 
 export default function Pricing() {
+  const { data: foundingStatus } = trpc.artists.getFoundingStatus.useQuery();
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -53,6 +56,8 @@ export default function Pricing() {
               const pricing = ARTIST_TIER_PRICING[tier];
               const isMostPopular = tier === "artist_pro";
               const isElite = tier === "artist_elite";
+              const isFoundingActive = isMostPopular && foundingStatus && !foundingStatus.isSoldOut;
+              const displayedPrice = isFoundingActive ? 1900 : pricing.monthly;
 
               return (
                 <Card
@@ -68,7 +73,7 @@ export default function Pricing() {
                     <div className="absolute top-0 -translate-y-1/2 w-full flex justify-center">
                       <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
                         <Crown className="h-3 w-3" />
-                        MOST POPULAR
+                        {isFoundingActive ? "FOUNDING OFFER" : "MOST POPULAR"}
                       </div>
                     </div>
                   )}
@@ -89,10 +94,19 @@ export default function Pricing() {
                       {limits.name}
                     </h2>
                     <div className="text-4xl font-bold mb-1">
-                      ${pricing.monthly / 100}
+                      ${displayedPrice / 100}
                       <span className="text-xl text-muted-foreground">/mo</span>
                     </div>
-                    {tier === "artist_pro" && (
+                    {isFoundingActive ? (
+                      <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
+                        🔒 Locked-in price + 3-Month Free Trial!
+                      </div>
+                    ) : isMostPopular ? (
+                      <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
+                        🎁 Includes 1-Month Free Trial!
+                      </div>
+                    ) : null}
+                    {tier === "artist_pro" && !isFoundingActive && (
                       <div className="text-xs text-muted-foreground mb-1">or $490/yr (2 months free)</div>
                     )}
                     {tier === "artist_elite" && (
@@ -138,8 +152,14 @@ export default function Pricing() {
           </div>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Founding Artist spots are limited to the first 100 qualifying artists.
-            Requires a complete portfolio and 3+ bid responses within 60 days.
+            {foundingStatus?.isSoldOut ? (
+              <span>👑 Founding Artist Offer is now SOLD OUT! Standard pricing applies.</span>
+            ) : (
+              <span>
+                Founding Artist spots are limited to the first 50 qualifying artists ({50 - (foundingStatus?.count ?? 0)} spots remaining).
+                Requires a complete portfolio and 3+ bid responses within 60 days.
+              </span>
+            )}
           </p>
         </section>
 
