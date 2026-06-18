@@ -62,17 +62,34 @@ function serializeUnknownError(error: unknown) {
 }
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", async (reason, promise) => {
   logger.error("Unhandled Rejection at:", {
     promise,
     reason: serializeUnknownError(reason),
   });
+  try {
+    const sentry = await import("./sentry");
+    sentry.captureException(reason, {
+      type: "unhandledRejection",
+      promise: String(promise),
+    });
+  } catch (err) {
+    // Avoid crashing the error handler itself
+  }
 });
 
 // Handle uncaught exceptions
-process.on("uncaughtException", (error) => {
+process.on("uncaughtException", async (error) => {
   logger.error("Uncaught Exception:", {
     error: serializeUnknownError(error),
   });
-  process.exit(1);
+  try {
+    const sentry = await import("./sentry");
+    sentry.captureException(error, { type: "uncaughtException" });
+    await sentry.flushSentry(2000);
+  } catch (err) {
+    // Avoid crashing the error handler itself
+  } finally {
+    process.exit(1);
+  }
 });

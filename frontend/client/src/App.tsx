@@ -15,6 +15,23 @@ import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import ForArtists from "./pages/ForArtists";
+import Pricing from "./pages/Pricing";
+import Help from "./pages/Help";
+import CancellationPolicy from "./pages/CancellationPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import ArtistRegister from "./pages/ArtistRegister";
+import NewRequest from "./pages/NewRequest";
+import RequestBoard from "./pages/RequestBoard";
+import RequestDetail from "./pages/RequestDetail";
+import ClientDashboard from "./pages/ClientDashboard";
+import DesignLab from "./pages/DesignLab";
+import ArtistDesignLab from "./pages/ArtistDesignLab";
+import ArtistBilling from "./pages/ArtistBilling";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import LicenseUpload from "./pages/LicenseUpload";
+import ArtistSignupLanding from "./pages/ArtistSignupLanding";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -38,6 +55,27 @@ function Router() {
       <Route path="/signup" component={Login} />
       <Route path="/dashboard" component={Dashboard} />
 
+      {/* Informational Pages */}
+      <Route path="/for-artists" component={ForArtists} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/help" component={Help} />
+      <Route path="/cancellation-policy" component={CancellationPolicy} />
+      <Route path="/terms-of-service" component={TermsOfService} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+
+      {/* Active Feature Pages */}
+      <Route path="/artist/register"><Redirect to="/artist/signup" /></Route>
+      <Route path="/artist/signup" component={ArtistSignupLanding} />
+      <Route path="/client/new-request" component={NewRequest} />
+      <Route path="/requests" component={RequestBoard} />
+      <Route path="/requests/:id" component={RequestDetail} />
+      <Route path="/client/dashboard" component={ClientDashboard} />
+      <Route path="/client/design-lab" component={DesignLab} />
+      <Route path="/artist/design-lab" component={ArtistDesignLab} />
+      <Route path="/artist/billing" component={ArtistBilling} />
+      <Route path="/artist/billing/success" component={SubscriptionSuccess} />
+      <Route path="/license-upload" component={LicenseUpload} />
+
       {/* Supporting Auth routes */}
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/forgot-password" component={ForgotPassword} />
@@ -45,31 +83,15 @@ function Router() {
 
       {/* Redirects for retired pages */}
       <Route path="/artist-finder"><Redirect to="/artists" /></Route>
-      <Route path="/for-artists"><Redirect to="/" /></Route>
       <Route path="/cover-ups"><Redirect to="/" /></Route>
       <Route path="/tattoo-planning"><Redirect to="/" /></Route>
       <Route path="/request-flow"><Redirect to="/dashboard" /></Route>
       <Route path="/artist-dashboard"><Redirect to="/dashboard" /></Route>
       <Route path="/client/onboarding"><Redirect to="/dashboard" /></Route>
-      <Route path="/client/dashboard"><Redirect to="/dashboard" /></Route>
-      <Route path="/client/new-request"><Redirect to="/dashboard" /></Route>
-      <Route path="/requests"><Redirect to="/dashboard" /></Route>
-      <Route path="/requests/:id"><Redirect to="/dashboard" /></Route>
-      <Route path="/client/design-lab"><Redirect to="/dashboard" /></Route>
-      <Route path="/artist/register"><Redirect to="/dashboard" /></Route>
-      <Route path="/artist/design-lab"><Redirect to="/dashboard" /></Route>
-      <Route path="/artist/billing"><Redirect to="/dashboard" /></Route>
-      <Route path="/artist/billing/success"><Redirect to="/dashboard" /></Route>
       <Route path="/admin"><Redirect to="/dashboard" /></Route>
       <Route path="/admin/moderation"><Redirect to="/dashboard" /></Route>
-      <Route path="/help"><Redirect to="/" /></Route>
-      <Route path="/pricing"><Redirect to="/" /></Route>
-      <Route path="/cancellation-policy"><Redirect to="/" /></Route>
-      <Route path="/terms-of-service"><Redirect to="/" /></Route>
-      <Route path="/terms"><Redirect to="/" /></Route>
-      <Route path="/privacy-policy"><Redirect to="/" /></Route>
-      <Route path="/privacy"><Redirect to="/" /></Route>
-      <Route path="/license-upload"><Redirect to="/dashboard" /></Route>
+      <Route path="/terms"><Redirect to="/terms-of-service" /></Route>
+      <Route path="/privacy"><Redirect to="/privacy-policy" /></Route>
 
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
@@ -79,11 +101,21 @@ function Router() {
 }
 
 function usesPageHeader(path: string) {
+  const customPages = [
+    "/artists",
+    "/dashboard",
+    "/404",
+    "/for-artists",
+    "/pricing",
+    "/help",
+    "/cancellation-policy",
+    "/terms-of-service",
+    "/privacy-policy",
+    "/client/design-lab",
+  ];
   return (
-    path === "/artists" ||
-    path.startsWith("/artist/") ||
-    path === "/dashboard" ||
-    path === "/404"
+    customPages.includes(path) ||
+    path.startsWith("/artist/")
   );
 }
 

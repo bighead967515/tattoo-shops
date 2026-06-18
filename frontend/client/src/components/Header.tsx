@@ -48,7 +48,7 @@ export default function Header() {
               Browse Artists
             </Link>
             <Link
-              href="/dashboard"
+              href="/for-artists"
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               For Artists

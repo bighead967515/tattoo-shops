@@ -82,6 +82,7 @@ export default function Dashboard() {
 }
 
 function OnboardingSelector() {
+  const [, setLocation] = useLocation();
   const [mode, setMode] = useState<"select" | "client" | "artist">("select");
 
   useEffect(() => {
@@ -105,15 +106,10 @@ function OnboardingSelector() {
   }
 
   if (mode === "artist") {
-    return (
-      <div>
-        <div className="container py-4 flex justify-between items-center border-b">
-          <Button variant="ghost" onClick={() => setMode("select")}>← Back</Button>
-          <span className="font-semibold text-muted-foreground">Artist Registration</span>
-        </div>
-        <ArtistRegister />
-      </div>
-    );
+    useEffect(() => {
+      setLocation("/artist/signup");
+    }, []);
+    return null;
   }
 
   return (

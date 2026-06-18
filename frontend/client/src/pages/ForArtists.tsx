@@ -54,7 +54,7 @@ export default function ForArtists() {
             <Button
               size="lg"
               className="w-full text-lg px-10 py-6 shadow-lg shadow-primary/20 sm:w-auto"
-              onClick={() => setLocation("/artist/register")}
+              onClick={() => setLocation("/artist/signup")}
             >
               Join as a tattoo artist
               <ArrowRight className="ml-2 w-5 h-5" />
@@ -152,7 +152,7 @@ export default function ForArtists() {
                 <Button
                   size="lg"
                   className="w-full text-lg py-6 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg shadow-primary/25"
-                  onClick={() => setLocation("/artist/register")}
+                  onClick={() => setLocation("/artist/signup")}
                 >
                   Apply for Elite Icon
                   <ArrowRight className="ml-2 w-5 h-5" />
@@ -186,7 +186,7 @@ export default function ForArtists() {
                   ))}
                 </ul>
               </div>
-              <Button variant="outline" className="w-full mt-auto" onClick={() => setLocation("/artist/register")}>Get Started</Button>
+              <Button variant="outline" className="w-full mt-auto" onClick={() => setLocation("/artist/signup")}>Get Started</Button>
             </Card>
 
             {/* Pay-as-you-go */}
@@ -204,7 +204,7 @@ export default function ForArtists() {
                   ))}
                 </ul>
               </div>
-              <Button className="w-full mt-auto" onClick={() => setLocation("/artist/register")}>Choose Pay-as-you-go</Button>
+              <Button className="w-full mt-auto" onClick={() => setLocation("/artist/signup")}>Choose Pay-as-you-go</Button>
             </Card>
 
             {/* Pro */}
@@ -233,7 +233,7 @@ export default function ForArtists() {
                   ))}
                 </ul>
               </div>
-              <Button className="w-full mt-auto bg-primary hover:bg-primary/95" onClick={() => setLocation("/artist/register")}>Get Pro Studio</Button>
+              <Button className="w-full mt-auto bg-primary hover:bg-primary/95" onClick={() => setLocation("/artist/signup")}>Get Pro Studio</Button>
             </Card>
 
             {/* Elite */}
@@ -262,7 +262,7 @@ export default function ForArtists() {
                   ))}
                 </ul>
               </div>
-              <Button className="w-full mt-auto bg-accent hover:bg-accent/90 text-accent-foreground font-bold" onClick={() => setLocation("/artist/register")}>Get Elite Icon</Button>
+              <Button className="w-full mt-auto bg-accent hover:bg-accent/90 text-accent-foreground font-bold" onClick={() => setLocation("/artist/signup")}>Get Elite Icon</Button>
             </Card>
           </div>
         </div>
@@ -299,7 +299,7 @@ export default function ForArtists() {
           <Button
             size="lg"
             className="w-full text-lg px-12 py-6 shadow-lg shadow-primary/20 sm:w-auto"
-            onClick={() => setLocation("/artist/register")}
+            onClick={() => setLocation("/artist/signup")}
           >
             Join as a tattoo artist
             <ArrowRight className="ml-2 w-5 h-5" />

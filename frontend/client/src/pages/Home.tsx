@@ -291,7 +291,7 @@ export default function Home() {
         </div>
 
         <div className="mt-10 text-center">
-          <Button size="lg" className="w-full sm:w-auto" variant="outline" onClick={() => setLocation("/artist/register")}> 
+          <Button size="lg" className="w-full sm:w-auto" variant="outline" onClick={() => setLocation("/artist/signup")}> 
             Join as a tattoo artist
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
@@ -585,7 +585,7 @@ export default function Home() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => setLocation("/artist/register")}
+              onClick={() => setLocation("/artist/signup")}
             >
               Join as a tattoo artist
             </Button>
@@ -616,7 +616,7 @@ export default function Home() {
                     </Link>
                   </li>
                   <li>
-                    <Link href="/dashboard" className="hover:text-primary">
+                    <Link href="/for-artists" className="hover:text-primary">
                       For Artists
                     </Link>
                   </li>

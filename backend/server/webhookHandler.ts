@@ -93,13 +93,13 @@ async function processWebhookEvent(
         : 0;
 
       // Update booking with payment information - use transaction for atomicity
-      await db.withTransaction(async () => {
+      await db.withTransaction(async (tx) => {
         await db.updateBooking(bookingId, {
           stripePaymentIntentId: session.payment_intent as string,
           depositAmount,
           depositPaid: true,
           status: "confirmed",
-        });
+        }, tx);
       });
 
       logger.info("Payment confirmed for booking", { bookingId });

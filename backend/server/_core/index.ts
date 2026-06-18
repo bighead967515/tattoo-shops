@@ -255,6 +255,102 @@ app.use(csrfProtectionMiddleware); // Verify CSRF on mutations
 // Supabase auth routes under /api/auth
 registerSupabaseAuthRoutes(app);
 
+// Enqueue-first image analysis route for Supabase Storage webhook triggers
+app.post("/api/portfolio/enqueue-analysis", async (req: Request, res: Response) => {
+  try {
+    // 1. Verify Authorization Bearer token matches JWT_SECRET
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
+      return;
+    }
+    const token = authHeader.substring(7);
+    if (token !== ENV.jwtSecret) {
+      res.status(401).json({ error: "Unauthorized: Invalid API secret" });
+      return;
+    }
+
+    const { bucketId, filePath } = req.body;
+
+    // 2. Re-validate payload (Reduce blast radius)
+    const ALLOWED_BUCKETS = ["portfolio-images", "request-images"];
+    const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic"];
+
+    if (!bucketId || !ALLOWED_BUCKETS.includes(bucketId)) {
+      res.status(400).json({ error: `Invalid or disallowed bucket: ${bucketId}` });
+      return;
+    }
+
+    if (typeof filePath !== "string" || !filePath.trim()) {
+      res.status(400).json({ error: "Invalid or empty filePath" });
+      return;
+    }
+
+    const lowercasePath = filePath.toLowerCase();
+    const hasAllowedExtension = ALLOWED_EXTENSIONS.some(ext => lowercasePath.endsWith(ext));
+    if (!hasAllowedExtension) {
+      res.status(400).json({ error: "File extension not allowed" });
+      return;
+    }
+
+    // 3. Process asynchronously (Enqueue immediately and return 202 Accepted)
+    const { getPublicUrl } = await import("./supabaseStorage");
+    const { analyzePortfolioImage } = await import("../geminiVision");
+    const db = await import("../db");
+
+    const imageUrl = getPublicUrl(bucketId, filePath);
+
+    logger.info("Enqueuing background portfolio image analysis", { bucketId, filePath });
+    
+    db.getDb().then(async (database) => {
+      if (!database) {
+        logger.error("Database unavailable for background analysis update");
+        return;
+      }
+      
+      const { portfolioImages } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [existingImage] = await database
+        .select()
+        .from(portfolioImages)
+        .where(eq(portfolioImages.imageKey, filePath))
+        .limit(1);
+
+      if (!existingImage) {
+        logger.warn("No portfolio image database record found yet for key; background analysis postponed or will retry via batch cron", { filePath });
+        return;
+      }
+
+      analyzePortfolioImage(imageUrl)
+        .then(async (analysis) => {
+          if (analysis.qualityScore > 0) {
+            await db.updatePortfolioImageAI(existingImage.id, {
+              aiStyles: JSON.stringify(analysis.styles),
+              aiTags: JSON.stringify(analysis.tags),
+              aiDescription: analysis.description,
+              qualityScore: analysis.qualityScore,
+              qualityIssues: JSON.stringify(analysis.qualityIssues),
+              aiProcessedAt: new Date(),
+            });
+            logger.info("Background portfolio image analysis completed and updated in database", { imageId: existingImage.id });
+          }
+        })
+        .catch((err) => {
+          logger.error("Background Gemini analysis failed:", err);
+        });
+    }).catch((err) => {
+      logger.error("Failed to load database for background analysis:", err);
+    });
+
+    res.status(202).json({ success: true, message: "Analysis enqueued successfully" });
+
+  } catch (error) {
+    logger.error("Failed to enqueue image analysis:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // Health check endpoint for monitoring
 // Returns status of all critical dependencies: database, storage, webhook queue, Stripe connectivity
 app.get("/api/health", async (_req, res) => {
@@ -287,7 +383,7 @@ app.get("/api/health", async (_req, res) => {
     const overallStatus =
       dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
 
-    const httpStatus = overallStatus === "ok" ? 200 : 503;
+    const httpStatus = dbStatus === "connected" ? 200 : 503;
 
     res.status(httpStatus).json({
       status: overallStatus,

@@ -123,7 +123,52 @@ var init_env = __esm({
   }
 });
 
+// backend/server/_core/supabase.ts
+import { createClient } from "@supabase/supabase-js";
+var supabaseAdmin;
+var init_supabase = __esm({
+  "backend/server/_core/supabase.ts"() {
+    "use strict";
+    init_env();
+    supabaseAdmin = createClient(
+      ENV.supabaseUrl,
+      ENV.supabaseServiceKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+  }
+});
+
 // backend/drizzle/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  artists: () => artists,
+  bidStatusEnum: () => bidStatusEnum,
+  bids: () => bids,
+  bookingStatusEnum: () => bookingStatusEnum,
+  bookings: () => bookings,
+  clients: () => clients,
+  favorites: () => favorites,
+  flashArt: () => flashArt,
+  invitations: () => invitations,
+  portfolioImages: () => portfolioImages,
+  requestImages: () => requestImages,
+  requestMessages: () => requestMessages,
+  requestStatusEnum: () => requestStatusEnum,
+  reviews: () => reviews,
+  roleEnum: () => roleEnum,
+  shops: () => shops,
+  tattooRequests: () => tattooRequests,
+  users: () => users,
+  verificationDocuments: () => verificationDocuments,
+  verificationStatusEnum: () => verificationStatusEnum,
+  webhookQueue: () => webhookQueue,
+  webhookStatusEnum: () => webhookStatusEnum
+});
 import {
   bigint,
   serial,
@@ -625,6 +670,121 @@ var init_schema = __esm({
   }
 });
 
+// backend/server/_core/sentry.ts
+var sentry_exports = {};
+__export(sentry_exports, {
+  addBreadcrumb: () => addBreadcrumb2,
+  captureException: () => captureException2,
+  captureMessage: () => captureMessage2,
+  flushSentry: () => flushSentry,
+  initSentry: () => initSentry,
+  isSentryInitialized: () => isSentryInitialized,
+  sentryErrorHandler: () => sentryErrorHandler,
+  sentryRequestHandler: () => sentryRequestHandler,
+  setUser: () => setUser2,
+  startTransaction: () => startTransaction
+});
+import * as Sentry from "@sentry/node";
+function initSentry() {
+  const dsn = process.env.SENTRY_DSN || "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752";
+  if (!dsn) {
+    logger.warn("SENTRY_DSN not configured - error tracking disabled");
+    return;
+  }
+  if (initialized) {
+    logger.debug("Sentry already initialized");
+    return;
+  }
+  try {
+    Sentry.init({
+      dsn,
+      environment: process.env.NODE_ENV || "development",
+      release: process.env.npm_package_version || "unknown",
+      // Performance monitoring
+      tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1,
+      // Integrations
+      integrations: [
+        // Express integration is automatically added
+        Sentry.httpIntegration(),
+        Sentry.expressIntegration()
+      ],
+      // Filter out noisy errors
+      beforeSend(event, hint) {
+        const error = hint.originalException;
+        if (error instanceof Error && error.message.includes("401")) {
+          return null;
+        }
+        if (error instanceof Error && error.message.includes("rate limit")) {
+          return null;
+        }
+        return event;
+      },
+      // Tag important info
+      initialScope: {
+        tags: {
+          component: "backend"
+        }
+      }
+    });
+    initialized = true;
+    logger.info("Sentry error tracking initialized");
+  } catch (err) {
+    logger.error("Failed to initialize Sentry", {
+      error: err instanceof Error ? err.message : String(err)
+    });
+  }
+}
+function captureException2(error, context) {
+  if (!initialized) {
+    return void 0;
+  }
+  return Sentry.captureException(error, {
+    extra: context
+  });
+}
+function captureMessage2(message, level = "info", context) {
+  if (!initialized) {
+    return void 0;
+  }
+  return Sentry.captureMessage(message, {
+    level,
+    extra: context
+  });
+}
+function setUser2(user) {
+  if (!initialized) return;
+  Sentry.setUser(user);
+}
+function addBreadcrumb2(breadcrumb) {
+  if (!initialized) return;
+  Sentry.addBreadcrumb(breadcrumb);
+}
+function startTransaction(name, op) {
+  if (!initialized) return void 0;
+  return Sentry.startSpan({ name, op }, (span) => span);
+}
+function sentryErrorHandler() {
+  return Sentry.expressErrorHandler();
+}
+function sentryRequestHandler() {
+  return Sentry.expressIntegration().setupOnce;
+}
+async function flushSentry(timeout = 2e3) {
+  if (!initialized) return true;
+  return Sentry.close(timeout);
+}
+function isSentryInitialized() {
+  return initialized;
+}
+var initialized;
+var init_sentry = __esm({
+  "backend/server/_core/sentry.ts"() {
+    "use strict";
+    init_logger();
+    initialized = false;
+  }
+});
+
 // backend/server/_core/logger.ts
 import winston from "winston";
 function serializeUnknownError(error) {
@@ -682,17 +842,32 @@ var init_logger = __esm({
       defaultMeta: { service: "tattoo-shops-api" },
       transports
     });
-    process.on("unhandledRejection", (reason, promise) => {
+    process.on("unhandledRejection", async (reason, promise) => {
       logger.error("Unhandled Rejection at:", {
         promise,
         reason: serializeUnknownError(reason)
       });
+      try {
+        const sentry = await Promise.resolve().then(() => (init_sentry(), sentry_exports));
+        sentry.captureException(reason, {
+          type: "unhandledRejection",
+          promise: String(promise)
+        });
+      } catch (err) {
+      }
     });
-    process.on("uncaughtException", (error) => {
+    process.on("uncaughtException", async (error) => {
       logger.error("Uncaught Exception:", {
         error: serializeUnknownError(error)
       });
-      process.exit(1);
+      try {
+        const sentry = await Promise.resolve().then(() => (init_sentry(), sentry_exports));
+        sentry.captureException(error, { type: "uncaughtException" });
+        await sentry.flushSentry(2e3);
+      } catch (err) {
+      } finally {
+        process.exit(1);
+      }
     });
   }
 });
@@ -794,11 +969,14 @@ async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const dbUrl = process.env.DATABASE_URL.replace(/^DATABASE_URL=/, "");
+      const maxPoolSize = parseInt(process.env.DATABASE_POOL_SIZE || "3", 10);
       _sqlClient = postgres(dbUrl, {
-        max: 10,
-        // Supabase free tier has a 60 connection limit; keep pool small
-        idle_timeout: 30,
-        // Close idle connections after 30 seconds
+        max: maxPoolSize,
+        // Keep pool small to avoid pool exhaustion in serverless/lambdas
+        idle_timeout: 10,
+        // Close idle connections faster to free up resources (10s)
+        max_lifetime: 60 * 15,
+        // Close connections after 15 minutes to refresh connections
         connect_timeout: 10,
         // 10 second connection timeout (Render cold starts are slow)
         prepare: false,
@@ -814,7 +992,7 @@ async function getDb() {
       });
       _db = drizzle(_sqlClient);
       logger.info("Database connection pool initialized", {
-        maxConnections: 20
+        maxConnections: maxPoolSize
       });
     } catch (error) {
       logger.error("Database connection failed", { error });
@@ -1109,10 +1287,10 @@ async function getBookingsByArtistId(artistId) {
   if (!db) return [];
   return await db.select().from(bookings).where(eq(bookings.artistId, artistId)).orderBy(desc(bookings.createdAt));
 }
-async function updateBooking(id, data) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.update(bookings).set(data).where(eq(bookings.id, id));
+async function updateBooking(id, data, tx) {
+  const client = tx || await getDb();
+  if (!client) throw new Error("Database not available");
+  return await client.update(bookings).set(data).where(eq(bookings.id, id));
 }
 async function addFavorite(favorite) {
   const db = await getDb();
@@ -1543,6 +1721,315 @@ var init_circuitBreaker = __esm({
   }
 });
 
+// backend/server/_core/supabaseStorage.ts
+var supabaseStorage_exports = {};
+__export(supabaseStorage_exports, {
+  BUCKETS: () => BUCKETS,
+  createSignedUploadUrl: () => createSignedUploadUrl,
+  createSignedUrl: () => createSignedUrl,
+  deleteFile: () => deleteFile,
+  deleteFiles: () => deleteFiles,
+  getPublicUrl: () => getPublicUrl,
+  initializeBuckets: () => initializeBuckets,
+  listFiles: () => listFiles,
+  uploadFile: () => uploadFile
+});
+async function uploadFile(bucketName, path7, data, contentType) {
+  const { error } = await supabaseAdmin.storage.from(bucketName).upload(path7, data, {
+    contentType,
+    upsert: true
+    // Overwrite if exists
+  });
+  if (error) {
+    console.error(`[Storage] Upload to bucket "${bucketName}" failed:`, error);
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
+}
+async function deleteFile(bucketName, path7) {
+  const { error } = await supabaseAdmin.storage.from(bucketName).remove([path7]);
+  if (error) {
+    console.error(
+      `[Storage] Delete from bucket "${bucketName}" failed:`,
+      error
+    );
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
+}
+async function deleteFiles(bucketName, paths) {
+  const { error } = await supabaseAdmin.storage.from(bucketName).remove(paths);
+  if (error) {
+    console.error(
+      `[Storage] Batch delete from bucket "${bucketName}" failed:`,
+      error
+    );
+    throw new Error(`Failed to delete files: ${error.message}`);
+  }
+}
+function getPublicUrl(bucketName, path7) {
+  const { data } = supabaseAdmin.storage.from(bucketName).getPublicUrl(path7);
+  return data.publicUrl;
+}
+async function createSignedUrl(bucketName, path7, expiresIn = 3600) {
+  const { data, error } = await supabaseAdmin.storage.from(bucketName).createSignedUrl(path7, expiresIn);
+  if (error) {
+    console.error(
+      `[Storage] Create signed URL for bucket "${bucketName}" failed:`,
+      error
+    );
+    throw new Error(`Failed to create signed URL: ${error.message}`);
+  }
+  return data.signedUrl;
+}
+async function createSignedUploadUrl(bucketName, path7) {
+  const { data, error } = await supabaseAdmin.storage.from(bucketName).createSignedUploadUrl(path7);
+  if (error) {
+    console.error(
+      `[Storage] Create signed upload URL for bucket "${bucketName}" failed:`,
+      error
+    );
+    throw new Error(`Failed to create signed upload URL: ${error.message}`);
+  }
+  return { signedUrl: data.signedUrl, path: path7 };
+}
+async function listFiles(bucketName, path7) {
+  const { data, error } = await supabaseAdmin.storage.from(bucketName).list(path7);
+  if (error) {
+    console.error(
+      `[Storage] List files in bucket "${bucketName}" failed:`,
+      error
+    );
+    throw new Error(`Failed to list files: ${error.message}`);
+  }
+  return data;
+}
+async function initializeBuckets() {
+  const { data: existingBuckets, error: listError } = await supabaseAdmin.storage.listBuckets();
+  if (listError) {
+    console.error("[Storage] Failed to list buckets:", listError);
+    throw new Error(`Failed to list storage buckets: ${listError.message}`);
+  }
+  const summary = {
+    existing: [],
+    created: [],
+    failed: []
+  };
+  for (const config of BUCKET_CONFIGS) {
+    const bucketExists = existingBuckets.some((b) => b.name === config.name);
+    if (!bucketExists) {
+      console.log(`[Storage] Bucket "${config.name}" not found. Creating...`);
+      const { error: createError } = await supabaseAdmin.storage.createBucket(
+        config.name,
+        {
+          public: config.public,
+          fileSizeLimit: config.fileSizeLimit,
+          allowedMimeTypes: config.allowedMimeTypes
+        }
+      );
+      if (createError) {
+        console.error(
+          `[Storage] Failed to create bucket "${config.name}":`,
+          createError
+        );
+        const statusCode = createError.statusCode;
+        const permissionHint = statusCode === "403" ? " Check SUPABASE_SERVICE_KEY on this environment; bucket creation requires a service_role key." : "";
+        summary.failed.push({
+          name: config.name,
+          message: `${createError.message}.${permissionHint}`.trim()
+        });
+      } else {
+        console.log(`[Storage] Bucket "${config.name}" created successfully.`);
+        summary.created.push(config.name);
+      }
+    } else {
+      summary.existing.push(config.name);
+    }
+  }
+  if (summary.failed.length > 0) {
+    const failedBuckets = summary.failed.map((f) => f.name).join(", ");
+    throw new Error(`Storage bucket initialization failed for: ${failedBuckets}`);
+  }
+  return summary;
+}
+var BUCKETS, BUCKET_CONFIGS;
+var init_supabaseStorage = __esm({
+  "backend/server/_core/supabaseStorage.ts"() {
+    "use strict";
+    init_supabase();
+    BUCKETS = {
+      PORTFOLIO_IMAGES: "portfolio-images",
+      REQUEST_IMAGES: "request-images",
+      ID_DOCUMENTS: "id-documents"
+    };
+    BUCKET_CONFIGS = [
+      {
+        name: BUCKETS.PORTFOLIO_IMAGES,
+        public: true,
+        fileSizeLimit: 5242880,
+        // 5MB
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+      },
+      {
+        name: BUCKETS.REQUEST_IMAGES,
+        public: true,
+        fileSizeLimit: 5242880,
+        // 5MB
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+      },
+      {
+        name: BUCKETS.ID_DOCUMENTS,
+        public: false,
+        // PRIVATE
+        fileSizeLimit: 10485760,
+        // 10MB
+        allowedMimeTypes: [
+          "image/jpeg",
+          "image/png",
+          "image/jpg",
+          "application/pdf"
+        ]
+      }
+    ];
+  }
+});
+
+// backend/server/_core/aiProviders.ts
+import OpenAI from "openai";
+function sleep2(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function stripCodeFences(text2) {
+  const trimmed = text2.trim();
+  if (!trimmed.startsWith("```")) return trimmed;
+  return trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+}
+function parseJsonFromModel(text2) {
+  const stripped = stripCodeFences(text2);
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    const match = stripped.match(/\{[\s\S]*\}/);
+    if (!match) {
+      throw new Error("No JSON object found in model response");
+    }
+    return JSON.parse(match[0]);
+  }
+}
+async function groqGenerateJson(systemPrompt, userPrompt, options) {
+  const response = await groqClient.chat.completions.create({
+    model: options?.model || DEFAULT_GROQ_MODEL,
+    temperature: options?.temperature ?? 0.2,
+    max_tokens: options?.maxTokens ?? 2e3,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ]
+  });
+  const content = response.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Groq returned an empty response");
+  }
+  return parseJsonFromModel(content);
+}
+async function huggingFaceRequest(model, init2, retries = 2) {
+  const response = await fetch(`${HF_BASE_URL}/${model}`, {
+    ...init2,
+    headers: {
+      Authorization: `Bearer ${ENV.huggingFaceApiKey}`,
+      ...init2.headers || {}
+    }
+  });
+  if (response.status === 503 && retries > 0) {
+    try {
+      const loading = await response.clone().json();
+      const waitMs = Math.min(
+        1e4,
+        Math.max(1e3, Math.round((loading.estimated_time ?? 1) * 1e3))
+      );
+      await sleep2(waitMs);
+    } catch {
+      await sleep2(1500);
+    }
+    return huggingFaceRequest(model, init2, retries - 1);
+  }
+  return response;
+}
+async function generateImageWithHuggingFace(prompt) {
+  const response = await huggingFaceRequest(DEFAULT_HF_IMAGE_MODEL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "image/png"
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      options: { wait_for_model: true }
+    })
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(
+      `Hugging Face image generation failed (${response.status}): ${details.slice(0, 400)}`
+    );
+  }
+  const contentType = response.headers.get("content-type") || "image/png";
+  if (contentType.includes("application/json")) {
+    const details = await response.text();
+    throw new Error(
+      `Hugging Face image generation returned JSON instead of image: ${details.slice(0, 400)}`
+    );
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return {
+    buffer,
+    mimeType: contentType.split(";")[0]
+  };
+}
+async function imageToTextWithHuggingFace(imageBuffer, mimeType, purpose) {
+  const model = purpose === "ocr" ? DEFAULT_HF_OCR_MODEL : DEFAULT_HF_CAPTION_MODEL;
+  const response = await huggingFaceRequest(model, {
+    method: "POST",
+    headers: {
+      "Content-Type": mimeType,
+      Accept: "application/json"
+    },
+    body: imageBuffer
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(
+      `Hugging Face ${purpose} request failed (${response.status}): ${details.slice(0, 400)}`
+    );
+  }
+  const payload = await response.json();
+  if (typeof payload === "string") {
+    return payload.trim();
+  }
+  if (Array.isArray(payload)) {
+    const first = payload[0];
+    if (!first) return "";
+    return String(first.generated_text || first.text || "").trim();
+  }
+  return String(payload.generated_text || payload.text || "").trim();
+}
+var GROQ_BASE_URL, DEFAULT_GROQ_MODEL, HF_BASE_URL, DEFAULT_HF_IMAGE_MODEL, DEFAULT_HF_CAPTION_MODEL, DEFAULT_HF_OCR_MODEL, groqClient;
+var init_aiProviders = __esm({
+  "backend/server/_core/aiProviders.ts"() {
+    "use strict";
+    init_env();
+    GROQ_BASE_URL = ENV.groqBaseUrl || "https://api.groq.com/openai/v1";
+    DEFAULT_GROQ_MODEL = ENV.groqModel || "llama-3.3-70b-versatile";
+    HF_BASE_URL = "https://api-inference.huggingface.co/models";
+    DEFAULT_HF_IMAGE_MODEL = ENV.huggingFaceImageModel || "stabilityai/stable-diffusion-xl-base-1.0";
+    DEFAULT_HF_CAPTION_MODEL = ENV.huggingFaceCaptionModel || "Salesforce/blip-image-captioning-large";
+    DEFAULT_HF_OCR_MODEL = ENV.huggingFaceOcrModel || "microsoft/trocr-base-printed";
+    groqClient = new OpenAI({
+      apiKey: ENV.groqApiKey,
+      baseURL: GROQ_BASE_URL
+    });
+  }
+});
+
 // backend/server/stripe.ts
 var stripe_exports = {};
 __export(stripe_exports, {
@@ -1695,6 +2182,169 @@ var init_stripe = __esm({
   }
 });
 
+// backend/server/geminiVision.ts
+var geminiVision_exports = {};
+__export(geminiVision_exports, {
+  analyzePortfolioImage: () => analyzePortfolioImage
+});
+import dns from "dns";
+import { isIPv4, isIPv6 } from "net";
+function sanitizeUrlForLogging(url) {
+  try {
+    const parsed2 = new URL(url);
+    return `${parsed2.origin}${parsed2.pathname}`;
+  } catch {
+    return "[invalid-url]";
+  }
+}
+function isPrivateOrReservedIp(ip) {
+  const v4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (v4Mapped) return isPrivateOrReservedIp(v4Mapped[1]);
+  if (isIPv4(ip)) {
+    const parts = ip.split(".").map(Number);
+    if (parts.some((p) => isNaN(p))) return true;
+    const [a, b] = parts;
+    if (ip === "0.0.0.0") return true;
+    if (a === 127) return true;
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    return false;
+  }
+  if (isIPv6(ip)) {
+    const lower = ip.toLowerCase();
+    if (lower === "::1") return true;
+    if (lower === "::") return true;
+    if (/^f[cd]/i.test(lower)) return true;
+    if (/^fe[89ab]/i.test(lower)) return true;
+    if (lower.startsWith("::ffff:")) return true;
+    return false;
+  }
+  return true;
+}
+async function analyzePortfolioImage(imageUrl) {
+  if (!await isAiEnabled()) {
+    logger.info("AI features gated (< 100 users). Skipping portfolio image analysis.");
+    return DEFAULT_GATED_ANALYSIS;
+  }
+  try {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(imageUrl);
+    } catch {
+      logger.warn(
+        `Invalid image URL for analysis: ${sanitizeUrlForLogging(imageUrl)}`
+      );
+      return DEFAULT_ANALYSIS;
+    }
+    if (parsedUrl.protocol !== "https:") {
+      logger.warn(`Rejected non-HTTPS image URL: ${parsedUrl.protocol}`);
+      return DEFAULT_ANALYSIS;
+    }
+    const hostname = parsedUrl.hostname.toLowerCase();
+    try {
+      const resolvedAddresses = await dns.promises.lookup(hostname, {
+        all: true
+      });
+      for (const { address } of resolvedAddresses) {
+        if (isPrivateOrReservedIp(address)) {
+          logger.warn(
+            `Rejected image URL resolving to private/reserved IP: ${hostname} \u2192 ${address}`
+          );
+          return DEFAULT_ANALYSIS;
+        }
+      }
+    } catch {
+      logger.warn(`DNS resolution failed for image URL hostname: ${hostname}`);
+      return DEFAULT_ANALYSIS;
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15e3);
+    let response;
+    try {
+      response = await fetch(imageUrl, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!response.ok) {
+      logger.warn(
+        `Failed to fetch image for analysis: ${response.status} ${sanitizeUrlForLogging(imageUrl)}`
+      );
+      return DEFAULT_ANALYSIS;
+    }
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+    const caption = await imageToTextWithHuggingFace(
+      imageBuffer,
+      contentType,
+      "caption"
+    );
+    const parsed2 = await groqGenerateJson(
+      ANALYSIS_PROMPT,
+      `Image caption: "${caption.slice(0, 1200)}"
+Content-Type: ${contentType}
+ByteLength: ${imageBuffer.length}
+
+Return the JSON object only.`,
+      { maxTokens: 1200 }
+    );
+    const analysis = {
+      styles: Array.isArray(parsed2.styles) ? parsed2.styles.slice(0, 4) : [],
+      tags: Array.isArray(parsed2.tags) ? parsed2.tags.slice(0, 8) : [],
+      description: typeof parsed2.description === "string" ? parsed2.description.slice(0, 500) : "",
+      qualityScore: typeof parsed2.qualityScore === "number" ? Math.max(1, Math.min(100, Math.round(parsed2.qualityScore))) : 65,
+      qualityIssues: Array.isArray(parsed2.qualityIssues) ? parsed2.qualityIssues : []
+    };
+    logger.info(
+      `Portfolio image analyzed: ${analysis.styles.join(", ")} | quality=${analysis.qualityScore} | tags=${analysis.tags.length}`
+    );
+    return analysis;
+  } catch (error) {
+    logger.error("Hugging Face/Groq portfolio analysis failed:", error);
+    return DEFAULT_ANALYSIS;
+  }
+}
+var ANALYSIS_PROMPT, DEFAULT_ANALYSIS, DEFAULT_GATED_ANALYSIS;
+var init_geminiVision = __esm({
+  "backend/server/geminiVision.ts"() {
+    "use strict";
+    init_aiProviders();
+    init_logger();
+    init_db();
+    ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. You will receive an image caption and technical metadata produced by an upstream vision model. Infer likely tattoo attributes and return a JSON object with the following fields. Be precise and concise.
+
+{
+  "styles": string[],         // Detected tattoo styles. Pick from: "Traditional", "Neo-Traditional", "Realism", "Hyperrealism", "Watercolor", "Tribal", "Japanese", "Biomechanical", "Geometric", "Dotwork", "Pointillism", "Fine-line", "Minimalist", "Blackwork", "Trash Polka", "New School", "Old School", "Illustrative", "Surrealism", "Lettering", "Chicano", "Ornamental", "Abstract", "Sketch", "Portrait". Return 1-4 styles max.
+  "tags": string[],           // Content/subject tags describing what is depicted. E.g. "floral", "rose", "skull", "dragon", "butterfly", "lion", "clock", "compass", "mandala", "snake", "eagle", "wolf", "heart", "dagger", "anchor", "phoenix", "eye", "tree", "mountain", "moon", "sun", "cross", "angel", "demon", "samurai", "koi fish", "octopus", "waves", "clouds", "fire", "sacred geometry". Return 2-8 tags.
+  "description": string,      // A 1-2 sentence SEO-friendly description of the tattoo for search indexing. Mention the style and subject matter.
+  "qualityScore": number,     // Image quality from 1-100. Consider: focus/sharpness, lighting, resolution clarity, composition, color accuracy. A well-lit, sharp, properly framed photo of a healed tattoo = 80-100. Slightly soft/uneven lighting = 50-79. Blurry, dark, or very low resolution = below 50.
+  "qualityIssues": string[]   // List any issues: "blurry", "low-resolution", "poor-lighting", "overexposed", "underexposed", "out-of-focus", "excessive-glare", "watermark", "heavy-filter", "not-a-tattoo". Empty array if no issues.
+}
+
+IMPORTANT:
+- Return ONLY the raw JSON object, no markdown code fences, no explanation.
+ - If the caption suggests this is not a tattoo, include "not-a-tattoo" in qualityIssues and give qualityScore below 30.
+- Be conservative with quality scores \u2014 most phone photos of tattoos score 60-85.`;
+    DEFAULT_ANALYSIS = {
+      styles: [],
+      tags: [],
+      description: "",
+      qualityScore: 0,
+      qualityIssues: ["analysis-failed"]
+    };
+    DEFAULT_GATED_ANALYSIS = {
+      styles: [],
+      tags: [],
+      description: "Tattoo portfolio design",
+      qualityScore: 90,
+      qualityIssues: []
+    };
+  }
+});
+
 // backend/server/_core/index.ts
 import "dotenv/config";
 import express2 from "express";
@@ -1708,19 +2358,8 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
-// backend/server/_core/supabase.ts
-init_env();
-import { createClient } from "@supabase/supabase-js";
-var supabaseAdmin = createClient(
-  ENV.supabaseUrl,
-  ENV.supabaseServiceKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-);
+// backend/server/_core/supabaseAuth.ts
+init_supabase();
 
 // backend/shared/const.ts
 import { z as z2 } from "zod";
@@ -2391,268 +3030,21 @@ async function sendBookingIntakeNotification(to, details) {
   });
 }
 
-// backend/server/_core/supabaseStorage.ts
-var BUCKETS = {
-  PORTFOLIO_IMAGES: "portfolio-images",
-  REQUEST_IMAGES: "request-images",
-  ID_DOCUMENTS: "id-documents"
-};
-var BUCKET_CONFIGS = [
-  {
-    name: BUCKETS.PORTFOLIO_IMAGES,
-    public: true,
-    fileSizeLimit: 5242880,
-    // 5MB
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/jpg", "image/webp"]
-  },
-  {
-    name: BUCKETS.REQUEST_IMAGES,
-    public: true,
-    fileSizeLimit: 5242880,
-    // 5MB
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/jpg", "image/webp"]
-  },
-  {
-    name: BUCKETS.ID_DOCUMENTS,
-    public: false,
-    // PRIVATE
-    fileSizeLimit: 10485760,
-    // 10MB
-    allowedMimeTypes: [
-      "image/jpeg",
-      "image/png",
-      "image/jpg",
-      "application/pdf"
-    ]
-  }
-];
-async function uploadFile(bucketName, path7, data, contentType) {
-  const { error } = await supabaseAdmin.storage.from(bucketName).upload(path7, data, {
-    contentType,
-    upsert: true
-    // Overwrite if exists
-  });
-  if (error) {
-    console.error(`[Storage] Upload to bucket "${bucketName}" failed:`, error);
-    throw new Error(`Failed to upload file: ${error.message}`);
-  }
-}
-async function deleteFile(bucketName, path7) {
-  const { error } = await supabaseAdmin.storage.from(bucketName).remove([path7]);
-  if (error) {
-    console.error(
-      `[Storage] Delete from bucket "${bucketName}" failed:`,
-      error
-    );
-    throw new Error(`Failed to delete file: ${error.message}`);
-  }
-}
-function getPublicUrl(bucketName, path7) {
-  const { data } = supabaseAdmin.storage.from(bucketName).getPublicUrl(path7);
-  return data.publicUrl;
-}
-async function createSignedUploadUrl(bucketName, path7) {
-  const { data, error } = await supabaseAdmin.storage.from(bucketName).createSignedUploadUrl(path7);
-  if (error) {
-    console.error(
-      `[Storage] Create signed upload URL for bucket "${bucketName}" failed:`,
-      error
-    );
-    throw new Error(`Failed to create signed upload URL: ${error.message}`);
-  }
-  return { signedUrl: data.signedUrl, path: path7 };
-}
-async function initializeBuckets() {
-  const { data: existingBuckets, error: listError } = await supabaseAdmin.storage.listBuckets();
-  if (listError) {
-    console.error("[Storage] Failed to list buckets:", listError);
-    throw new Error(`Failed to list storage buckets: ${listError.message}`);
-  }
-  const summary = {
-    existing: [],
-    created: [],
-    failed: []
-  };
-  for (const config of BUCKET_CONFIGS) {
-    const bucketExists = existingBuckets.some((b) => b.name === config.name);
-    if (!bucketExists) {
-      console.log(`[Storage] Bucket "${config.name}" not found. Creating...`);
-      const { error: createError } = await supabaseAdmin.storage.createBucket(
-        config.name,
-        {
-          public: config.public,
-          fileSizeLimit: config.fileSizeLimit,
-          allowedMimeTypes: config.allowedMimeTypes
-        }
-      );
-      if (createError) {
-        console.error(
-          `[Storage] Failed to create bucket "${config.name}":`,
-          createError
-        );
-        const statusCode = createError.statusCode;
-        const permissionHint = statusCode === "403" ? " Check SUPABASE_SERVICE_KEY on this environment; bucket creation requires a service_role key." : "";
-        summary.failed.push({
-          name: config.name,
-          message: `${createError.message}.${permissionHint}`.trim()
-        });
-      } else {
-        console.log(`[Storage] Bucket "${config.name}" created successfully.`);
-        summary.created.push(config.name);
-      }
-    } else {
-      summary.existing.push(config.name);
-    }
-  }
-  if (summary.failed.length > 0) {
-    const failedBuckets = summary.failed.map((f) => f.name).join(", ");
-    throw new Error(`Storage bucket initialization failed for: ${failedBuckets}`);
-  }
-  return summary;
-}
+// backend/server/routers.ts
+init_supabaseStorage();
 
 // backend/server/clientRouters.ts
 import { z as z3 } from "zod";
 init_db();
 init_schema();
-import { eq as eq2, and as and2, desc as desc2, sql as sql2 } from "drizzle-orm";
+init_supabaseStorage();
 init_logger();
+import { eq as eq2, and as and2, desc as desc2, sql as sql2 } from "drizzle-orm";
 import { TRPCError as TRPCError2 } from "@trpc/server";
 import path from "path";
 
-// backend/server/_core/aiProviders.ts
-init_env();
-import OpenAI from "openai";
-var GROQ_BASE_URL = ENV.groqBaseUrl || "https://api.groq.com/openai/v1";
-var DEFAULT_GROQ_MODEL = ENV.groqModel || "llama-3.3-70b-versatile";
-var HF_BASE_URL = "https://api-inference.huggingface.co/models";
-var DEFAULT_HF_IMAGE_MODEL = ENV.huggingFaceImageModel || "stabilityai/stable-diffusion-xl-base-1.0";
-var DEFAULT_HF_CAPTION_MODEL = ENV.huggingFaceCaptionModel || "Salesforce/blip-image-captioning-large";
-var DEFAULT_HF_OCR_MODEL = ENV.huggingFaceOcrModel || "microsoft/trocr-base-printed";
-var groqClient = new OpenAI({
-  apiKey: ENV.groqApiKey,
-  baseURL: GROQ_BASE_URL
-});
-function sleep2(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-function stripCodeFences(text2) {
-  const trimmed = text2.trim();
-  if (!trimmed.startsWith("```")) return trimmed;
-  return trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-}
-function parseJsonFromModel(text2) {
-  const stripped = stripCodeFences(text2);
-  try {
-    return JSON.parse(stripped);
-  } catch {
-    const match = stripped.match(/\{[\s\S]*\}/);
-    if (!match) {
-      throw new Error("No JSON object found in model response");
-    }
-    return JSON.parse(match[0]);
-  }
-}
-async function groqGenerateJson(systemPrompt, userPrompt, options) {
-  const response = await groqClient.chat.completions.create({
-    model: options?.model || DEFAULT_GROQ_MODEL,
-    temperature: options?.temperature ?? 0.2,
-    max_tokens: options?.maxTokens ?? 2e3,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ]
-  });
-  const content = response.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("Groq returned an empty response");
-  }
-  return parseJsonFromModel(content);
-}
-async function huggingFaceRequest(model, init2, retries = 2) {
-  const response = await fetch(`${HF_BASE_URL}/${model}`, {
-    ...init2,
-    headers: {
-      Authorization: `Bearer ${ENV.huggingFaceApiKey}`,
-      ...init2.headers || {}
-    }
-  });
-  if (response.status === 503 && retries > 0) {
-    try {
-      const loading = await response.clone().json();
-      const waitMs = Math.min(
-        1e4,
-        Math.max(1e3, Math.round((loading.estimated_time ?? 1) * 1e3))
-      );
-      await sleep2(waitMs);
-    } catch {
-      await sleep2(1500);
-    }
-    return huggingFaceRequest(model, init2, retries - 1);
-  }
-  return response;
-}
-async function generateImageWithHuggingFace(prompt) {
-  const response = await huggingFaceRequest(DEFAULT_HF_IMAGE_MODEL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "image/png"
-    },
-    body: JSON.stringify({
-      inputs: prompt,
-      options: { wait_for_model: true }
-    })
-  });
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(
-      `Hugging Face image generation failed (${response.status}): ${details.slice(0, 400)}`
-    );
-  }
-  const contentType = response.headers.get("content-type") || "image/png";
-  if (contentType.includes("application/json")) {
-    const details = await response.text();
-    throw new Error(
-      `Hugging Face image generation returned JSON instead of image: ${details.slice(0, 400)}`
-    );
-  }
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return {
-    buffer,
-    mimeType: contentType.split(";")[0]
-  };
-}
-async function imageToTextWithHuggingFace(imageBuffer, mimeType, purpose) {
-  const model = purpose === "ocr" ? DEFAULT_HF_OCR_MODEL : DEFAULT_HF_CAPTION_MODEL;
-  const response = await huggingFaceRequest(model, {
-    method: "POST",
-    headers: {
-      "Content-Type": mimeType,
-      Accept: "application/json"
-    },
-    body: imageBuffer
-  });
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(
-      `Hugging Face ${purpose} request failed (${response.status}): ${details.slice(0, 400)}`
-    );
-  }
-  const payload = await response.json();
-  if (typeof payload === "string") {
-    return payload.trim();
-  }
-  if (Array.isArray(payload)) {
-    const first = payload[0];
-    if (!first) return "";
-    return String(first.generated_text || first.text || "").trim();
-  }
-  return String(payload.generated_text || payload.text || "").trim();
-}
-
 // backend/server/geminiBidOptimizer.ts
+init_aiProviders();
 init_logger();
 var REFINER_PROMPT = `You are a tattoo consultation expert helping clients create better tattoo requests. Analyze the client's request and assess if the description provides enough detail for an artist to give an accurate bid.
 
@@ -3686,6 +4078,7 @@ init_env();
 init_db();
 init_db();
 init_schema();
+init_supabaseStorage();
 import { eq as eq3 } from "drizzle-orm";
 import { TRPCError as TRPCError3 } from "@trpc/server";
 import path2 from "path";
@@ -3825,159 +4218,11 @@ var healthRouter = router({
   })
 });
 
-// backend/server/geminiVision.ts
-import dns from "dns";
-import { isIPv4, isIPv6 } from "net";
-init_logger();
-init_db();
-var ANALYSIS_PROMPT = `You are a tattoo industry expert and image analyst. You will receive an image caption and technical metadata produced by an upstream vision model. Infer likely tattoo attributes and return a JSON object with the following fields. Be precise and concise.
-
-{
-  "styles": string[],         // Detected tattoo styles. Pick from: "Traditional", "Neo-Traditional", "Realism", "Hyperrealism", "Watercolor", "Tribal", "Japanese", "Biomechanical", "Geometric", "Dotwork", "Pointillism", "Fine-line", "Minimalist", "Blackwork", "Trash Polka", "New School", "Old School", "Illustrative", "Surrealism", "Lettering", "Chicano", "Ornamental", "Abstract", "Sketch", "Portrait". Return 1-4 styles max.
-  "tags": string[],           // Content/subject tags describing what is depicted. E.g. "floral", "rose", "skull", "dragon", "butterfly", "lion", "clock", "compass", "mandala", "snake", "eagle", "wolf", "heart", "dagger", "anchor", "phoenix", "eye", "tree", "mountain", "moon", "sun", "cross", "angel", "demon", "samurai", "koi fish", "octopus", "waves", "clouds", "fire", "sacred geometry". Return 2-8 tags.
-  "description": string,      // A 1-2 sentence SEO-friendly description of the tattoo for search indexing. Mention the style and subject matter.
-  "qualityScore": number,     // Image quality from 1-100. Consider: focus/sharpness, lighting, resolution clarity, composition, color accuracy. A well-lit, sharp, properly framed photo of a healed tattoo = 80-100. Slightly soft/uneven lighting = 50-79. Blurry, dark, or very low resolution = below 50.
-  "qualityIssues": string[]   // List any issues: "blurry", "low-resolution", "poor-lighting", "overexposed", "underexposed", "out-of-focus", "excessive-glare", "watermark", "heavy-filter", "not-a-tattoo". Empty array if no issues.
-}
-
-IMPORTANT:
-- Return ONLY the raw JSON object, no markdown code fences, no explanation.
- - If the caption suggests this is not a tattoo, include "not-a-tattoo" in qualityIssues and give qualityScore below 30.
-- Be conservative with quality scores \u2014 most phone photos of tattoos score 60-85.`;
-var DEFAULT_ANALYSIS = {
-  styles: [],
-  tags: [],
-  description: "",
-  qualityScore: 0,
-  qualityIssues: ["analysis-failed"]
-};
-var DEFAULT_GATED_ANALYSIS = {
-  styles: [],
-  tags: [],
-  description: "Tattoo portfolio design",
-  qualityScore: 90,
-  qualityIssues: []
-};
-function sanitizeUrlForLogging(url) {
-  try {
-    const parsed2 = new URL(url);
-    return `${parsed2.origin}${parsed2.pathname}`;
-  } catch {
-    return "[invalid-url]";
-  }
-}
-function isPrivateOrReservedIp(ip) {
-  const v4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-  if (v4Mapped) return isPrivateOrReservedIp(v4Mapped[1]);
-  if (isIPv4(ip)) {
-    const parts = ip.split(".").map(Number);
-    if (parts.some((p) => isNaN(p))) return true;
-    const [a, b] = parts;
-    if (ip === "0.0.0.0") return true;
-    if (a === 127) return true;
-    if (a === 10) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true;
-    return false;
-  }
-  if (isIPv6(ip)) {
-    const lower = ip.toLowerCase();
-    if (lower === "::1") return true;
-    if (lower === "::") return true;
-    if (/^f[cd]/i.test(lower)) return true;
-    if (/^fe[89ab]/i.test(lower)) return true;
-    if (lower.startsWith("::ffff:")) return true;
-    return false;
-  }
-  return true;
-}
-async function analyzePortfolioImage(imageUrl) {
-  if (!await isAiEnabled()) {
-    logger.info("AI features gated (< 100 users). Skipping portfolio image analysis.");
-    return DEFAULT_GATED_ANALYSIS;
-  }
-  try {
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(imageUrl);
-    } catch {
-      logger.warn(
-        `Invalid image URL for analysis: ${sanitizeUrlForLogging(imageUrl)}`
-      );
-      return DEFAULT_ANALYSIS;
-    }
-    if (parsedUrl.protocol !== "https:") {
-      logger.warn(`Rejected non-HTTPS image URL: ${parsedUrl.protocol}`);
-      return DEFAULT_ANALYSIS;
-    }
-    const hostname = parsedUrl.hostname.toLowerCase();
-    try {
-      const resolvedAddresses = await dns.promises.lookup(hostname, {
-        all: true
-      });
-      for (const { address } of resolvedAddresses) {
-        if (isPrivateOrReservedIp(address)) {
-          logger.warn(
-            `Rejected image URL resolving to private/reserved IP: ${hostname} \u2192 ${address}`
-          );
-          return DEFAULT_ANALYSIS;
-        }
-      }
-    } catch {
-      logger.warn(`DNS resolution failed for image URL hostname: ${hostname}`);
-      return DEFAULT_ANALYSIS;
-    }
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15e3);
-    let response;
-    try {
-      response = await fetch(imageUrl, { signal: controller.signal });
-    } finally {
-      clearTimeout(timeoutId);
-    }
-    if (!response.ok) {
-      logger.warn(
-        `Failed to fetch image for analysis: ${response.status} ${sanitizeUrlForLogging(imageUrl)}`
-      );
-      return DEFAULT_ANALYSIS;
-    }
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    const arrayBuffer = await response.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
-    const caption = await imageToTextWithHuggingFace(
-      imageBuffer,
-      contentType,
-      "caption"
-    );
-    const parsed2 = await groqGenerateJson(
-      ANALYSIS_PROMPT,
-      `Image caption: "${caption.slice(0, 1200)}"
-Content-Type: ${contentType}
-ByteLength: ${imageBuffer.length}
-
-Return the JSON object only.`,
-      { maxTokens: 1200 }
-    );
-    const analysis = {
-      styles: Array.isArray(parsed2.styles) ? parsed2.styles.slice(0, 4) : [],
-      tags: Array.isArray(parsed2.tags) ? parsed2.tags.slice(0, 8) : [],
-      description: typeof parsed2.description === "string" ? parsed2.description.slice(0, 500) : "",
-      qualityScore: typeof parsed2.qualityScore === "number" ? Math.max(1, Math.min(100, Math.round(parsed2.qualityScore))) : 65,
-      qualityIssues: Array.isArray(parsed2.qualityIssues) ? parsed2.qualityIssues : []
-    };
-    logger.info(
-      `Portfolio image analyzed: ${analysis.styles.join(", ")} | quality=${analysis.qualityScore} | tags=${analysis.tags.length}`
-    );
-    return analysis;
-  } catch (error) {
-    logger.error("Hugging Face/Groq portfolio analysis failed:", error);
-    return DEFAULT_ANALYSIS;
-  }
-}
+// backend/server/routers.ts
+init_geminiVision();
 
 // backend/server/geminiDiscovery.ts
+init_aiProviders();
 init_logger();
 init_db();
 var DISCOVERY_PROMPT = `You are a tattoo industry expert. A user is describing the tattoo they want. Parse their description and extract structured search criteria as a JSON object.
@@ -4180,6 +4425,7 @@ async function parseDiscoveryQuery(query) {
 }
 
 // backend/server/geminiSafety.ts
+init_aiProviders();
 init_logger();
 init_db();
 var REVIEW_ANALYSIS_PROMPT = `You are a content moderation specialist for a tattoo artist booking platform. Analyze this review for potential issues that warrant human moderation.
@@ -4294,7 +4540,9 @@ import { TRPCError as TRPCError4 } from "@trpc/server";
 import { eq as eq4, sql as sql3, and as and3, gt } from "drizzle-orm";
 
 // backend/server/geminiGeneration.ts
+init_aiProviders();
 init_logger();
+init_supabaseStorage();
 var TATTOO_GENERATION_PROMPT = `You are a world-class tattoo stencil artist. Create a highly detailed, professional tattoo design based on the following description. The design should:
 
 1. Be rendered as clean black linework suitable for a tattoo stencil
@@ -5633,6 +5881,7 @@ var appRouter = router({
 });
 
 // backend/server/_core/context.ts
+init_supabase();
 init_db();
 init_schema();
 import { eq as eq6 } from "drizzle-orm";
@@ -6033,13 +6282,13 @@ async function processWebhookEvent(eventType, event) {
         return;
       }
       const depositAmount = session.amount_total ? Number(session.amount_total) : 0;
-      await withTransaction(async () => {
+      await withTransaction(async (tx) => {
         await updateBooking(bookingId, {
           stripePaymentIntentId: session.payment_intent,
           depositAmount,
           depositPaid: true,
           status: "confirmed"
-        });
+        }, tx);
       });
       logger.info("Payment confirmed for booking", { bookingId });
       break;
@@ -6407,73 +6656,8 @@ async function getWebhookQueueStats() {
 // backend/server/_core/index.ts
 init_env();
 init_logger();
-
-// backend/server/_core/sentry.ts
-init_logger();
-import * as Sentry from "@sentry/node";
-var initialized = false;
-function initSentry() {
-  const dsn = process.env.SENTRY_DSN || "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752";
-  if (!dsn) {
-    logger.warn("SENTRY_DSN not configured - error tracking disabled");
-    return;
-  }
-  if (initialized) {
-    logger.debug("Sentry already initialized");
-    return;
-  }
-  try {
-    Sentry.init({
-      dsn,
-      environment: process.env.NODE_ENV || "development",
-      release: process.env.npm_package_version || "unknown",
-      // Performance monitoring
-      tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1,
-      // Integrations
-      integrations: [
-        // Express integration is automatically added
-        Sentry.httpIntegration(),
-        Sentry.expressIntegration()
-      ],
-      // Filter out noisy errors
-      beforeSend(event, hint) {
-        const error = hint.originalException;
-        if (error instanceof Error && error.message.includes("401")) {
-          return null;
-        }
-        if (error instanceof Error && error.message.includes("rate limit")) {
-          return null;
-        }
-        return event;
-      },
-      // Tag important info
-      initialScope: {
-        tags: {
-          component: "backend"
-        }
-      }
-    });
-    initialized = true;
-    logger.info("Sentry error tracking initialized");
-  } catch (err) {
-    logger.error("Failed to initialize Sentry", {
-      error: err instanceof Error ? err.message : String(err)
-    });
-  }
-}
-function captureException2(error, context) {
-  if (!initialized) {
-    return void 0;
-  }
-  return Sentry.captureException(error, {
-    extra: context
-  });
-}
-function sentryErrorHandler() {
-  return Sentry.expressErrorHandler();
-}
-
-// backend/server/_core/index.ts
+init_supabaseStorage();
+init_sentry();
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -6632,6 +6816,76 @@ app.use(express2.urlencoded({ limit: "5mb", extended: true }));
 app.use(csrfTokenMiddleware);
 app.use(csrfProtectionMiddleware);
 registerSupabaseAuthRoutes(app);
+app.post("/api/portfolio/enqueue-analysis", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
+      return;
+    }
+    const token = authHeader.substring(7);
+    if (token !== ENV.jwtSecret) {
+      res.status(401).json({ error: "Unauthorized: Invalid API secret" });
+      return;
+    }
+    const { bucketId, filePath } = req.body;
+    const ALLOWED_BUCKETS = ["portfolio-images", "request-images"];
+    const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic"];
+    if (!bucketId || !ALLOWED_BUCKETS.includes(bucketId)) {
+      res.status(400).json({ error: `Invalid or disallowed bucket: ${bucketId}` });
+      return;
+    }
+    if (typeof filePath !== "string" || !filePath.trim()) {
+      res.status(400).json({ error: "Invalid or empty filePath" });
+      return;
+    }
+    const lowercasePath = filePath.toLowerCase();
+    const hasAllowedExtension = ALLOWED_EXTENSIONS.some((ext) => lowercasePath.endsWith(ext));
+    if (!hasAllowedExtension) {
+      res.status(400).json({ error: "File extension not allowed" });
+      return;
+    }
+    const { getPublicUrl: getPublicUrl2 } = await Promise.resolve().then(() => (init_supabaseStorage(), supabaseStorage_exports));
+    const { analyzePortfolioImage: analyzePortfolioImage2 } = await Promise.resolve().then(() => (init_geminiVision(), geminiVision_exports));
+    const db = await Promise.resolve().then(() => (init_db(), db_exports));
+    const imageUrl = getPublicUrl2(bucketId, filePath);
+    logger.info("Enqueuing background portfolio image analysis", { bucketId, filePath });
+    db.getDb().then(async (database) => {
+      if (!database) {
+        logger.error("Database unavailable for background analysis update");
+        return;
+      }
+      const { portfolioImages: portfolioImages2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq9 } = await import("drizzle-orm");
+      const [existingImage] = await database.select().from(portfolioImages2).where(eq9(portfolioImages2.imageKey, filePath)).limit(1);
+      if (!existingImage) {
+        logger.warn("No portfolio image database record found yet for key; background analysis postponed or will retry via batch cron", { filePath });
+        return;
+      }
+      analyzePortfolioImage2(imageUrl).then(async (analysis) => {
+        if (analysis.qualityScore > 0) {
+          await db.updatePortfolioImageAI(existingImage.id, {
+            aiStyles: JSON.stringify(analysis.styles),
+            aiTags: JSON.stringify(analysis.tags),
+            aiDescription: analysis.description,
+            qualityScore: analysis.qualityScore,
+            qualityIssues: JSON.stringify(analysis.qualityIssues),
+            aiProcessedAt: /* @__PURE__ */ new Date()
+          });
+          logger.info("Background portfolio image analysis completed and updated in database", { imageId: existingImage.id });
+        }
+      }).catch((err) => {
+        logger.error("Background Gemini analysis failed:", err);
+      });
+    }).catch((err) => {
+      logger.error("Failed to load database for background analysis:", err);
+    });
+    res.status(202).json({ success: true, message: "Analysis enqueued successfully" });
+  } catch (error) {
+    logger.error("Failed to enqueue image analysis:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 app.get("/api/health", async (_req, res) => {
   try {
     const db = await Promise.resolve().then(() => (init_db(), db_exports)).then((m) => m.getDb());
@@ -6645,7 +6899,7 @@ app.get("/api/health", async (_req, res) => {
     const storageReady = true;
     const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth ? true : false;
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
-    const httpStatus = overallStatus === "ok" ? 200 : 503;
+    const httpStatus = dbStatus === "connected" ? 200 : 503;
     res.status(httpStatus).json({
       status: overallStatus,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),

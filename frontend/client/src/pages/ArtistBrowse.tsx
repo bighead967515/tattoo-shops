@@ -433,7 +433,7 @@ export default function ArtistBrowse() {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button
-                      onClick={() => setLocation("/artist/register")}
+                      onClick={() => setLocation("/artist/signup")}
                       className="shadow-md shadow-primary/20"
                     >
                       Join as an Artist

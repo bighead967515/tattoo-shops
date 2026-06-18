@@ -110,9 +110,11 @@ export async function getDb() {
       const dbUrl = process.env.DATABASE_URL!.replace(/^DATABASE_URL=/, "");
       // Supabase always routes through Supavisor/PgBouncer — prepared statements
       // must be disabled unconditionally regardless of which connection URL is used.
+      const maxPoolSize = parseInt(process.env.DATABASE_POOL_SIZE || "3", 10);
       _sqlClient = postgres(dbUrl, {
-        max: 10, // Supabase free tier has a 60 connection limit; keep pool small
-        idle_timeout: 30, // Close idle connections after 30 seconds
+        max: maxPoolSize, // Keep pool small to avoid pool exhaustion in serverless/lambdas
+        idle_timeout: 10, // Close idle connections faster to free up resources (10s)
+        max_lifetime: 60 * 15, // Close connections after 15 minutes to refresh connections
         connect_timeout: 10, // 10 second connection timeout (Render cold starts are slow)
         prepare: false, // MUST be false for Supabase (Supavisor/PgBouncer incompatible)
         ssl: dbUrl.includes("supabase") ? "require" : undefined, // Supabase pooler requires SSL
@@ -127,7 +129,7 @@ export async function getDb() {
 
       // Log successful connection
       logger.info("Database connection pool initialized", {
-        maxConnections: 20,
+        maxConnections: maxPoolSize,
       });
     } catch (error) {
       logger.error("Database connection failed", { error });
@@ -612,11 +614,11 @@ export async function getBookingsByArtistId(artistId: number) {
     .orderBy(desc(bookings.createdAt));
 }
 
-export async function updateBooking(id: number, data: Partial<InsertBooking>) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+export async function updateBooking(id: number, data: Partial<InsertBooking>, tx?: any) {
+  const client = tx || (await getDb());
+  if (!client) throw new Error("Database not available");
 
-  return await db.update(bookings).set(data).where(eq(bookings.id, id));
+  return await client.update(bookings).set(data).where(eq(bookings.id, id));
 }
 
 // Favorite functions
