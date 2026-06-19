@@ -247,7 +247,24 @@ export async function createArtist(artist: InsertArtist) {
       .where(eq(users.id, artist.userId));
 
     // NEW ARTISTS HAVE IMMEDIATE ACCESS AND APPEAR IN PUBLIC LISTINGS IMMEDIATELY
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
+    const [created] = await tx
+      .insert(artists)
+      .values({ ...artist, isApproved: true })
+      .onConflictDoUpdate({
+        target: artists.userId,
+        set: {
+          shopName: artist.shopName,
+          bio: artist.bio ?? null,
+          specialties: artist.specialties ?? null,
+          experience: artist.experience ?? null,
+          city: artist.city ?? null,
+          state: artist.state ?? null,
+          instagram: artist.instagram ?? null,
+          isApproved: true,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
     return created;
   });
 }
@@ -272,6 +289,7 @@ export async function getArtistById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
 
+  // Try querying by primary key id first
   const result = await db
     .select({
       ...artistFields,
@@ -281,7 +299,23 @@ export async function getArtistById(id: number) {
     .innerJoin(users, eq(artists.userId, users.id))
     .where(eq(artists.id, id))
     .limit(1);
-  return result.length > 0 ? result[0] : undefined;
+
+  if (result.length > 0) {
+    return result[0];
+  }
+
+  // Fallback: query by userId
+  const fallback = await db
+    .select({
+      ...artistFields,
+      subscriptionTier: users.subscriptionTier,
+    })
+    .from(artists)
+    .innerJoin(users, eq(artists.userId, users.id))
+    .where(eq(artists.userId, id))
+    .limit(1);
+
+  return fallback.length > 0 ? fallback[0] : undefined;
 }
 
 export async function getAllArtists() {

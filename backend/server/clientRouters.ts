@@ -128,6 +128,19 @@ export const clientsRouter = router({
             preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : undefined,
             onboardingCompleted: true,
           })
+          .onConflictDoUpdate({
+            target: clients.userId,
+            set: {
+              displayName: sanitizeInput(input.displayName, 255),
+              bio: input.bio ? sanitizeInput(input.bio, 1000) : null,
+              preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : null,
+              city: input.city ?? null,
+              state: input.state ?? null,
+              phone: input.phone ?? null,
+              onboardingCompleted: true,
+              updatedAt: new Date(),
+            },
+          })
           .returning();
 
         return created;

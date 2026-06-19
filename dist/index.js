@@ -1079,7 +1079,20 @@ async function createArtist(artist) {
   if (!db) throw new Error("Database not available");
   return await db.transaction(async (tx) => {
     await tx.update(users).set(buildArtistOnboardingUserUpdate()).where(eq(users.id, artist.userId));
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).returning();
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).onConflictDoUpdate({
+      target: artists.userId,
+      set: {
+        shopName: artist.shopName,
+        bio: artist.bio ?? null,
+        specialties: artist.specialties ?? null,
+        experience: artist.experience ?? null,
+        city: artist.city ?? null,
+        state: artist.state ?? null,
+        instagram: artist.instagram ?? null,
+        isApproved: true,
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    }).returning();
     return created;
   });
 }
@@ -1099,7 +1112,14 @@ async function getArtistById(id) {
     ...artistFields,
     subscriptionTier: users.subscriptionTier
   }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.id, id)).limit(1);
-  return result.length > 0 ? result[0] : void 0;
+  if (result.length > 0) {
+    return result[0];
+  }
+  const fallback = await db.select({
+    ...artistFields,
+    subscriptionTier: users.subscriptionTier
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.userId, id)).limit(1);
+  return fallback.length > 0 ? fallback[0] : void 0;
 }
 async function getAllArtists() {
   const db = await getDb();
@@ -3322,6 +3342,18 @@ var clientsRouter = router({
         bio: input.bio ? sanitizeInput(input.bio, 1e3) : void 0,
         preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : void 0,
         onboardingCompleted: true
+      }).onConflictDoUpdate({
+        target: clients.userId,
+        set: {
+          displayName: sanitizeInput(input.displayName, 255),
+          bio: input.bio ? sanitizeInput(input.bio, 1e3) : null,
+          preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : null,
+          city: input.city ?? null,
+          state: input.state ?? null,
+          phone: input.phone ?? null,
+          onboardingCompleted: true,
+          updatedAt: /* @__PURE__ */ new Date()
+        }
       }).returning();
       return created;
     });
