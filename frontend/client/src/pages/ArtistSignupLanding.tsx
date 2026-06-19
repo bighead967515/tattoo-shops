@@ -140,12 +140,14 @@ export default function ArtistSignupLanding() {
   const addPortfolioImage = trpc.portfolio.add.useMutation();
   const getLicenseUploadUrl = trpc.verification.getUploadUrl.useMutation();
   const addLicenseDocument = trpc.verification.addDocument.useMutation();
+  const { data: artistProfile, isLoading: isProfileLoading } =
+    trpc.artists.getByUserId.useQuery(undefined, { enabled: !!user });
 
   useEffect(() => {
-    if (user?.role === "artist") {
+    if (user?.role === "artist" && artistProfile && !isProfileLoading) {
       setLocation("/dashboard");
     }
-  }, [user, setLocation]);
+  }, [user, artistProfile, isProfileLoading, setLocation]);
 
   const toggleStyle = (style: string) => {
     setStyles(prev => 

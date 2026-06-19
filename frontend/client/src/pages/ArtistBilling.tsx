@@ -206,7 +206,7 @@ export default function ArtistBilling() {
           <p className="text-muted-foreground mb-8">
             You need to register as an artist before managing your subscription.
           </p>
-          <Button onClick={() => setLocation("/for-artists")}>
+          <Button onClick={() => setLocation("/artist/signup")}>
             Register as Artist
           </Button>
         </div>
