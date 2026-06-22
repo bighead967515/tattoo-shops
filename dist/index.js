@@ -2040,7 +2040,7 @@ var init_aiProviders = __esm({
     GROQ_BASE_URL = ENV.groqBaseUrl || "https://api.groq.com/openai/v1";
     DEFAULT_GROQ_MODEL = ENV.groqModel || "llama-3.3-70b-versatile";
     HF_BASE_URL = "https://api-inference.huggingface.co/models";
-    DEFAULT_HF_IMAGE_MODEL = ENV.huggingFaceImageModel || "stabilityai/stable-diffusion-xl-base-1.0";
+    DEFAULT_HF_IMAGE_MODEL = ENV.huggingFaceImageModel || "black-forest-labs/FLUX.1-schnell";
     DEFAULT_HF_CAPTION_MODEL = ENV.huggingFaceCaptionModel || "Salesforce/blip-image-captioning-large";
     DEFAULT_HF_OCR_MODEL = ENV.huggingFaceOcrModel || "microsoft/trocr-base-printed";
     groqClient = new OpenAI({
@@ -3342,18 +3342,6 @@ var clientsRouter = router({
         bio: input.bio ? sanitizeInput(input.bio, 1e3) : void 0,
         preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : void 0,
         onboardingCompleted: true
-      }).onConflictDoUpdate({
-        target: clients.userId,
-        set: {
-          displayName: sanitizeInput(input.displayName, 255),
-          bio: input.bio ? sanitizeInput(input.bio, 1e3) : null,
-          preferredStyles: input.preferredStyles ? sanitizeInput(input.preferredStyles, 500) : null,
-          city: input.city ?? null,
-          state: input.state ?? null,
-          phone: input.phone ?? null,
-          onboardingCompleted: true,
-          updatedAt: /* @__PURE__ */ new Date()
-        }
       }).returning();
       return created;
     });
@@ -4583,9 +4571,9 @@ init_supabaseStorage();
 var TATTOO_GENERATION_PROMPT = `You are a world-class tattoo stencil artist. Create a highly detailed, professional tattoo design based on the following description. The design should:
 
 1. Be rendered as clean black linework suitable for a tattoo stencil
-2. Use a plain white background
-3. Be well-composed and centered in the frame
-4. Include appropriate shading using crosshatching or dotwork techniques
+2. Use a plain, pure, solid white background with NO skin texture, NO body parts, NO background scenery, and NO mockups
+3. Be well-composed, isolated, and centered in the frame
+4. Include appropriate shading using crosshatching, stippling, or dotwork techniques
 5. Show fine detail that a real tattoo artist could replicate
 
 STYLE DIRECTION: {style}
@@ -4593,7 +4581,7 @@ STYLE DIRECTION: {style}
 DESIGN REQUEST:
 {prompt}
 
-Generate a single cohesive tattoo design image. The output must be a clear, monochrome (black on white) tattoo-ready stencil design. No text, no watermarks, no borders.`;
+Generate a single cohesive tattoo design image. The output must be a clear, monochrome (black on white) tattoo-ready stencil design isolated on a solid white background. No text, no watermarks, no borders, no human skin visible.`;
 var STYLE_MAP = {
   traditional: "Bold outlines, limited color palette feel, classic American Traditional with thick lines and iconic imagery",
   "neo-traditional": "Rich detail with bold lines, more complex shading and subtle depth than classic traditional",

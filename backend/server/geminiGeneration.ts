@@ -15,9 +15,9 @@ import { uploadFile, getPublicUrl, BUCKETS } from "./_core/supabaseStorage";
 const TATTOO_GENERATION_PROMPT = `You are a world-class tattoo stencil artist. Create a highly detailed, professional tattoo design based on the following description. The design should:
 
 1. Be rendered as clean black linework suitable for a tattoo stencil
-2. Use a plain white background
-3. Be well-composed and centered in the frame
-4. Include appropriate shading using crosshatching or dotwork techniques
+2. Use a plain, pure, solid white background with NO skin texture, NO body parts, NO background scenery, and NO mockups
+3. Be well-composed, isolated, and centered in the frame
+4. Include appropriate shading using crosshatching, stippling, or dotwork techniques
 5. Show fine detail that a real tattoo artist could replicate
 
 STYLE DIRECTION: {style}
@@ -25,7 +25,7 @@ STYLE DIRECTION: {style}
 DESIGN REQUEST:
 {prompt}
 
-Generate a single cohesive tattoo design image. The output must be a clear, monochrome (black on white) tattoo-ready stencil design. No text, no watermarks, no borders.`;
+Generate a single cohesive tattoo design image. The output must be a clear, monochrome (black on white) tattoo-ready stencil design isolated on a solid white background. No text, no watermarks, no borders, no human skin visible.`;
 
 const STYLE_MAP: Record<string, string> = {
   traditional:

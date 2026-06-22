@@ -6,7 +6,7 @@ const DEFAULT_GROQ_MODEL = ENV.groqModel || "llama-3.3-70b-versatile";
 
 const HF_BASE_URL = "https://api-inference.huggingface.co/models";
 const DEFAULT_HF_IMAGE_MODEL =
-  ENV.huggingFaceImageModel || "stabilityai/stable-diffusion-xl-base-1.0";
+  ENV.huggingFaceImageModel || "black-forest-labs/FLUX.1-schnell";
 const DEFAULT_HF_CAPTION_MODEL =
   ENV.huggingFaceCaptionModel || "Salesforce/blip-image-captioning-large";
 const DEFAULT_HF_OCR_MODEL =
