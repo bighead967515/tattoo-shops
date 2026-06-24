@@ -122,7 +122,7 @@ export async function getDb() {
           logger.debug("Database notice", { message: notice.message });
         },
         onclose: () => {
-          logger.warn("Database connection closed");
+          logger.debug("Database connection closed");
         },
       });
       _db = drizzle(_sqlClient);
