@@ -93,6 +93,12 @@ function OnboardingSelector() {
     }
   }, []);
 
+  useEffect(() => {
+    if (mode === "artist") {
+      setLocation("/artist/signup");
+    }
+  }, [mode, setLocation]);
+
   if (mode === "client") {
     return (
       <div>
@@ -106,9 +112,6 @@ function OnboardingSelector() {
   }
 
   if (mode === "artist") {
-    useEffect(() => {
-      setLocation("/artist/signup");
-    }, []);
     return null;
   }
 

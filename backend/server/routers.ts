@@ -666,22 +666,9 @@ export const appRouter = router({
           userId: ctx.user.id,
         });
 
-        if (ENV.n8nOnboardingWebhookUrl) {
-          fetch(ENV.n8nOnboardingWebhookUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${ENV.n8nWebhookSecret}`,
-            },
-            body: JSON.stringify({
-              artistId: newArtist.id,
-              userId: ctx.user.id,
-              email: ctx.user.email,
-              firstName: ctx.user.name?.split(" ")[0] ?? "there",
-              shopName: input.shopName,
-            }),
-          }).catch(() => {});
-        }
+        // Note: post-signup side effects (welcome email, admin notification, n8n)
+        // are now handled by the Supabase Edge Function `artist-onboarding`,
+        // triggered automatically via a DB webhook on INSERT into the artists table.
 
         return newArtist;
       }),

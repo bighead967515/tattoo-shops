@@ -50,7 +50,6 @@ function Router() {
       {/* 5 Core Pages */}
       <Route path="/" component={Home} />
       <Route path="/artists" component={ArtistBrowse} />
-      <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Login} />
       <Route path="/dashboard" component={Dashboard} />
@@ -74,6 +73,7 @@ function Router() {
       <Route path="/artist/design-lab" component={ArtistDesignLab} />
       <Route path="/artist/billing" component={ArtistBilling} />
       <Route path="/artist/billing/success" component={SubscriptionSuccess} />
+      <Route path="/artist/:id" component={ArtistProfile} />
       <Route path="/license-upload" component={LicenseUpload} />
 
       {/* Supporting Auth routes */}
