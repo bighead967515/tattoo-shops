@@ -36,7 +36,7 @@ import { toast } from "sonner";
 // ──────────────────────────────────────────────
 
 function ArtistApprovalPanel() {
-  const { data: artists, isLoading, refetch } = trpc.artists.adminGetAll.useQuery();
+  const { data: artists, isLoading, error, refetch } = trpc.artists.adminGetAll.useQuery();
 
   const approveMutation = trpc.artists.adminSetApproval.useMutation({
     onSuccess: (_, vars) => {
@@ -50,6 +50,19 @@ function ArtistApprovalPanel() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 text-destructive space-y-2">
+        <AlertTriangle className="w-12 h-12 mx-auto opacity-80" />
+        <p className="text-lg font-semibold">Failed to load artists</p>
+        <p className="text-sm opacity-80">{error.message || "An unexpected error occurred."}</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-2">
+          Retry
+        </Button>
       </div>
     );
   }
@@ -234,7 +247,7 @@ function ArtistRow({
 // ──────────────────────────────────────────────
 
 function VerificationPanel() {
-  const { data: documents, isLoading, refetch } = trpc.verification.getPending.useQuery();
+  const { data: documents, isLoading, error, refetch } = trpc.verification.getPending.useQuery();
   const reviewMutation = trpc.verification.review.useMutation({
     onSuccess: () => {
       toast.success("Verification decision saved");
@@ -248,6 +261,19 @@ function VerificationPanel() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 text-destructive space-y-2">
+        <AlertTriangle className="w-12 h-12 mx-auto opacity-80" />
+        <p className="text-lg font-semibold">Failed to load verifications</p>
+        <p className="text-sm opacity-80">{error.message || "An unexpected error occurred."}</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-2">
+          Retry
+        </Button>
       </div>
     );
   }
@@ -426,7 +452,7 @@ function VerificationPanel() {
 // ──────────────────────────────────────────────
 
 function FlaggedReviewsPanel() {
-  const { data: reviews, isLoading, refetch } = trpc.moderation.getFlaggedReviews.useQuery();
+  const { data: reviews, isLoading, error, refetch } = trpc.moderation.getFlaggedReviews.useQuery();
   const updateMutation = trpc.moderation.updateReviewStatus.useMutation({
     onSuccess: () => {
       toast.success("Review status updated");
@@ -446,6 +472,19 @@ function FlaggedReviewsPanel() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 text-destructive space-y-2">
+        <AlertTriangle className="w-12 h-12 mx-auto opacity-80" />
+        <p className="text-lg font-semibold">Failed to load flagged reviews</p>
+        <p className="text-sm opacity-80">{error.message || "An unexpected error occurred."}</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-2">
+          Retry
+        </Button>
       </div>
     );
   }
@@ -590,7 +629,7 @@ function ScorePill({ label, score }: { label: string; score: number }) {
 // ──────────────────────────────────────────────
 
 function RefundRequestsPanel() {
-  const { data: requests, isLoading, refetch } = trpc.bookings.adminGetRefundRequests.useQuery();
+  const { data: requests, isLoading, error, refetch } = trpc.bookings.adminGetRefundRequests.useQuery();
 
   const reviewMutation = trpc.bookings.adminReviewRefund.useMutation({
     onSuccess: (_, vars) => {
@@ -604,6 +643,19 @@ function RefundRequestsPanel() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 text-destructive space-y-2">
+        <AlertTriangle className="w-12 h-12 mx-auto opacity-80" />
+        <p className="text-lg font-semibold">Failed to load refund requests</p>
+        <p className="text-sm opacity-80">{error.message || "An unexpected error occurred."}</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-2">
+          Retry
+        </Button>
       </div>
     );
   }
@@ -729,10 +781,9 @@ function InvitationsPanel() {
   const [csvBatch, setCsvBatch] = useState<{ email: string; shopName: string; state: string; error?: string }[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
 
-  // Queries & Mutations
   const utils = trpc.useUtils();
-  const { data: invitations, isLoading: historyLoading } = trpc.artists.adminGetInvitations.useQuery();
-  const { data: metrics, isLoading: metricsLoading } = trpc.artists.adminGetInvitationMetrics.useQuery({
+  const { data: invitations, isLoading: historyLoading, error: historyError } = trpc.artists.adminGetInvitations.useQuery();
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = trpc.artists.adminGetInvitationMetrics.useQuery({
     state: selectedStateFilter === "all" ? undefined : selectedStateFilter,
   });
 
@@ -939,6 +990,10 @@ function InvitationsPanel() {
           {metricsLoading ? (
             <div className="py-8 flex justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : metricsError ? (
+            <div className="py-8 text-center text-destructive text-sm font-semibold">
+              Failed to load metrics: {metricsError.message}
             </div>
           ) : metrics ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1157,6 +1212,11 @@ function InvitationsPanel() {
         {historyLoading ? (
           <div className="py-12 flex justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : historyError ? (
+          <div className="py-12 text-center text-destructive">
+            <p className="font-semibold">Failed to load invitation history</p>
+            <p className="text-sm opacity-80">{historyError.message}</p>
           </div>
         ) : !filteredHistory || filteredHistory.length === 0 ? (
           <p className="text-muted-foreground text-center py-12 text-sm">No invitations found for this filter.</p>

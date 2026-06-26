@@ -47,7 +47,7 @@ export default function LegalAcceptanceModal({
     <Dialog open={open} onOpenChange={() => {}}>
       {/* Prevent closing by clicking outside — user MUST accept */}
       <DialogContent
-        className="max-w-lg"
+        className="max-w-lg max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >

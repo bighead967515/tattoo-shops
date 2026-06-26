@@ -5259,23 +5259,6 @@ var appRouter = router({
         specialties: input.specialties ? sanitizeInput(input.specialties, 500) : void 0,
         userId: ctx.user.id
       });
-      if (ENV.n8nOnboardingWebhookUrl) {
-        fetch(ENV.n8nOnboardingWebhookUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${ENV.n8nWebhookSecret}`
-          },
-          body: JSON.stringify({
-            artistId: newArtist.id,
-            userId: ctx.user.id,
-            email: ctx.user.email,
-            firstName: ctx.user.name?.split(" ")[0] ?? "there",
-            shopName: input.shopName
-          })
-        }).catch(() => {
-        });
-      }
       return newArtist;
     }),
     update: artistOwnerProcedure.input(
