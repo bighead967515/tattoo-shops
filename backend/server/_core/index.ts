@@ -25,7 +25,8 @@ import {
   getWebhookQueueStats,
 } from "../webhookHandler";
 import { ENV } from "./env";
-import { logger } from "./logger";
+import { logger, requestStorage } from "./logger";
+import crypto from "crypto";
 import { initializeBuckets } from "./supabaseStorage";
 import { initSentry, sentryErrorHandler, captureException } from "./sentry";
 
@@ -83,6 +84,18 @@ app.set("trust proxy", 1);
 
 // Initialize Sentry early (must be before other middleware)
 initSentry();
+
+// Assign request correlation ID and run Winston logger context using AsyncLocalStorage
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const requestId = (req.headers["x-request-id"] as string) || crypto.randomUUID();
+  res.setHeader("X-Request-ID", requestId);
+
+  requestStorage.run({ requestId }, () => {
+    // Fallback store on globalThis for synchronous Winston formats
+    (globalThis as any).__requestStorageStore = { requestId };
+    next();
+  });
+});
 
 // Security headers
 // CSP is production-only — Vite dev middleware uses websockets and inline code for HMR
@@ -184,11 +197,15 @@ const limiter = rateLimit({
     });
   },
   skip: (req) => {
-    // Only skip rate limiting for lightweight, cacheable GET tRPC queries.
-    // AI discovery, search, and other expensive procedures remain rate-limited.
+    // Replace blanket skip with allowlist for cheap public reads as recommended in the Launch Readiness Plan.
     if (req.method !== "GET" || !req.path.startsWith("/api/trpc/")) return false;
-    const expensive = ["artists.discover", "requests.refineDescription", "ai."];
-    return !expensive.some((prefix) => req.path.includes(prefix));
+    const cheapQueries = [
+      "healthCheck",
+      "artists.getAll",
+      "artists.getById",
+      "reviews.getForArtist",
+    ];
+    return cheapQueries.some((query) => req.path.includes(query));
   },
 });
 app.use("/api/", limiter);
@@ -243,9 +260,10 @@ app.post(
 
 // Configure body parser — files are uploaded directly to Supabase Storage via signed URLs,
 // so the JSON body limit only needs to cover text payloads (descriptions, bids, reviews).
+// Enforce strict 1MB limits globally as recommended in the Launch Readiness Plan.
 app.use(cookieParser());
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ limit: "5mb", extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ limit: "1mb", extended: true }));
 
 // P1-1 CSRF Protection Middleware
 // Verify CSRF tokens on all mutations (POST/PUT/PATCH/DELETE)
@@ -369,21 +387,34 @@ app.get("/api/health", async (_req, res) => {
     // Get webhook queue stats
     const webhookStats = await getWebhookQueueStats();
 
-    // Check if storage buckets are initialized
-    // In production, this should be true because startup fails if buckets unavailable
-    const storageReady = true; // Extended check can be added if bucket ping is available
+    // Check if storage buckets are initialized and reachable
+    let storageReady = false;
+    try {
+      const { supabaseAdmin } = await import("./supabase");
+      const { data, error } = await supabaseAdmin.storage.listBuckets();
+      if (!error && data) {
+        storageReady = true;
+      }
+    } catch (err) {
+      logger.error("Health check storage ping failed", { error: err });
+    }
 
-    // Check Stripe connectivity (basic: just verify API key and artist price IDs are set)
-    const stripeReady =
-      ENV.stripeSecretKey &&
-      ENV.stripeArtistAmateurPriceIdMonth
-        ? true
-        : false;
+    // Check Stripe connectivity (perform a lightweight call)
+    let stripeReady = false;
+    if (ENV.stripeSecretKey) {
+      try {
+        const { stripe } = await import("../stripe");
+        await stripe.customers.list({ limit: 1 });
+        stripeReady = true;
+      } catch (err) {
+        logger.error("Health check Stripe ping failed", { error: err });
+      }
+    }
 
     const overallStatus =
       dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
 
-    const httpStatus = dbStatus === "connected" ? 200 : 503;
+    const httpStatus = dbStatus === "connected" && storageReady && stripeReady ? 200 : 503;
 
     res.status(httpStatus).json({
       status: overallStatus,

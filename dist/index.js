@@ -126,7 +126,21 @@ var init_env = __esm({
 });
 
 // backend/server/_core/supabase.ts
+var supabase_exports = {};
+__export(supabase_exports, {
+  createSupabaseClientForUser: () => createSupabaseClientForUser,
+  supabaseAdmin: () => supabaseAdmin
+});
 import { createClient } from "@supabase/supabase-js";
+function createSupabaseClientForUser(accessToken) {
+  return createClient(ENV.supabaseUrl, ENV.supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  });
+}
 var supabaseAdmin;
 var init_supabase = __esm({
   "backend/server/_core/supabase.ts"() {
@@ -791,6 +805,7 @@ var init_sentry = __esm({
 
 // backend/server/_core/logger.ts
 import winston from "winston";
+import { AsyncLocalStorage } from "node:async_hooks";
 function serializeUnknownError(error) {
   if (error instanceof Error) {
     return {
@@ -803,7 +818,7 @@ function serializeUnknownError(error) {
     value: error
   };
 }
-var isDev, transports, logger;
+var isDev, transports, requestStorage, requestContextFormat, logger;
 var init_logger = __esm({
   "backend/server/_core/logger.ts"() {
     "use strict";
@@ -837,10 +852,19 @@ var init_logger = __esm({
       } catch {
       }
     }
+    requestStorage = new AsyncLocalStorage();
+    requestContextFormat = winston.format((info) => {
+      const store = globalThis.__requestStorageStore || requestStorage.getStore();
+      if (store?.requestId) {
+        info.requestId = store.requestId;
+      }
+      return info;
+    });
     logger = winston.createLogger({
       level: isDev ? "debug" : "info",
       format: winston.format.combine(
         winston.format.timestamp(),
+        requestContextFormat(),
         winston.format.errors({ stack: true })
       ),
       defaultMeta: { service: "tattoo-shops-api" },
@@ -1083,7 +1107,7 @@ async function createArtist(artist) {
   if (!db) throw new Error("Database not available");
   return await db.transaction(async (tx) => {
     await tx.update(users).set(buildArtistOnboardingUserUpdate()).where(eq(users.id, artist.userId));
-    const [created] = await tx.insert(artists).values({ ...artist, isApproved: true }).onConflictDoUpdate({
+    const [created] = await tx.insert(artists).values({ ...artist, isApproved: false }).onConflictDoUpdate({
       target: artists.userId,
       set: {
         shopName: artist.shopName,
@@ -1093,7 +1117,7 @@ async function createArtist(artist) {
         city: artist.city ?? null,
         state: artist.state ?? null,
         instagram: artist.instagram ?? null,
-        isApproved: true,
+        isApproved: false,
         updatedAt: /* @__PURE__ */ new Date()
       }
     }).returning();
@@ -6780,6 +6804,7 @@ init_env();
 init_logger();
 init_supabaseStorage();
 init_sentry();
+import crypto3 from "crypto";
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -6817,6 +6842,14 @@ var require2 = createRequire(import.meta.url);
 var app = express2();
 app.set("trust proxy", 1);
 initSentry();
+app.use((req, res, next) => {
+  const requestId = req.headers["x-request-id"] || crypto3.randomUUID();
+  res.setHeader("X-Request-ID", requestId);
+  requestStorage.run({ requestId }, () => {
+    globalThis.__requestStorageStore = { requestId };
+    next();
+  });
+});
 app.use(
   helmet({
     contentSecurityPolicy: ENV.isProduction ? {
@@ -6891,8 +6924,13 @@ var limiter = rateLimit({
   },
   skip: (req) => {
     if (req.method !== "GET" || !req.path.startsWith("/api/trpc/")) return false;
-    const expensive = ["artists.discover", "requests.refineDescription", "ai."];
-    return !expensive.some((prefix) => req.path.includes(prefix));
+    const cheapQueries = [
+      "healthCheck",
+      "artists.getAll",
+      "artists.getById",
+      "reviews.getForArtist"
+    ];
+    return cheapQueries.some((query) => req.path.includes(query));
   }
 });
 app.use("/api/", limiter);
@@ -6933,8 +6971,8 @@ app.post(
   handleStripeWebhook
 );
 app.use(cookieParser());
-app.use(express2.json({ limit: "5mb" }));
-app.use(express2.urlencoded({ limit: "5mb", extended: true }));
+app.use(express2.json({ limit: "1mb" }));
+app.use(express2.urlencoded({ limit: "1mb", extended: true }));
 app.use(csrfTokenMiddleware);
 app.use(csrfProtectionMiddleware);
 registerSupabaseAuthRoutes(app);
@@ -7018,10 +7056,28 @@ app.get("/api/health", async (_req, res) => {
       dbStatus = "connected";
     }
     const webhookStats = await getWebhookQueueStats();
-    const storageReady = true;
-    const stripeReady = ENV.stripeSecretKey && ENV.stripeArtistAmateurPriceIdMonth ? true : false;
+    let storageReady = false;
+    try {
+      const { supabaseAdmin: supabaseAdmin2 } = await Promise.resolve().then(() => (init_supabase(), supabase_exports));
+      const { data, error } = await supabaseAdmin2.storage.listBuckets();
+      if (!error && data) {
+        storageReady = true;
+      }
+    } catch (err) {
+      logger.error("Health check storage ping failed", { error: err });
+    }
+    let stripeReady = false;
+    if (ENV.stripeSecretKey) {
+      try {
+        const { stripe: stripe2 } = await Promise.resolve().then(() => (init_stripe(), stripe_exports));
+        await stripe2.customers.list({ limit: 1 });
+        stripeReady = true;
+      } catch (err) {
+        logger.error("Health check Stripe ping failed", { error: err });
+      }
+    }
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
-    const httpStatus = dbStatus === "connected" ? 200 : 503;
+    const httpStatus = dbStatus === "connected" && storageReady && stripeReady ? 200 : 503;
     res.status(httpStatus).json({
       status: overallStatus,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),

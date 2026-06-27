@@ -1,5 +1,6 @@
 import winston from "winston";
 import { ENV } from "./env";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 const isDev = !ENV.isProduction;
 
@@ -37,10 +38,22 @@ if (ENV.isProduction) {
   }
 }
 
+// Request context storage for correlation request IDs in logs
+export const requestStorage = new AsyncLocalStorage<{ requestId: string }>();
+
+const requestContextFormat = winston.format((info) => {
+  const store = (globalThis as any).__requestStorageStore || requestStorage.getStore();
+  if (store?.requestId) {
+    info.requestId = store.requestId;
+  }
+  return info;
+});
+
 export const logger = winston.createLogger({
   level: isDev ? "debug" : "info",
   format: winston.format.combine(
     winston.format.timestamp(),
+    requestContextFormat(),
     winston.format.errors({ stack: true }),
   ),
   defaultMeta: { service: "tattoo-shops-api" },

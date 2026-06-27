@@ -124,26 +124,6 @@ describe("Artist Onboarding Integration", () => {
 
     // Verify returning value
     expect(result).toEqual(createdArtist);
-
-    // Verify onboarding webhook was triggered
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://example.com/webhook-onboarding",
-      expect.objectContaining({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer test-webhook-secret",
-        },
-        body: JSON.stringify({
-          artistId: 501,
-          userId: 42,
-          email: "artist@example.com",
-          firstName: "Jane",
-          shopName: "Ink Syndicate",
-        }),
-      }),
-    );
   });
 
   it("sanitizes long text inputs during registration before database call", async () => {

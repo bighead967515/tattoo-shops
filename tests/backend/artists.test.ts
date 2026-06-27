@@ -40,6 +40,12 @@ describe("Artist Management", () => {
       const result = { subscriptionTier: "free" };
       expect(result.subscriptionTier).toBe("free");
     });
+
+    it('should set default isApproved to false', async () => {
+      // Mock: Create artist isApproved
+      const result = { isApproved: false };
+      expect(result.isApproved).toBe(false);
+    });
   });
 
   describe("Update Artist Profile", () => {

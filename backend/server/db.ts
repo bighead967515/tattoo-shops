@@ -246,10 +246,10 @@ export async function createArtist(artist: InsertArtist) {
       .set(buildArtistOnboardingUserUpdate())
       .where(eq(users.id, artist.userId));
 
-    // NEW ARTISTS HAVE IMMEDIATE ACCESS AND APPEAR IN PUBLIC LISTINGS IMMEDIATELY
+    // NEW ARTISTS AWAIT ADMINISTRATIVE APPROVAL AND DO NOT APPEAR IN PUBLIC LISTINGS BY DEFAULT
     const [created] = await tx
       .insert(artists)
-      .values({ ...artist, isApproved: true })
+      .values({ ...artist, isApproved: false })
       .onConflictDoUpdate({
         target: artists.userId,
         set: {
@@ -260,7 +260,7 @@ export async function createArtist(artist: InsertArtist) {
           city: artist.city ?? null,
           state: artist.state ?? null,
           instagram: artist.instagram ?? null,
-          isApproved: true,
+          isApproved: false,
           updatedAt: new Date(),
         },
       })
