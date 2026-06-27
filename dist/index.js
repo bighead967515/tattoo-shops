@@ -7046,6 +7046,9 @@ app.post("/api/portfolio/enqueue-analysis", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+app.get("/api/csrf-token", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 app.get("/api/health", async (_req, res) => {
   try {
     const db = await Promise.resolve().then(() => (init_db(), db_exports)).then((m) => m.getDb());
@@ -7077,7 +7080,7 @@ app.get("/api/health", async (_req, res) => {
       }
     }
     const overallStatus = dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
-    const httpStatus = dbStatus === "connected" && storageReady && stripeReady ? 200 : 503;
+    const httpStatus = dbStatus === "connected" && storageReady ? 200 : 503;
     res.status(httpStatus).json({
       status: overallStatus,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),

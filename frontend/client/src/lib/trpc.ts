@@ -33,7 +33,7 @@ async function ensureCsrfToken(): Promise<string | null> {
   // Bootstrap token from a safe GET endpoint. The backend emits X-CSRF-Token on all responses.
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const response = await window.fetch("/api/health", {
+      const response = await window.fetch("/api/csrf-token", {
         method: "GET",
         credentials: "include",
       });

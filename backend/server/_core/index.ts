@@ -369,6 +369,13 @@ app.post("/api/portfolio/enqueue-analysis", async (req: Request, res: Response) 
   }
 });
 
+// CSRF bootstrap endpoint for frontend.
+// Returns a simple 200 OK. The csrfTokenMiddleware automatically runs on all routes,
+// attaching the 'X-CSRF-Token' header and setting the '__csrf_token' cookie.
+app.get("/api/csrf-token", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Health check endpoint for monitoring
 // Returns status of all critical dependencies: database, storage, webhook queue, Stripe connectivity
 app.get("/api/health", async (_req, res) => {
@@ -414,7 +421,9 @@ app.get("/api/health", async (_req, res) => {
     const overallStatus =
       dbStatus === "connected" && storageReady && stripeReady ? "ok" : "degraded";
 
-    const httpStatus = dbStatus === "connected" && storageReady && stripeReady ? 200 : 503;
+    // Only return 503 if critical dependencies (db and storage) are down.
+    // Stripe is non-critical for core app availability (browsing, etc.).
+    const httpStatus = dbStatus === "connected" && storageReady ? 200 : 503;
 
     res.status(httpStatus).json({
       status: overallStatus,
