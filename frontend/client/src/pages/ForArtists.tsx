@@ -194,9 +194,9 @@ export default function ForArtists() {
               <div>
                 <h3 className="font-bold text-lg mb-1 text-primary">Pay-as-you-go</h3>
                 <p className="text-xs text-muted-foreground mb-4">No monthly commitment</p>
-                <p className="text-3xl font-bold mb-6">15%<span className="text-base font-normal text-muted-foreground"> booking fee</span></p>
+                <p className="text-3xl font-bold mb-6">10%<span className="text-base font-normal text-muted-foreground"> booking fee</span></p>
                 <ul className="space-y-3 text-xs mb-6">
-                  {["20 portfolio photos", "Receive client bids", "No subscription", "Standard support"].map(f => (
+                  {["10 portfolio photos", "Up to 3 monthly bids", "Receive client bids", "Standard support"].map(f => (
                     <li key={f} className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                       <span>{f}</span>

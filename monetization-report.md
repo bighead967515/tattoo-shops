@@ -20,8 +20,8 @@ The monetization strategy is built on three core pillars:
 | :--- | :--- | :--- | :--- | :--- |
 | **Free** | $0 | $0 | N/A (no bidding) | New artists, hobbyists, exposure seekers |
 | **Pay-as-you-go** | $0 | $0 | **10%** on accepted bids | Artists who prefer pure success-fee models |
-| **Pro** | $29/mo | $232/yr | **5%** on accepted bids | Working artists, small studios |
-| **Founding Artist** | $19/mo (locked) | $190/yr | **5%** on accepted bids | First 100 early adopters |
+| **Pro** | $49/mo | $490/yr | **5%** on accepted bids | Working artists, small studios |
+| **Founding Artist** | $19/mo (locked) | $190/yr | **5%** on accepted bids | First 50 early adopters |
 
 *Note: Annual billing for Pro and Founding Artist tiers includes a built-in "2 months free" discount.*
 
@@ -48,7 +48,7 @@ The monetization strategy is built on three core pillars:
 - **Pricing:** $0/month
 - **Transaction Fee:** **10%** on accepted bids
 - **Portfolio Limit:** 10 photos
-- **Bidding:** **Unlimited**
+- **Bidding:** **Cap of 3 bids per month**
 - **Booking Calendar:** No
 - **Payment Processing:** No
 - **Verified Badge:** No
@@ -57,7 +57,7 @@ The monetization strategy is built on three core pillars:
 ### Pro Subscription
 *Purpose: The core recurring revenue engine.*
 
-- **Pricing:** $29/month (or $232/year)
+- **Pricing:** $49/month (or $490/year)
 - **Transaction Fee:** **5%** on accepted bids (Reduced rate)
 - **Portfolio Limit:** Unlimited
 - **Bidding:** **Unlimited**
@@ -68,10 +68,10 @@ The monetization strategy is built on three core pillars:
 - **Analytics:** Yes (Profile views, conversion rate)
 
 ### Founding Artist (Launch Special)
-*Purpose: Cold-start solution to get the first 50-100 artists emotionally invested and active.*
+*Purpose: Cold-start solution to get the first 50 artists emotionally invested and active.*
 
-- **Pricing:** **$19/month locked for life** (vs. $29 future price)
-- **Special Offer:** First 6 months FREE (using promo code `FOUNDING_ARTIST_6MO`)
+- **Pricing:** **$19/month locked for life** (vs. $49 future price)
+- **Special Offer:** First 3 months FREE
 - **Transaction Fee:** **5%** on accepted bids
 - **Features:** Everything in Pro
 - **Exclusives:** "Founding Artist" badge on profile, Homepage carousel placement
@@ -86,4 +86,4 @@ The transaction fee system is built directly into the bidding engine:
 1. **Fee Calculation:** When an artist submits a bid, the backend checks their current tier and calculates the `platformFeeRateBps` (basis points: 500 for 5%, 1000 for 10%). This rate is stored permanently on the bid record.
 2. **Fee Lock-in:** Storing the rate at the time of bidding ensures that if an artist changes tiers later, the fee applied to already-submitted bids remains fair and predictable.
 3. **Amount Calculation:** When a client accepts a bid, the backend calculates the exact `platformFeeAmountCents` based on the agreed bid price and the locked-in fee rate.
-4. **Collection:** This fee amount is then passed to Stripe during the final checkout/payment process, automatically routing the platform's cut to the Ink Connect connected account.
+4. **Collection:** The transaction fee applies exclusively to the upfront digital booking deposit processed through the platform. When a client pays the deposit, the entire platform fee (calculated as a percentage of the total bid price) is deducted directly from that deposit payment using Stripe Connect's application fee/transfer split capability. This ensures the platform's cut is collected immediately and securely. The remaining deposit portion is routed directly to the artist. Escrowed shop fees settled inside a studio (the final cash/card payment following the appointment) remain fully disintermediated from the core software framework, eliminating the need to chase artists for cash cuts.

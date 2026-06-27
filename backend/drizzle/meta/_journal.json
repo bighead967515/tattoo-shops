@@ -57,6 +57,13 @@
       "when": 1780852143541,
       "tag": "0007_dark_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782520306993,
+      "tag": "0008_green_xorn",
+      "breakpoints": true
     }
   ]
 }

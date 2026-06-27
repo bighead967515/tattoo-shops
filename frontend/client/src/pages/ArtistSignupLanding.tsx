@@ -70,7 +70,7 @@ const PLAN_OPTIONS = [
     name: "Pay-as-you-go",
     price: "$0/mo",
     desc: "No monthly commitment",
-    details: "15% booking fee, 20 portfolio photos, receive client bids, standard support.",
+    details: "10% booking fee, 10 portfolio photos, 3 monthly bids limit, receive client bids, standard support.",
     popular: false,
     color: "border-primary/50 bg-primary/5 text-primary",
   },

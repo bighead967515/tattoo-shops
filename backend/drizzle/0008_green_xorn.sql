@@ -1,0 +1,1 @@
+ALTER TABLE "artists" ADD COLUMN "profileViewCount" integer DEFAULT 0 NOT NULL;

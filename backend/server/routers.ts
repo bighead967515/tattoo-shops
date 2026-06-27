@@ -14,7 +14,7 @@ import {
 import { sanitizeInput, sanitizeEmail, sanitizePhone } from "./_core/sanitize";
 import { z } from "zod";
 import * as db from "./db";
-import { sendBookingIntakeNotification, sendArtistInvitation } from "./email";
+import { sendBookingIntakeNotification, sendArtistInvitation, sendFreeTierPerformanceInsights } from "./email";
 import {
   createSignedUploadUrl,
   deleteFile,
@@ -635,7 +635,43 @@ export const appRouter = router({
     getById: publicProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
-        return await db.getArtistById(input.id);
+        const artist = await db.getArtistById(input.id);
+        if (artist) {
+          const database = await getDb();
+          if (database) {
+            database
+              .update(artists)
+              .set({ profileViewCount: sql`profileViewCount + 1` })
+              .where(eq(artists.id, artist.id))
+              .returning()
+              .then(async ([updatedArtist]) => {
+                if (
+                  updatedArtist &&
+                  updatedArtist.profileViewCount % 15 === 0 &&
+                  artist.subscriptionTier === "artist_free"
+                ) {
+                  const [artistUser] = await database
+                    .select({ email: users.email, name: users.name })
+                    .from(users)
+                    .where(eq(users.id, artist.userId))
+                    .limit(1);
+
+                  if (artistUser && artistUser.email) {
+                    await sendFreeTierPerformanceInsights(artistUser.email, {
+                      artistName: artistUser.name || artist.shopName,
+                      viewsCount: updatedArtist.profileViewCount,
+                    }).catch((err) => {
+                      logger.error("Failed to send free tier view performance insights:", err);
+                    });
+                  }
+                }
+              })
+              .catch((err) => {
+                logger.error("Failed to increment profileViewCount or process insights:", err);
+              });
+          }
+        }
+        return artist;
       }),
 
     getByUserId: protectedProcedure.query(async ({ ctx }) => {
@@ -1040,6 +1076,7 @@ export const appRouter = router({
                 shopName: artists.shopName,
                 userEmail: users.email,
                 userName: users.name,
+                subscriptionTier: users.subscriptionTier,
               })
               .from(artists)
               .innerJoin(users, eq(artists.userId, users.id))
@@ -1059,6 +1096,15 @@ export const appRouter = router({
                 budget: booking.budget || "N/A",
                 additionalNotes: booking.additionalNotes || "N/A",
               });
+
+              if (artistWithUser.subscriptionTier === "artist_free") {
+                sendFreeTierPerformanceInsights(artistWithUser.userEmail, {
+                  artistName: artistWithUser.userName || artistWithUser.shopName,
+                  inquiryReceived: true,
+                }).catch((err) => {
+                  logger.error("Failed to send free tier inquiry performance insights:", err);
+                });
+              }
             }
           }
         } catch (err) {

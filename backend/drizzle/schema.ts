@@ -132,8 +132,10 @@ export const artists = pgTable("artists", {
   aiCredits: integer("aiCredits").default(0).notNull(),
   /** True if this artist signed up during the Founding Artist offer period */
   isFoundingArtist: boolean("isFoundingArtist").default(false).notNull(),
-  /** When the 6-month free trial ends; null for non-founding artists */
+  /** When the 3-month free trial ends; null for non-founding artists */
   foundingTrialEndsAt: timestamp("foundingTrialEndsAt"),
+  /** Number of times this artist profile has been viewed by clients */
+  profileViewCount: integer("profileViewCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

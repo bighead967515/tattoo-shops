@@ -415,3 +415,78 @@ export async function sendBookingIntakeNotification(
   });
 }
 
+/**
+ * Send performance insights email to a Free tier artist to incentivize upgrading to Pro Studio
+ */
+export async function sendFreeTierPerformanceInsights(
+  to: string,
+  details: {
+    artistName: string;
+    viewsCount?: number;
+    inquiryReceived?: boolean;
+  },
+) {
+  const { artistName, viewsCount, inquiryReceived } = details;
+  const escapedArtistName = escapeHtml(artistName);
+
+  let messageBody = "";
+  if (inquiryReceived) {
+    messageBody = `You just received a new client inquiry! However, because you are on our Free tier, you can't view detailed client information or respond to them immediately.`;
+  } else if (viewsCount) {
+    messageBody = `Your profile was viewed ${viewsCount} times recently! Serious clients are looking at your work, but they can't easily contact you on the Free tier.`;
+  } else {
+    messageBody = `Serious clients are checking out your profile and looking at your work.`;
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #10b981, #06b6d4); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
+    .cta-box { background: #f0fdf4; padding: 20px; border-radius: 6px; margin: 20px 0; border: 1px solid #bbf7d0; text-align: center; }
+    .cta-button { display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
+    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>📈 Grow Your Tattoo Studio!</h2>
+      <p style="margin: 0; font-size: 15px; opacity: 0.9;">Ink Connect Performance Insights</p>
+    </div>
+    <div class="content">
+      <p>Hi ${escapedArtistName},</p>
+      
+      <p>${messageBody}</p>
+      
+      <div class="cta-box">
+        <h3>Unlock Your Studio's Full Potential</h3>
+        <p style="margin: 5px 0 15px 0;">Upgrade to <strong>Pro Studio</strong> to get unlimited portfolio photos, a verified artist badge, and the ability to view details and respond to client inquiries instantly.</p>
+        <a href="https://inkedconnect.com/artist/billing" class="cta-button">Upgrade to Pro Studio</a>
+      </div>
+
+      <p>If you have any questions, feel free to reply to this email.</p>
+      
+      <p>Best regards,<br>
+      <strong>Ink Connect Team</strong></p>
+    </div>
+    <div class="footer">
+      <p>Ink Connect &mdash; Your Tattoo Journey Starts Here</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return sendEmail({
+    to,
+    subject: `📈 Performance Insights: Grow your tattoo studio on Ink Connect`,
+    html,
+  });
+}
+

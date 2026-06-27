@@ -289,8 +289,10 @@ var init_schema = __esm({
       aiCredits: integer("aiCredits").default(0).notNull(),
       /** True if this artist signed up during the Founding Artist offer period */
       isFoundingArtist: boolean("isFoundingArtist").default(false).notNull(),
-      /** When the 6-month free trial ends; null for non-founding artists */
+      /** When the 3-month free trial ends; null for non-founding artists */
       foundingTrialEndsAt: timestamp("foundingTrialEndsAt"),
+      /** Number of times this artist profile has been viewed by clients */
+      profileViewCount: integer("profileViewCount").default(0).notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
     });
@@ -2612,25 +2614,25 @@ function readRuntimeEnv(key) {
 var ARTIST_TIER_LIMITS = {
   artist_free: {
     name: "Directory Profile",
-    portfolioPhotos: Number.MAX_SAFE_INTEGER,
-    canBid: true,
-    freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
-    transactionFeePercent: 15,
+    portfolioPhotos: 10,
+    canBid: false,
+    freeBidsPerMonth: 0,
+    transactionFeePercent: 0,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
     sponsoredListing: false,
-    verifiedBadge: true
+    verifiedBadge: false
   },
   artist_paygo: {
     name: "Pay-as-you-go",
-    portfolioPhotos: 20,
+    portfolioPhotos: 10,
     canBid: true,
-    freeBidsPerMonth: 5,
-    transactionFeePercent: 15,
+    freeBidsPerMonth: 3,
+    transactionFeePercent: 10,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
     sponsoredListing: false,
-    verifiedBadge: true
+    verifiedBadge: false
   },
   artist_pro: {
     name: "Pro Studio",
@@ -3053,6 +3055,67 @@ async function sendBookingIntakeNotification(to, details) {
   return sendEmail({
     to,
     subject: `New booking request from ${clientName} via The Inked Network`,
+    html
+  });
+}
+async function sendFreeTierPerformanceInsights(to, details) {
+  const { artistName, viewsCount, inquiryReceived } = details;
+  const escapedArtistName = escapeHtml(artistName);
+  let messageBody = "";
+  if (inquiryReceived) {
+    messageBody = `You just received a new client inquiry! However, because you are on our Free tier, you can't view detailed client information or respond to them immediately.`;
+  } else if (viewsCount) {
+    messageBody = `Your profile was viewed ${viewsCount} times recently! Serious clients are looking at your work, but they can't easily contact you on the Free tier.`;
+  } else {
+    messageBody = `Serious clients are checking out your profile and looking at your work.`;
+  }
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #10b981, #06b6d4); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
+    .cta-box { background: #f0fdf4; padding: 20px; border-radius: 6px; margin: 20px 0; border: 1px solid #bbf7d0; text-align: center; }
+    .cta-button { display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
+    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>\u{1F4C8} Grow Your Tattoo Studio!</h2>
+      <p style="margin: 0; font-size: 15px; opacity: 0.9;">Ink Connect Performance Insights</p>
+    </div>
+    <div class="content">
+      <p>Hi ${escapedArtistName},</p>
+      
+      <p>${messageBody}</p>
+      
+      <div class="cta-box">
+        <h3>Unlock Your Studio's Full Potential</h3>
+        <p style="margin: 5px 0 15px 0;">Upgrade to <strong>Pro Studio</strong> to get unlimited portfolio photos, a verified artist badge, and the ability to view details and respond to client inquiries instantly.</p>
+        <a href="https://inkedconnect.com/artist/billing" class="cta-button">Upgrade to Pro Studio</a>
+      </div>
+
+      <p>If you have any questions, feel free to reply to this email.</p>
+      
+      <p>Best regards,<br>
+      <strong>Ink Connect Team</strong></p>
+    </div>
+    <div class="footer">
+      <p>Ink Connect &mdash; Your Tattoo Journey Starts Here</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  return sendEmail({
+    to,
+    subject: `\u{1F4C8} Performance Insights: Grow your tattoo studio on Ink Connect`,
     html
   });
 }
@@ -5235,7 +5298,28 @@ var appRouter = router({
       };
     }),
     getById: publicProcedure.input(z7.object({ id: z7.number() })).query(async ({ input }) => {
-      return await getArtistById(input.id);
+      const artist = await getArtistById(input.id);
+      if (artist) {
+        const database = await getDb();
+        if (database) {
+          database.update(artists).set({ profileViewCount: sql4`profileViewCount + 1` }).where(eq5(artists.id, artist.id)).returning().then(async ([updatedArtist]) => {
+            if (updatedArtist && updatedArtist.profileViewCount % 15 === 0 && artist.subscriptionTier === "artist_free") {
+              const [artistUser] = await database.select({ email: users.email, name: users.name }).from(users).where(eq5(users.id, artist.userId)).limit(1);
+              if (artistUser && artistUser.email) {
+                await sendFreeTierPerformanceInsights(artistUser.email, {
+                  artistName: artistUser.name || artist.shopName,
+                  viewsCount: updatedArtist.profileViewCount
+                }).catch((err) => {
+                  logger.error("Failed to send free tier view performance insights:", err);
+                });
+              }
+            }
+          }).catch((err) => {
+            logger.error("Failed to increment profileViewCount or process insights:", err);
+          });
+        }
+      }
+      return artist;
     }),
     getByUserId: protectedProcedure.query(async ({ ctx }) => {
       return await getArtistByUserId(ctx.user.id);
@@ -5524,7 +5608,8 @@ var appRouter = router({
             artistId: artists.id,
             shopName: artists.shopName,
             userEmail: users.email,
-            userName: users.name
+            userName: users.name,
+            subscriptionTier: users.subscriptionTier
           }).from(artists).innerJoin(users, eq5(artists.userId, users.id)).where(eq5(artists.id, input.artistId)).limit(1);
           if (artistWithUser && artistWithUser.userEmail) {
             await sendBookingIntakeNotification(artistWithUser.userEmail, {
@@ -5539,6 +5624,14 @@ var appRouter = router({
               budget: booking.budget || "N/A",
               additionalNotes: booking.additionalNotes || "N/A"
             });
+            if (artistWithUser.subscriptionTier === "artist_free") {
+              sendFreeTierPerformanceInsights(artistWithUser.userEmail, {
+                artistName: artistWithUser.userName || artistWithUser.shopName,
+                inquiryReceived: true
+              }).catch((err) => {
+                logger.error("Failed to send free tier inquiry performance insights:", err);
+              });
+            }
           }
         }
       } catch (err) {

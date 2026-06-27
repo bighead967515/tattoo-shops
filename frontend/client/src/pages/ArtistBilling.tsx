@@ -67,17 +67,17 @@ const PLANS: PlanDef[] = [
     Icon: Zap,
     monthlyPrice: 0,
     yearlyPrice: 0,
-    transactionFee: "15% booking fee",
+    transactionFee: "10% booking fee",
     stripeTierArg: null,
     badge: "No subscription",
     isMostPopular: false,
     isElite: false,
     features: [
-      { label: "20 portfolio photos", included: true },
+      { label: "10 portfolio photos", included: true },
       { label: "Directory listing & search visibility", included: true },
       { label: "Receive client inquiries", included: true },
-      { label: "Bid on client requests", included: true },
-      { label: "15% booking fee on successful deals", included: true },
+      { label: "Up to 3 monthly bids", included: true },
+      { label: "10% booking fee on successful deals", included: true },
       { label: "Booking calendar", included: false },
       { label: "Stripe payment processing", included: false },
       { label: "Verified artist badge", included: false },
@@ -561,7 +561,7 @@ export default function ArtistBilling() {
             </div>
             <p className="text-xs text-muted-foreground mt-3">
               💡 <strong>Pro tip:</strong> Once you win 3+ bids per month, a Pro
-              subscription pays for itself — you'll save more on fees than the $29/mo cost.
+              subscription pays for itself — you'll save more on fees than the $49/mo cost.
             </p>
           </div>
 

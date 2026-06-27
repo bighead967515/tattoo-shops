@@ -71,7 +71,7 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 - **Request board** — browse client tattoo requests and submit bids
 - **AI Bid Assistant** — Professional/Icon tier artists get AI-drafted bid responses with suggested pricing, estimated hours, and personalized pitch messages
 - **License verification** — upload documents for verified artist status with AI-powered OCR that extracts names, license numbers, and expiration dates
-- **Subscription tiers** — Free, Pro ($29/mo), Pay-as-you-go (0$/mo + 10% fee), Founding Artist ($19/mo locked, first 100 only)
+- **Subscription tiers** — Free, Pro ($49/mo), Pay-as-you-go (0$/mo + 10% fee), Founding Artist ($19/mo locked, first 50 only)
 - **Bid dashboard** — My Bids tab with status, analytics strip (total/pending/accepted/win-rate), and withdraw actions
 - **Analytics & reviews** — ratings, review responses, helpful votes
 
@@ -164,13 +164,13 @@ A full-stack web application for finding, connecting with, and booking tattoo ar
 | Tier                      | Price             | Bid Fee | Portfolio | Bookings | Verified Badge | Featured |
 | ------------------------- | ----------------- | ------- | --------- | -------- | -------------- | -------- |
 | **Free**                  | $0/mo             | —       | 10 photos | —        | —              | —        |
-| **Pro**                   | $29/mo (or $232/yr) | 5%    | Unlimited | ✓        | ✓              | —        |
+| **Pro**                   | $49/mo (or $490/yr) | 5%     | Unlimited | ✓        | ✓              | —        |
 | **Pay-as-you-go**         | $0/mo             | 10%     | 10 photos | —        | —              | —        |
 | **Founding Artist**       | $19/mo locked     | 5%      | Unlimited | ✓        | ✓              | ✓        |
 
-> **Founding Artist** is limited to the first 100 artists. Requires: complete portfolio + 3 bid responses within 60 days. Badge is revocable if activity drops.
+> **Founding Artist** is limited to the first 50 artists and includes a **3-month trial**. Requires: complete portfolio + 3 bid responses within 60 days. Badge is revocable if activity drops.
 >
-> **Pro break-even**: At ~$580/month in accepted bids, the 5% Pro fee costs the same as the $29 subscription vs. 10% pay-as-you-go fee.
+> **Pro break-even**: At ~$980/month in accepted bids, the 5% Pro fee costs the same as the $49 subscription vs. 10% pay-as-you-go fee.
 
 ## Getting Started
 
