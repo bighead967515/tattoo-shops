@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import HomepageFeed from "@/components/HomepageFeed";
+import FeaturedArtistSection from "@/components/FeaturedArtistSection";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -265,6 +266,34 @@ export default function Home() {
               </Card>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Featured Artist of the Week Section */}
+      <FeaturedArtistSection />
+
+      {/* Latest open requests from the community */}
+      <section className="container py-16 border-y bg-muted/10">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Latest ideas from the community
+          </h2>
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+            These are real requests from real people looking for artists right now.
+          </p>
+        </div>
+
+        <HomepageFeed />
+
+        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <Button size="lg" variant="outline" onClick={() => setLocation("/requests")}> 
+            See All Open Requests
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
+            Post Your Own Idea
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
       </section>
 
@@ -545,30 +574,6 @@ export default function Home() {
           )}
         </DialogContent>
       </Dialog>
-
-      <section className="container py-20 border-b">
-        <div className="mb-12 text-center">
-          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Latest ideas from the community
-          </h2>
-          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            These are real requests from real people looking for artists right now.
-          </p>
-        </div>
-
-        <HomepageFeed />
-
-        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Button size="lg" variant="outline" onClick={() => setLocation("/requests")}> 
-            See All Open Requests
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-          <Button size="lg" onClick={() => setLocation("/client/new-request")}> 
-            Post Your Own Idea
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </section>
 
       <section className="container pb-20">
         <Card className="rounded-[2rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-12 text-center">
