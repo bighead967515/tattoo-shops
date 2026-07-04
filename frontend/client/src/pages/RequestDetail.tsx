@@ -1076,10 +1076,28 @@ export default function RequestDetail() {
                         <div className="space-y-4">
                           <div>
                             <Label htmlFor="price">Your Price ($) *</Label>
+                            {/* Budget guidance — Issue #26 */}
+                            {(request.budgetMin || request.budgetMax) && (
+                              <div className="mt-1 mb-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground shrink-0">Client budget:</span>
+                                <span>
+                                  {request.budgetMin && request.budgetMax
+                                    ? `${formatPrice(request.budgetMin)} – ${formatPrice(request.budgetMax)}`
+                                    : request.budgetMin
+                                      ? `From ${formatPrice(request.budgetMin)}`
+                                      : `Up to ${formatPrice(request.budgetMax!)}`}
+                                </span>
+                                <span className="text-muted-foreground/60 ml-auto">Bids outside this range are still accepted.</span>
+                              </div>
+                            )}
                             <Input
                               id="price"
                               type="number"
-                              placeholder="500"
+                              placeholder={
+                                request.budgetMin
+                                  ? String(Math.round(request.budgetMin / 100))
+                                  : "500"
+                              }
                               value={bidForm.priceEstimate}
                               onChange={(e) =>
                                 setBidForm({
