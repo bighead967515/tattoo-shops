@@ -62,6 +62,10 @@ import {
   Sparkles,
   Zap,
   Crown,
+  PartyPopper,
+  MessageCircle,
+  CalendarCheck,
+  ChevronDown,
 } from "lucide-react";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import {
@@ -649,10 +653,12 @@ export default function RequestDetail() {
                           </Badge>
                         )}
                         {bid.status === "rejected" && (
-                          <Badge variant="secondary" className="mt-2">
-                            <X className="h-3 w-3 mr-1" />
-                            Not Selected
-                          </Badge>
+                          <div className="mt-2 opacity-50">
+                            <Badge variant="secondary">
+                              <X className="h-3 w-3 mr-1" />
+                              Not Selected
+                            </Badge>
+                          </div>
                         )}
                       </CardContent>
                       {isOwner &&
@@ -1194,6 +1200,64 @@ export default function RequestDetail() {
                 </CardContent>
               </Card>
             )}
+
+          {/* Post-acceptance next-steps panel — Issue #28 */}
+          {isOwner && request.status !== "open" && request.bids.some((b: BidType) => b.status === "accepted") && (() => {
+            const acceptedBid = request.bids.find((b: BidType) => b.status === "accepted")!;
+            return (
+              <Card className="border-green-500/50 bg-green-500/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                    <PartyPopper className="w-5 h-5" />
+                    You're booked!
+                  </CardTitle>
+                  <CardDescription>
+                    You accepted a bid from{" "}
+                    <span className="font-semibold text-foreground">
+                      {acceptedBid.artist.shopName}
+                    </span>
+                    . Here's what to do next.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-start gap-3 text-sm">
+                    <MessageCircle className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="font-medium">Contact your artist</p>
+                      <p className="text-muted-foreground">
+                        Reach out to {acceptedBid.artist.shopName} to confirm design details, finalize the appointment date, and discuss any last-minute changes.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <CalendarCheck className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="font-medium">Confirm your appointment</p>
+                      <p className="text-muted-foreground">
+                        {acceptedBid.availableDate
+                          ? `Proposed date: ${new Date(acceptedBid.availableDate).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`
+                          : "No date was proposed yet — follow up with your artist to lock in a time."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <DollarSign className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="font-medium">Agreed price</p>
+                      <p className="text-muted-foreground">
+                        {formatPrice(acceptedBid.priceEstimate)} — your deposit has been processed securely via Stripe.
+                      </p>
+                    </div>
+                  </div>
+                  <Link href={`/artist/${acceptedBid.artist.id}`}>
+                    <Button variant="outline" size="sm" className="w-full mt-1">
+                      View {acceptedBid.artist.shopName}'s Profile
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Already bid message */}
           {isArtist && hasAlreadyBid && (
