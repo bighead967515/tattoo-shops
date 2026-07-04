@@ -148,18 +148,24 @@ function PromptRefinerSection({ description, context, onUseImproved }: PromptRef
   };
 
   if (!refine.data && !refine.isPending) {
+    if (description.length < 20) return null;
     return (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-2 border-primary/30 text-primary hover:bg-primary/10"
-        onClick={handleRefine}
-        disabled={description.length < 10}
-      >
-        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-primary" />
-        Get AI Feedback
-      </Button>
+      <div className="mt-3 flex items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 py-2">
+        <Sparkles className="w-4 h-4 text-primary shrink-0" />
+        <p className="text-xs text-muted-foreground flex-1">
+          Not sure how to describe it? Let AI improve your brief.
+        </p>
+        <Button
+          type="button"
+          variant="default"
+          size="sm"
+          className="shrink-0 h-7 text-xs"
+          onClick={handleRefine}
+        >
+          <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+          Improve with AI
+        </Button>
+      </div>
     );
   }
 

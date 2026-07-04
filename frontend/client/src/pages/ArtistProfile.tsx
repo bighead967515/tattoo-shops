@@ -268,10 +268,15 @@ export default function ArtistProfile() {
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 <h1 className="text-4xl font-bold">{artist.shopName}</h1>
                 {isVerifiedArtist && (
-                  <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30 gap-1.5 px-3 py-1 text-sm font-semibold">
-                    <ShieldCheck className="w-4 h-4" />
-                    Verified Artist
-                  </Badge>
+                  <span
+                    title="This artist has been verified by Ink Connect — license and identity confirmed."
+                    className="inline-flex"
+                  >
+                    <Badge className="bg-green-500/20 text-green-700 dark:text-green-300 border border-green-500/50 gap-1.5 px-3 py-1.5 text-sm font-semibold shadow-sm ring-2 ring-green-500/20 ring-offset-1 ring-offset-background animate-in fade-in duration-500">
+                      <ShieldCheck className="w-4 h-4" />
+                      Verified Artist
+                    </Badge>
+                  </span>
                 )}
                 {portfolio && portfolio.length >= 3 && (
                   <Badge className="bg-primary/15 text-primary border border-primary/30 gap-1.5 px-3 py-1 text-sm font-semibold">
