@@ -855,6 +855,42 @@ export default function NewRequest() {
                   />
                 </div>
               </div>
+
+              {/* Budget guidance helper — Issue #31 */}
+              {(() => {
+                const min = parseFloat(formData.budgetMin);
+                const max = parseFloat(formData.budgetMax);
+                const hasMin = !isNaN(min) && min > 0;
+                const hasMax = !isNaN(max) && max > 0;
+                if (!hasMin && !hasMax) return null;
+
+                let tip: string | null = null;
+
+                if (hasMin && hasMax && min > max) {
+                  tip = "Your minimum is higher than your maximum — please check the values.";
+                } else if (hasMax && max < 100) {
+                  tip = "Tattoos under $100 are rare. Most small pieces start around $100–$150. Consider adjusting your range to attract more artists.";
+                } else if (hasMax && max >= 100 && max < 300) {
+                  tip = "Good for small, simple designs (palm-sized or less). Ideal for minimalist line work or single-color pieces.";
+                } else if (hasMax && max >= 300 && max < 600) {
+                  tip = "A solid mid-range budget. Works well for medium pieces with moderate detail or colour.";
+                } else if (hasMax && max >= 600 && max < 1000) {
+                  tip = "Great for larger, more detailed work or full-colour pieces. You'll attract experienced artists.";
+                } else if (hasMax && max >= 1000) {
+                  tip = "Premium budget — expect high-detail, large-format, or full-sleeve work from top-tier artists.";
+                } else if (hasMin && !hasMax) {
+                  tip = "Consider adding a maximum to help artists understand your full range.";
+                }
+
+                if (!tip) return null;
+
+                const isWarning = hasMin && hasMax && min > max;
+                return (
+                  <p className={`text-xs mt-1 ${isWarning ? "text-destructive" : "text-muted-foreground"}`}>
+                    {isWarning ? "\u26a0\ufe0f " : "\u2139\ufe0f "}{tip}
+                  </p>
+                );
+              })()}
             </CardContent>
           </Card>
 
