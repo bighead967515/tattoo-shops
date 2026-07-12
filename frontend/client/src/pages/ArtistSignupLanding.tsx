@@ -20,7 +20,7 @@ import {
   User,
   MapPin,
   Palette,
-  Instagram,
+  AtSign,
   Shield,
   Star,
   Zap,
@@ -784,7 +784,7 @@ export default function ArtistSignupLanding() {
 
                 <div className="space-y-2">
                   <Label htmlFor="instagram">
-                    <Instagram className="w-4 h-4 inline mr-1 text-primary" />
+                    <AtSign className="w-4 h-4 inline mr-1 text-primary" />
                     Instagram Handle
                   </Label>
                   <Input

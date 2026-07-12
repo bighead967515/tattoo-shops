@@ -22,8 +22,8 @@ import {
   MapPin,
   Phone,
   Globe,
-  Instagram,
-  Facebook,
+  AtSign,
+  Share2,
   Heart,
   Calendar,
   Upload,
@@ -427,7 +427,7 @@ export default function ArtistProfile() {
                     rel="noopener noreferrer"
                     className="hover:text-primary"
                   >
-                    <Instagram className="w-5 h-5" />
+                    <AtSign className="w-5 h-5" />
                   </a>
                 )}
                 {artist.facebook && (
@@ -437,7 +437,7 @@ export default function ArtistProfile() {
                     rel="noopener noreferrer"
                     className="hover:text-primary"
                   >
-                    <Facebook className="w-5 h-5" />
+                    <Share2 className="w-5 h-5" />
                   </a>
                 )}
               </div>

@@ -98,9 +98,18 @@ export default function RequestBoard() {
           </Link>
         )}
 
+        {user?.role === "artist" && (
+          <Link href="/dashboard">
+            <Button variant="outline">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              My Bids & Dashboard
+            </Button>
+          </Link>
+        )}
+
         {!user && (
           <Link href="/login">
-            <Button variant="outline">Sign in to post a request</Button>
+            <Button variant="outline">Sign in to bid on requests</Button>
           </Link>
         )}
       </div>
@@ -163,6 +172,18 @@ export default function RequestBoard() {
                 <Button className="mt-4">
                   <Plus className="mr-2 h-4 w-4" />
                   Be the first to post a request
+                </Button>
+              </Link>
+            )}
+            {user?.role === "artist" && (
+              <p className="text-sm text-muted-foreground mt-2">
+                No open requests match your filters right now — check back soon or adjust your search.
+              </p>
+            )}
+            {!user && (
+              <Link href="/login">
+                <Button variant="outline" className="mt-4">
+                  Sign in to bid on requests
                 </Button>
               </Link>
             )}

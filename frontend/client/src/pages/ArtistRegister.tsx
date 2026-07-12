@@ -19,7 +19,7 @@ import {
   User,
   MapPin,
   Palette,
-  Instagram,
+  AtSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -460,7 +460,7 @@ export default function ArtistRegister() {
             {/* Instagram */}
             <div className="space-y-2">
               <Label htmlFor="instagram">
-                <Instagram className="w-4 h-4 inline mr-1" />
+                <AtSign className="w-4 h-4 inline mr-1" />
                 Instagram Handle <span className="text-muted-foreground font-normal">(optional)</span>
               </Label>
               <Input

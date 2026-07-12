@@ -81,6 +81,10 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/auth/reset-password" component={ResetPassword} />
 
+      {/* Artist dashboard convenience routes */}
+      <Route path="/artist/dashboard"><Redirect to="/dashboard" /></Route>
+      <Route path="/artist/manage"><Redirect to="/dashboard" /></Route>
+
       {/* Redirects for retired pages */}
       <Route path="/artist-finder"><Redirect to="/artists" /></Route>
       <Route path="/cover-ups"><Redirect to="/" /></Route>

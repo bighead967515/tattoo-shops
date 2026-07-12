@@ -158,7 +158,7 @@ export default function ForArtists() {
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Upgrading from Pay-as-you-go (15%) saves you money instantly.
+                  Upgrading from Pay-as-you-go (10% fee) saves you money instantly.
                 </p>
               </div>
             </div>

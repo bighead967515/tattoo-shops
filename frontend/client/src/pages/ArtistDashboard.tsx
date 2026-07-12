@@ -211,6 +211,9 @@ export default function ArtistDashboard() {
       { enabled: !!artist },
     );
 
+  const { data: myBids, isLoading: bidsLoading } =
+    trpc.bids.getMyBids.useQuery(undefined, { enabled: !!artist });
+
   const {
     data: portfolio,
     isLoading: portfolioLoading,
@@ -498,10 +501,14 @@ export default function ArtistDashboard() {
         })()}
 
         <Tabs defaultValue="portfolio" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-xl grid-cols-4">
             <TabsTrigger value="portfolio">
               <ImageIcon className="w-4 h-4 mr-2" />
               Portfolio
+            </TabsTrigger>
+            <TabsTrigger value="requests">
+              <Gavel className="w-4 h-4 mr-2" />
+              Requests
             </TabsTrigger>
             <TabsTrigger value="bookings">
               <Calendar className="w-4 h-4 mr-2" />
@@ -805,6 +812,100 @@ export default function ArtistDashboard() {
                 ))
               )}
             </div>
+          </TabsContent>
+
+          {/* Requests Tab */}
+          <TabsContent value="requests" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold">Client Requests</h2>
+                <p className="text-sm text-muted-foreground mt-1">Browse open client requests and track your submitted bids.</p>
+              </div>
+              <Link href="/requests">
+                <Button variant="outline">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Browse All Requests
+                </Button>
+              </Link>
+            </div>
+            {bidsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : !myBids || myBids.length === 0 ? (
+              <Card className="p-12 text-center">
+                <Gavel className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No bids submitted yet</h3>
+                <p className="text-muted-foreground mb-4">Browse open client requests and submit your first bid to get started.</p>
+                <Link href="/requests">
+                  <Button>
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Browse Open Requests
+                  </Button>
+                </Link>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">{myBids.length} bid{myBids.length !== 1 ? "s" : ""} submitted</p>
+                {myBids.map((bid) => (
+                  <Card key={bid.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-base">{bid.request?.title || "Untitled Request"}</CardTitle>
+                          <CardDescription className="mt-1 line-clamp-2">{bid.request?.description}</CardDescription>
+                        </div>
+                        <Badge
+                          variant={bid.status === "accepted" ? "default" : bid.status === "rejected" ? "destructive" : "secondary"}
+                          className="shrink-0"
+                        >
+                          {bid.status === "accepted" ? (
+                            <><CheckCircle2 className="w-3 h-3 mr-1" />Accepted</>
+                          ) : bid.status === "rejected" ? (
+                            <><XCircle className="w-3 h-3 mr-1" />Not Selected</>
+                          ) : (
+                            <><Clock className="w-3 h-3 mr-1" />Pending</>
+                          )}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                        {bid.priceEstimate && (
+                          <span className="flex items-center gap-1">
+                            <DollarSign className="w-4 h-4" />
+                            Your estimate: ${(bid.priceEstimate / 100).toFixed(2)}
+                          </span>
+                        )}
+                        {bid.availability && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {bid.availability}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          Submitted {format(new Date(bid.createdAt), "MMM d, yyyy")}
+                        </span>
+                      </div>
+                      {bid.message && (
+                        <p className="mt-3 text-sm border-l-2 border-primary/30 pl-3 text-muted-foreground italic">
+                          &ldquo;{bid.message}&rdquo;
+                        </p>
+                      )}
+                      <div className="mt-3">
+                        <Link href={`/requests/${bid.requestId}`}>
+                          <Button size="sm" variant="outline">
+                            <ExternalLink className="w-3 h-3 mr-2" />
+                            View Request
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* Billing Tab Content removed */}
