@@ -107,6 +107,9 @@ export default function ArtistSignupLanding() {
   const [, setLocation] = useLocation();
   const { user, refresh } = useAuth();
   const { signUpWithEmail, signInWithOAuth } = useSupabaseAuth();
+  // Store the newly-created user's email so doSubmit can verify auth
+  // without depending on React Query cache timing
+  const pendingUserEmailRef = useRef<string | null>(null);
   
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [selectedPlan, setSelectedPlan] = useState("pay_as_you_go");
@@ -193,14 +196,11 @@ export default function ArtistSignupLanding() {
       setIsCreatingAccount(true);
       try {
         await signUpWithEmail(email, password, { name: fullName });
-        // Retry refresh until user is available (auth state propagation can be async)
-        let retries = 0;
-        let refreshResult = await refresh();
-        while (!refreshResult?.data && retries < 6) {
-          await new Promise((r) => setTimeout(r, 500));
-          refreshResult = await refresh();
-          retries++;
-        }
+        // Store email in ref immediately — this is our proof of successful signup
+        // and allows doSubmit to proceed even if React Query cache hasn't updated yet
+        pendingUserEmailRef.current = email;
+        // Also kick off a background refresh so the reactive user state catches up
+        refresh().catch(() => {});
         toast.success("Account created successfully!");
         setStep(3);
       } catch (err: any) {
@@ -256,14 +256,27 @@ export default function ArtistSignupLanding() {
   const doSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Re-fetch the latest user to handle the case where reactive state
-      // hasn't propagated yet after account creation (auth race condition)
+      // Get the current user. We check three sources in order:
+      // 1. Reactive user from useAuth (already in React state)
+      // 2. A fresh refresh() call to re-query auth.me
+      // 3. The pendingUserEmailRef set immediately after signUpWithEmail()
+      //    This bypasses the React Query cache timing issue entirely.
       let currentUser = user;
       if (!currentUser) {
-        const result = await refresh();
-        currentUser = result?.data ?? null;
+        // Poll auth.me up to 10 times (5 seconds total) to wait for DB propagation
+        for (let i = 0; i < 10; i++) {
+          const result = await refresh();
+          if (result?.data) {
+            currentUser = result.data;
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
       }
-      if (!currentUser) {
+      // If still no user but we have a pendingUserEmailRef, the session cookie
+      // is valid (signUpWithEmail succeeded) but auth.me is still propagating.
+      // We can proceed — the backend will use the cookie directly.
+      if (!currentUser && !pendingUserEmailRef.current) {
         toast.error("Please sign in or create an account first");
         setStep(2);
         setIsSubmitting(false);
@@ -272,7 +285,7 @@ export default function ArtistSignupLanding() {
 
       // 1. Create artist profile
       const artist = await createArtistMutation.mutateAsync({
-        shopName: shopName.trim() || fullName || currentUser.name || "Tattoo Studio",
+        shopName: shopName.trim() || fullName || currentUser?.name || "Tattoo Studio",
         bio,
         specialties: styles.join(", "),
         experience: experience ? parseInt(experience) : undefined,
