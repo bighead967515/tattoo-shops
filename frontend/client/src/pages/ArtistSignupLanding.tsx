@@ -193,7 +193,14 @@ export default function ArtistSignupLanding() {
       setIsCreatingAccount(true);
       try {
         await signUpWithEmail(email, password, { name: fullName });
-        await refresh();
+        // Retry refresh until user is available (auth state propagation can be async)
+        let retries = 0;
+        let refreshResult = await refresh();
+        while (!refreshResult?.data && retries < 6) {
+          await new Promise((r) => setTimeout(r, 500));
+          refreshResult = await refresh();
+          retries++;
+        }
         toast.success("Account created successfully!");
         setStep(3);
       } catch (err: any) {
@@ -249,7 +256,14 @@ export default function ArtistSignupLanding() {
   const doSubmit = async () => {
     setIsSubmitting(true);
     try {
-      if (!user) {
+      // Re-fetch the latest user to handle the case where reactive state
+      // hasn't propagated yet after account creation (auth race condition)
+      let currentUser = user;
+      if (!currentUser) {
+        const result = await refresh();
+        currentUser = result?.data ?? null;
+      }
+      if (!currentUser) {
         toast.error("Please sign in or create an account first");
         setStep(2);
         setIsSubmitting(false);
@@ -258,7 +272,7 @@ export default function ArtistSignupLanding() {
 
       // 1. Create artist profile
       const artist = await createArtistMutation.mutateAsync({
-        shopName: shopName.trim() || fullName || user.name || "Tattoo Studio",
+        shopName: shopName.trim() || fullName || currentUser.name || "Tattoo Studio",
         bio,
         specialties: styles.join(", "),
         experience: experience ? parseInt(experience) : undefined,
