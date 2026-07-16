@@ -18,6 +18,11 @@ function storeCsrfToken(token: string) {
   window.sessionStorage.setItem(CSRF_STORAGE_KEY, token);
 }
 
+export function clearCsrfToken() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(CSRF_STORAGE_KEY);
+}
+
 export async function getCsrfToken(): Promise<string | null> {
   return ensureCsrfToken();
 }

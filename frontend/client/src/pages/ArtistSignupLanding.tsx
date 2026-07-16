@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { trpc } from "@/lib/trpc";
+import { trpc, clearCsrfToken } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -199,6 +199,11 @@ export default function ArtistSignupLanding() {
         // Store email in ref immediately — this is our proof of successful signup
         // and allows doSubmit to proceed even if React Query cache hasn't updated yet
         pendingUserEmailRef.current = email;
+        // Clear the stored CSRF token so the next tRPC mutation fetches a fresh one.
+        // The /api/auth/session POST (inside signUpWithEmail) sets a new session cookie,
+        // which may rotate the CSRF cookie. Without this, the stale CSRF token in
+        // sessionStorage would cause all subsequent mutations to fail with CSRF_INVALID.
+        clearCsrfToken();
         // Also kick off a background refresh so the reactive user state catches up
         refresh().catch(() => {});
         toast.success("Account created successfully!");
