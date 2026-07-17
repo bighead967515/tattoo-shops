@@ -82,6 +82,10 @@ export function csrfProtectionMiddleware(
       path: "/",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
+    // Store in res.locals so csrfTokenMiddleware can reuse the same token
+    res.locals.csrfToken = tokenInCookie;
+  } else {
+    res.locals.csrfToken = tokenInCookie;
   }
 
   // For mutations, verify CSRF token from header matches cookie
@@ -125,9 +129,14 @@ export function csrfTokenMiddleware(
   res: Response,
   next: NextFunction,
 ) {
-  // Set response header so frontend can access token for mutations
-  const token = req.cookies?.[CSRF_COOKIE_NAME] || generateCsrfToken();
-  if (!req.cookies?.[CSRF_COOKIE_NAME]) {
+  // Reuse the token already set by csrfProtectionMiddleware (via res.locals)
+  // to avoid generating two different tokens for the same request.
+  const token =
+    (res.locals.csrfToken as string | undefined) ||
+    req.cookies?.[CSRF_COOKIE_NAME] ||
+    generateCsrfToken();
+
+  if (!req.cookies?.[CSRF_COOKIE_NAME] && !res.locals.csrfToken) {
     res.cookie(CSRF_COOKIE_NAME, token, {
       httpOnly: true,
       secure: isSecureRequest(req),

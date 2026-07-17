@@ -2584,6 +2584,9 @@ function csrfProtectionMiddleware(req, res, next) {
       maxAge: 24 * 60 * 60 * 1e3
       // 24 hours
     });
+    res.locals.csrfToken = tokenInCookie;
+  } else {
+    res.locals.csrfToken = tokenInCookie;
   }
   if (isStateChanging) {
     const tokenInHeader = getCsrfTokenFromRequest(req);
@@ -2613,8 +2616,8 @@ function csrfProtectionMiddleware(req, res, next) {
   next();
 }
 function csrfTokenMiddleware(req, res, next) {
-  const token = req.cookies?.[CSRF_COOKIE_NAME] || generateCsrfToken();
-  if (!req.cookies?.[CSRF_COOKIE_NAME]) {
+  const token = res.locals.csrfToken || req.cookies?.[CSRF_COOKIE_NAME] || generateCsrfToken();
+  if (!req.cookies?.[CSRF_COOKIE_NAME] && !res.locals.csrfToken) {
     res.cookie(CSRF_COOKIE_NAME, token, {
       httpOnly: true,
       secure: isSecureRequest(req),
