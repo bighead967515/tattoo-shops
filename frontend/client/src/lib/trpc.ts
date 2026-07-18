@@ -36,18 +36,33 @@ async function ensureCsrfToken(): Promise<string | null> {
   let lastError: unknown = null;
 
   // Bootstrap token from a safe GET endpoint. The backend emits X-CSRF-Token on all responses.
+  // NOTE: Due to a server-side quirk, the first request sets two cookies and returns the
+  // first token in the header (which the browser overwrites with the second cookie value).
+  // We make a second request so the server sees the already-set cookie and returns the
+  // correct matching token in the header.
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const response = await window.fetch("/api/csrf-token", {
+      // First request — establishes the cookie
+      const firstResponse = await window.fetch("/api/csrf-token", {
         method: "GET",
         credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error(`CSRF bootstrap failed with status ${response.status}`);
+      if (!firstResponse.ok) {
+        throw new Error(`CSRF bootstrap failed with status ${firstResponse.status}`);
       }
 
-      const token = response.headers.get("X-CSRF-Token");
+      // Second request — cookie is now set, server returns the matching token in header
+      const secondResponse = await window.fetch("/api/csrf-token", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!secondResponse.ok) {
+        throw new Error(`CSRF confirm failed with status ${secondResponse.status}`);
+      }
+
+      const token = secondResponse.headers.get("X-CSRF-Token");
       if (token) {
         storeCsrfToken(token);
         return token;
