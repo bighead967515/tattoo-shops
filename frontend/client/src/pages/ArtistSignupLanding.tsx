@@ -350,7 +350,19 @@ export default function ArtistSignupLanding() {
         }
       }
 
-      await refresh();
+      // Poll auth.me until the user's role is updated to 'artist' in the DB.
+      // The createArtist mutation updates the user row in a transaction, but the
+      // React Query cache for auth.me is stale until we explicitly refetch.
+      // Without this poll, Dashboard.tsx sees isAuthenticated=false and redirects to /login.
+      let refreshedUser = null;
+      for (let i = 0; i < 15; i++) {
+        const result = await refresh();
+        if (result?.data?.role === "artist") {
+          refreshedUser = result.data;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 400));
+      }
       toast.success("🎉 Welcome to Ink Connect! Your artist profile has been initialized.");
       setLocation("/dashboard");
     } catch (err: any) {

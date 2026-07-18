@@ -41,12 +41,22 @@ import ArtistRegister from "./ArtistRegister";
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, loading } = useAuth();
+  // Track how long we've been on this page without a user — prevents immediate
+  // redirect on fresh login where the auth.me query hasn't resolved yet.
+  const [authWaitMs, setAuthWaitMs] = useState(0);
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || !user)) {
+      // Give the auth.me query up to 3 seconds to resolve before redirecting.
+      // This prevents a race condition where the user navigates to /dashboard
+      // immediately after signup before the React Query cache has been updated.
+      if (authWaitMs < 3000) {
+        const timer = setTimeout(() => setAuthWaitMs(prev => prev + 200), 200);
+        return () => clearTimeout(timer);
+      }
       setLocation("/login");
     }
-  }, [loading, isAuthenticated, user, setLocation]);
+  }, [loading, isAuthenticated, user, setLocation, authWaitMs]);
 
   if (loading) {
     return (
@@ -59,9 +69,17 @@ export default function Dashboard() {
     );
   }
 
-  // Redirect if not authenticated after loading completes
+  // During the grace period (authWaitMs < 3000), show a loading spinner instead of null.
+  // This prevents a flash of empty content while auth.me resolves after fresh signup.
   if (!isAuthenticated || !user) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container py-20 text-center">
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   // Unified Dashboard Router
