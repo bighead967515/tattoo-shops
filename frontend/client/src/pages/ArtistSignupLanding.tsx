@@ -106,7 +106,7 @@ const PLAN_OPTIONS = [
 export default function ArtistSignupLanding() {
   const [, setLocation] = useLocation();
   const { user, refresh } = useAuth();
-  const { signUpWithEmail, signInWithOAuth } = useSupabaseAuth();
+  const { signUpWithEmail, signInWithEmail, signInWithOAuth } = useSupabaseAuth();
   // Store the newly-created user's email so doSubmit can verify auth
   // without depending on React Query cache timing
   const pendingUserEmailRef = useRef<string | null>(null);
@@ -195,7 +195,25 @@ export default function ArtistSignupLanding() {
       
       setIsCreatingAccount(true);
       try {
-        await signUpWithEmail(email, password, { name: fullName });
+        // Attempt sign-up. Supabase returns session=null when the email already
+        // exists (it silently treats it as a "resend confirmation" call). In that
+        // case we fall back to a normal sign-in so we always get a real session cookie.
+        let signUpResult: Awaited<ReturnType<typeof signUpWithEmail>> | null = null;
+        try {
+          signUpResult = await signUpWithEmail(email, password, { name: fullName });
+        } catch (signUpErr: any) {
+          // Explicit error from Supabase (e.g. "User already registered")
+          const msg = (signUpErr?.message || "").toLowerCase();
+          if (msg.includes("already") || msg.includes("exists") || msg.includes("registered")) {
+            await signInWithEmail(email, password);
+          } else {
+            throw signUpErr;
+          }
+        }
+        // If signUp succeeded but returned no session, the account already existed
+        if (signUpResult && !signUpResult.session) {
+          await signInWithEmail(email, password);
+        }
         // Store email in ref immediately — this is our proof of successful signup
         // and allows doSubmit to proceed even if React Query cache hasn't updated yet
         pendingUserEmailRef.current = email;
