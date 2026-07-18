@@ -113,10 +113,10 @@ export default function PrivacyPolicy() {
             <p className="text-muted-foreground">
               If you have questions or comments about this Privacy Policy, please contact us at{" "}
               <a
-                href="mailto:legal@inkconnect.pro"
+                href="mailto:legal@inkedconnect.com"
                 className="text-primary hover:underline"
               >
-                legal@inkconnect.pro
+                legal@inkedconnect.com
               </a>
               .
             </p>

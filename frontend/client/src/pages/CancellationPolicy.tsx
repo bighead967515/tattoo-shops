@@ -160,10 +160,10 @@ export default function CancellationPolicy() {
               emergencies (medical, family, etc.), please contact our support
               team at{" "}
               <a
-                href="mailto:support@inkconnect.pro"
+                href="mailto:support@inkedconnect.com"
                 className="text-primary hover:underline"
               >
-                support@inkconnect.pro
+                support@inkedconnect.com
               </a>{" "}
               with relevant documentation.
             </p>
@@ -238,10 +238,10 @@ export default function CancellationPolicy() {
             <li>
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:support@inkconnect.pro"
+                href="mailto:support@inkedconnect.com"
                 className="text-primary hover:underline"
               >
-                support@inkconnect.pro
+                support@inkedconnect.com
               </a>
             </li>
             <li>
@@ -254,7 +254,8 @@ export default function CancellationPolicy() {
               </a>
             </li>
             <li>
-              <strong>Live Chat:</strong> Available on our Help Center page
+              <strong>Help Center:</strong>{" "}
+              <a href="/help" className="text-primary hover:underline">Visit Help Center</a>
             </li>
           </ul>
         </Card>

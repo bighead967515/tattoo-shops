@@ -167,6 +167,17 @@ function App() {
   }, [user]);
 
   useEffect(() => {
+    // Update canonical URL on every route change
+    const BASE = "https://inkedconnect.com";
+    let canonical = document.querySelector<HTMLLinkElement>("link[rel='canonical']");
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    // Strip query strings and hash from canonical; dynamic pages use their own path
+    canonical.href = BASE + location.split("?")[0].split("#")[0];
+
     const win = window as Window & {
       dataLayer?: unknown[];
       gtag?: (...args: unknown[]) => void;

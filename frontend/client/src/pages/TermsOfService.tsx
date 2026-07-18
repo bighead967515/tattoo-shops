@@ -116,10 +116,10 @@ export default function TermsOfService() {
             <p className="text-muted-foreground">
               If you have any questions about these Terms, please contact us at{" "}
               <a
-                href="mailto:legal@inkconnect.pro"
+                href="mailto:legal@inkedconnect.com"
                 className="text-primary hover:underline"
               >
-                legal@inkconnect.pro
+                legal@inkedconnect.com
               </a>
               .
             </p>
