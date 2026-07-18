@@ -6981,8 +6981,8 @@ app.post(
 app.use(cookieParser());
 app.use(express2.json({ limit: "1mb" }));
 app.use(express2.urlencoded({ limit: "1mb", extended: true }));
-app.use(csrfTokenMiddleware);
 app.use(csrfProtectionMiddleware);
+app.use(csrfTokenMiddleware);
 registerSupabaseAuthRoutes(app);
 app.post("/api/portfolio/enqueue-analysis", async (req, res) => {
   try {

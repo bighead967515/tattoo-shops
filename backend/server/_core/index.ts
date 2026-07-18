@@ -266,9 +266,11 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ limit: "1mb", extended: true }));
 
 // P1-1 CSRF Protection Middleware
-// Verify CSRF tokens on all mutations (POST/PUT/PATCH/DELETE)
-app.use(csrfTokenMiddleware); // Set CSRF token in response header
-app.use(csrfProtectionMiddleware); // Verify CSRF on mutations
+// ORDER MATTERS: csrfProtectionMiddleware MUST run first — it generates the token and stores it in
+// res.locals.csrfToken. csrfTokenMiddleware then reads res.locals.csrfToken and sets the
+// X-CSRF-Token response header. Reversing this order causes two different tokens to be generated.
+app.use(csrfProtectionMiddleware); // Generate/verify CSRF token, store in res.locals.csrfToken
+app.use(csrfTokenMiddleware); // Read res.locals.csrfToken and set X-CSRF-Token header
 
 // Supabase auth routes under /api/auth
 registerSupabaseAuthRoutes(app);
