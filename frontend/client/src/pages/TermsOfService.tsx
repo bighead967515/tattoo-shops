@@ -2,7 +2,7 @@ import Header from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { FileText, User, Shield, AlertTriangle } from "lucide-react";
 
-const POLICY_LAST_UPDATED = new Date("2024-03-01");
+const POLICY_LAST_UPDATED = new Date("2026-07-19");
 
 export default function TermsOfService() {
   return (
@@ -13,7 +13,7 @@ export default function TermsOfService() {
         <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
         <p className="text-lg text-muted-foreground mb-12">
           Last updated:{" "}
-          {new Date("2024-04-22").toLocaleDateString("en-US", {
+          {new Date("2026-07-19").toLocaleDateString("en-US", {
             year: "numeric",
             month: "long",
             day: "numeric",

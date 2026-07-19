@@ -2,7 +2,7 @@ import Header from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Shield, Lock, Eye, Server } from "lucide-react";
 
-const POLICY_LAST_UPDATED = new Date("2024-04-22");
+const POLICY_LAST_UPDATED = new Date("2026-07-19");
 
 export default function PrivacyPolicy() {
   return (
