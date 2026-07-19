@@ -37,3 +37,5 @@ export function initAnalytics() {
 
   analyticsInitialized = true;
 }
+
+// Build trigger: GA4 tracking enabled (G-93DVKJBFDV)
