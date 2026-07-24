@@ -5,6 +5,7 @@ import * as db from "./db";
 import { getDb } from "./db";
 import { clients, users, tattooRequests, artists, bookings, flashArt } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { getArtistTierLimits } from "../shared/tierLimits";
 import { logger } from "./_core/logger";
 import { sendBookingIntakeNotification } from "./email";
 import {
@@ -494,7 +495,11 @@ async function handleArtistSubscriptionChange(
       updatedAt: Date;
       isFoundingArtist?: boolean;
       foundingTrialEndsAt?: Date | null;
-    } = { updatedAt: new Date() };
+      aiCredits?: number;
+    } = {
+      updatedAt: new Date(),
+      aiCredits: getArtistTierLimits(tier).aiGenerationsPerMonth,
+    };
 
     if (isFoundingArtist) {
       artistUpdate.isFoundingArtist = true;
@@ -577,6 +582,7 @@ async function handleSubscriptionCancelled(
       await tx
         .update(artists)
         .set({
+          aiCredits: 0,
           updatedAt: new Date(),
         })
         .where(eq(artists.userId, user.id));
