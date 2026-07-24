@@ -937,7 +937,7 @@ export const appRouter = router({
       .input(
         z.object({
           artistId: z.number(),
-          rating: z.number().min(1).max(5),
+          rating: z.number().min(0).max(5),
           comment: z.string().optional(),
         }),
       )

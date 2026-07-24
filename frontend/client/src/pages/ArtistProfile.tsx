@@ -489,8 +489,22 @@ export default function ArtistProfile() {
                       <div
                         role="radiogroup"
                         aria-labelledby="review-rating-label"
-                        className="flex gap-2"
+                        className="flex items-center gap-2"
                       >
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={reviewRating === 0}
+                          aria-label="0 stars"
+                          onClick={() => setReviewRating(0)}
+                          className={`px-2.5 py-1.5 text-xs font-semibold rounded border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                            reviewRating === 0
+                              ? "bg-destructive/10 border-destructive text-destructive"
+                              : "bg-muted border-transparent text-muted-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          0 Stars
+                        </button>
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
@@ -503,7 +517,7 @@ export default function ArtistProfile() {
                           >
                             <Star
                               className={`w-8 h-8 ${
-                                star <= reviewRating
+                                star <= reviewRating && reviewRating > 0
                                   ? "fill-primary text-primary"
                                   : "text-muted-foreground"
                               }`}
