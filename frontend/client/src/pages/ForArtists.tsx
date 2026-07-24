@@ -158,7 +158,7 @@ export default function ForArtists() {
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Upgrading from Pay-as-you-go (10% fee) saves you money instantly.
+                  Upgrade your account to minimize fees and maximize bookings.
                 </p>
               </div>
             </div>
@@ -189,33 +189,16 @@ export default function ForArtists() {
               <Button variant="outline" className="w-full mt-auto" onClick={() => setLocation("/artist/signup")}>Get Started</Button>
             </Card>
 
-            {/* Pay-as-you-go */}
-            <Card className="p-6 border-border/60 flex flex-col justify-between hover:border-primary/30 hover:shadow-lg transition-all duration-300">
-              <div>
-                <h3 className="font-bold text-lg mb-1 text-primary">Pay-as-you-go</h3>
-                <p className="text-xs text-muted-foreground mb-4">No monthly commitment</p>
-                <p className="text-3xl font-bold mb-6">10%<span className="text-base font-normal text-muted-foreground"> booking fee</span></p>
-                <ul className="space-y-3 text-xs mb-6">
-                  {["10 portfolio photos", "Up to 3 monthly bids", "Receive client bids", "Standard support"].map(f => (
-                    <li key={f} className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <Button className="w-full mt-auto" onClick={() => setLocation("/artist/signup")}>Choose Pay-as-you-go</Button>
-            </Card>
-
             {/* Pro */}
             <Card className="p-6 border-primary/50 bg-primary/5 relative flex flex-col justify-between shadow-md hover:border-primary hover:shadow-xl transition-all duration-300">
-              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-0.5 text-xs font-semibold">
-                Most Popular
+              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-4 py-0.5 text-xs font-semibold">
+                👑 Founding Offer
               </Badge>
               <div>
                 <h3 className="font-bold text-lg mb-1 text-primary">Pro Studio</h3>
-                <p className="text-xs text-muted-foreground mb-4">For working professionals</p>
-                <p className="text-3xl font-bold mb-6">$49<span className="text-base font-normal text-muted-foreground">/mo</span></p>
+                <p className="text-xs text-muted-foreground mb-4">First 50 Artists Only</p>
+                <p className="text-3xl font-bold mb-1">$19<span className="text-base font-normal text-muted-foreground">/mo</span></p>
+                <p className="text-xs text-green-600 font-semibold mb-4">or $9.99/mo billed annually (3-Month Trial)</p>
                 <ul className="space-y-3 text-xs mb-6">
                   {[
                     "5% platform transaction fee",
@@ -233,7 +216,7 @@ export default function ForArtists() {
                   ))}
                 </ul>
               </div>
-              <Button className="w-full mt-auto bg-primary hover:bg-primary/95" onClick={() => setLocation("/artist/signup")}>Get Pro Studio</Button>
+              <Button className="w-full mt-auto bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => setLocation("/artist/signup")}>Claim Founding Offer</Button>
             </Card>
 
             {/* Elite */}

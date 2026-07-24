@@ -10,7 +10,6 @@ import { trpc } from "@/lib/trpc";
 
 const artistTierOrder: ArtistSubscriptionTier[] = [
   "artist_free",
-  "artist_paygo",
   "artist_pro",
   "artist_elite",
 ];
@@ -50,7 +49,7 @@ export default function Pricing() {
             <p className="text-muted-foreground">Choose how you want to grow your studio</p>
           </div>
 
-          <div className="grid xl:grid-cols-4 lg:grid-cols-2 md:grid-cols-2 gap-6 max-w-7xl mx-auto">
+          <div className="grid xl:grid-cols-3 lg:grid-cols-3 md:grid-cols-1 gap-6 max-w-5xl mx-auto">
             {artistTierOrder.map((tier) => {
               const limits = ARTIST_TIER_LIMITS[tier];
               const pricing = ARTIST_TIER_PRICING[tier];
@@ -98,9 +97,14 @@ export default function Pricing() {
                       <span className="text-xl text-muted-foreground">/mo</span>
                     </div>
                     {isFoundingActive ? (
-                      <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
-                        🔒 Locked-in price + 3-Month Free Trial!
-                      </div>
+                      <>
+                        <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
+                          🔒 Locked-in price + 3-Month Free Trial!
+                        </div>
+                        <div className="text-xs text-green-600 font-semibold mb-1">
+                          or $9.99/mo ($119.88/yr) billed annually
+                        </div>
+                      </>
                     ) : isMostPopular ? (
                       <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
                         🎁 Includes 1-Month Free Trial!

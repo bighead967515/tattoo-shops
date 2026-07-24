@@ -66,20 +66,11 @@ const US_STATES = [
 
 const PLAN_OPTIONS = [
   {
-    id: "pay_as_you_go",
-    name: "Pay-as-you-go",
-    price: "$0/mo",
-    desc: "No monthly commitment",
-    details: "10% booking fee, 10 portfolio photos, 3 monthly bids limit, receive client bids, standard support.",
-    popular: false,
-    color: "border-primary/50 bg-primary/5 text-primary",
-  },
-  {
     id: "pro_studio",
     name: "Pro Studio",
-    price: "$49/mo",
-    desc: "For working professionals",
-    details: "5% booking fee, unlimited portfolio photos, booking calendar + deposits, 50 AI generations/mo, Verified badge.",
+    price: "$19/mo",
+    desc: "Founding Artist Offer (or $9.99/mo billed annually)",
+    details: "3-Month Free Trial, 5% booking fee, unlimited portfolio photos, booking calendar + deposits, 50 AI generations/mo, Verified badge.",
     popular: true,
     color: "border-emerald-500/50 bg-emerald-500/5 text-emerald-500",
   },
@@ -112,7 +103,7 @@ export default function ArtistSignupLanding() {
   const pendingUserEmailRef = useRef<string | null>(null);
   
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
-  const [selectedPlan, setSelectedPlan] = useState("pay_as_you_go");
+  const [selectedPlan, setSelectedPlan] = useState("pro_studio");
   const [showLegal, setShowLegal] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
