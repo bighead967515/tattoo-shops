@@ -1511,6 +1511,7 @@ export const appRouter = router({
           productName: `Lock Flash: "${flash.title}"`,
           productDescription: `Non-refundable deposit to claim and book this custom flash art by ${artist.shopName}.`,
           customerEmail: ctx.user.email ?? "",
+          bookingProtectionFeeInCents: 399,
           metadata: {
             paymentType: "flash_deposit",
             flashId: String(flash.id),

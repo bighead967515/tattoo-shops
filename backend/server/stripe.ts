@@ -20,6 +20,7 @@ export async function createCheckoutSession({
   metadata,
   successUrl,
   cancelUrl,
+  bookingProtectionFeeInCents,
 }: {
   priceInCents: number;
   productName: string;
@@ -28,23 +29,40 @@ export async function createCheckoutSession({
   metadata: Record<string, string>;
   successUrl: string;
   cancelUrl: string;
+  bookingProtectionFeeInCents?: number;
 }) {
   return stripeCircuit.execute(async () => {
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: productName,
+            description: productDescription,
+          },
+          unit_amount: priceInCents,
+        },
+        quantity: 1,
+      },
+    ];
+
+    if (bookingProtectionFeeInCents) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Booking Protection & Service Fee",
+            description: "Guarantees secure deposit handling and cancellation refund protection.",
+          },
+          unit_amount: bookingProtectionFeeInCents,
+        },
+        quantity: 1,
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: productName,
-              description: productDescription,
-            },
-            unit_amount: priceInCents,
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: "payment",
       customer_email: customerEmail,
       metadata,
