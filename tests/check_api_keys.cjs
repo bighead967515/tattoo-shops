@@ -23,16 +23,24 @@ async function main() {
     console.error("❌ Failed to read .env file:", e.message);
   }
 
-  // Stripe restricted key from mcp_config.json
+  // Keys extracted from mcp_config.json
   let stripeRestrictedKey = null;
+  let renderApiKey = null;
   try {
-    const mcpConfig = JSON.parse(fs.readFileSync('C:\\Users\\dillo\\.gemini\\antigravity-ide\\mcp_config.json', 'utf8'));
+    let path = 'C:\\Users\\dillo\\.gemini\\antigravity\\mcp_config.json';
+    if (!fs.existsSync(path)) {
+      path = 'C:\\Users\\dillo\\.gemini\\antigravity-ide\\mcp_config.json';
+    }
+    const mcpConfig = JSON.parse(fs.readFileSync(path, 'utf8'));
     const stripeArg = mcpConfig.mcpServers?.stripe?.args?.find(a => a.startsWith('--api-key='));
     if (stripeArg) {
       stripeRestrictedKey = stripeArg.replace('--api-key=', '');
     }
+    if (mcpConfig.mcpServers?.render?.env?.RENDER_API_KEY) {
+      renderApiKey = mcpConfig.mcpServers.render.env.RENDER_API_KEY;
+    }
   } catch (e) {
-    console.warn("⚠️  Could not read Stripe restricted key from mcp_config.json:", e.message);
+    console.warn("⚠️  Could not read mcp_config.json:", e.message);
   }
 
   const tests = [];
@@ -148,6 +156,22 @@ async function main() {
         if (status === 403 && body.includes("Permission denied")) {
           return { success: true, warning: "Key is valid, but lacks balance endpoint read permission (Restricted Key)" };
         }
+        return { success: false, error: `HTTP ${status}: ${body.substring(0, 150)}` };
+      }
+    });
+  }
+
+  // Render API Key (MCP)
+  if (renderApiKey) {
+    tests.push({
+      name: "Render API Key (MCP)",
+      url: "https://api.render.com/v1/services?limit=1",
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${renderApiKey}`
+      },
+      validate: (status, body) => {
+        if (status === 200) return { success: true };
         return { success: false, error: `HTTP ${status}: ${body.substring(0, 150)}` };
       }
     });

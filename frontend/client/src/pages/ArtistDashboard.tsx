@@ -877,10 +877,10 @@ export default function ArtistDashboard() {
                             Your estimate: ${(bid.priceEstimate / 100).toFixed(2)}
                           </span>
                         )}
-                        {bid.availability && (
+                        {bid.availableDate && (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            {bid.availability}
+                            Available: {format(new Date(bid.availableDate), "MMM d, yyyy")}
                           </span>
                         )}
                         <span className="flex items-center gap-1">

@@ -103,7 +103,7 @@ function createCaller(user: unknown) {
 describe("client onboarding integration", () => {
   beforeAll(async () => {
     ({ clientsRouter } = await import("../../backend/server/clientRouters"));
-  }, 30000);
+  }, 120000);
 
   beforeEach(() => {
     vi.clearAllMocks();

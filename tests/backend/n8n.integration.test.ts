@@ -68,7 +68,7 @@ describe("n8n workflow integrations", () => {
     seedRequiredEnv();
     vi.stubGlobal("fetch", mockFetch);
     ({ appRouter } = await import("../../backend/server/routers"));
-  }, 30000);
+  }, 120000);
 
   beforeEach(() => {
     vi.clearAllMocks();

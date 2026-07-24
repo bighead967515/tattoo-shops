@@ -26,8 +26,8 @@ export const ARTIST_TIER_LIMITS = {
   artist_paygo: {
     name: "Pay-as-you-go",
     portfolioPhotos: 10,
-    canBid: true,
-    freeBidsPerMonth: 3,
+    canBid: false,
+    freeBidsPerMonth: 0,
     transactionFeePercent: 10,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,

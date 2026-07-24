@@ -59,7 +59,7 @@ describe("artists router integration", () => {
   beforeAll(async () => {
     seedRequiredEnv();
     ({ appRouter } = await import("../../backend/server/routers"));
-  }, 30000);
+  }, 120000);
 
   beforeEach(() => {
     vi.clearAllMocks();

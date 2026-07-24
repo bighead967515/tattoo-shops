@@ -31,15 +31,6 @@ import {
 // Config
 // ---------------------------------------------------------------------------
 
-const API_KEY = process.env.RENDER_API_KEY;
-if (!API_KEY) {
-  console.error("ERROR: RENDER_API_KEY environment variable is not set.");
-  console.error(
-    "Generate one at https://dashboard.render.com/u/settings#api-keys"
-  );
-  process.exit(1);
-}
-
 const BASE_URL = "https://api.render.com/v1";
 
 // ---------------------------------------------------------------------------
@@ -47,11 +38,18 @@ const BASE_URL = "https://api.render.com/v1";
 // ---------------------------------------------------------------------------
 
 async function renderFetch(path, options = {}) {
+  const apiKey = process.env.RENDER_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "RENDER_API_KEY environment variable is not configured. Please set the RENDER_API_KEY env variable in your MCP settings/environment."
+    );
+  }
+
   const url = `${BASE_URL}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       ...(options.headers ?? {}),
     },

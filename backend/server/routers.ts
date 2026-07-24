@@ -509,6 +509,7 @@ export const appRouter = router({
     startFoundingCheckout: protectedProcedure
       .input(
         z.object({
+          interval: z.enum(["month", "year"]).default("month"),
           successUrl: z.string().url(),
           cancelUrl: z.string().url(),
         }),
@@ -550,11 +551,14 @@ export const appRouter = router({
           .where(eq(users.id, ctx.user.id))
           .limit(1);
 
-        const priceId = ENV.stripeFoundingArtistPriceId;
+        const priceId = input.interval === "year"
+          ? (ENV.stripeFoundingArtistYearlyPriceId || ENV.stripeFoundingArtistPriceId)
+          : ENV.stripeFoundingArtistPriceId;
+
         if (!priceId) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "Founding Artist price is not configured.",
+            message: `Founding Artist price for ${input.interval} is not configured.`,
           });
         }
 
@@ -566,7 +570,7 @@ export const appRouter = router({
             userId: String(ctx.user.id),
             artistId: String(artist.id),
             tier: "artist_pro",
-            interval: "month",
+            interval: input.interval,
             isFoundingArtist: "true",
           },
           successUrl: input.successUrl,
@@ -743,55 +747,11 @@ export const appRouter = router({
      * Enable the no-subscription transaction plan.
      * Sets canonical tier to artist_pro (mapped to pay-as-you-go fee logic).
      */
-    enablePayAsYouGo: protectedProcedure.mutation(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Database unavailable",
-        });
-      }
-
-      const [artist] = await database
-        .select({ id: artists.id })
-        .from(artists)
-        .where(eq(artists.userId, ctx.user.id))
-        .limit(1);
-
-      if (!artist) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You must have an artist profile first.",
-        });
-      }
-
-      const [userRow] = await database
-        .select({
-          stripeSubscriptionId: users.stripeSubscriptionId,
-          subscriptionTier: users.subscriptionTier,
-        })
-        .from(users)
-        .where(eq(users.id, ctx.user.id))
-        .limit(1);
-
-      if (!userRow) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-      }
-
-      if (userRow.stripeSubscriptionId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message:
-            "You already have an active subscription. Cancel it first before switching to pay-as-you-go.",
-        });
-      }
-
-      await database
-        .update(users)
-        .set({ subscriptionTier: "artist_pro" })
-        .where(eq(users.id, ctx.user.id));
-
-      return { success: true, tier: "artist_pro" as const };
+    enablePayAsYouGo: protectedProcedure.mutation(async () => {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Pay-as-you-go is no longer available. You must subscribe to a paid tier to bid.",
+      });
     }),
   }),
 

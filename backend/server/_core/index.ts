@@ -520,7 +520,7 @@ app.use(
 
 // Global error handler - MUST be last middleware
 // Sentry error handler first to capture errors
-app.use(sentryErrorHandler());
+app.use(sentryErrorHandler() as any);
 
 app.use(
   (

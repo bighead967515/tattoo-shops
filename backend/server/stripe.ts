@@ -7,7 +7,7 @@ if (!ENV.stripeSecretKey) {
 }
 
 export const stripe = new Stripe(ENV.stripeSecretKey, {
-  apiVersion: "2025-10-29.clover",
+  apiVersion: "2026-06-24.dahlia",
   timeout: 30000, // 30 second timeout
   maxNetworkRetries: 2, // Stripe's built-in retry
 });
@@ -72,12 +72,14 @@ export function stripePriceToArtistTier(
     stripeArtistProPriceIdMonth,     stripeArtistProPriceIdYear,
     stripeArtistIconPriceIdMonth,    stripeArtistIconPriceIdYear,
     stripeFoundingArtistPriceId,
+    stripeFoundingArtistYearlyPriceId,
   } = ENV;
 
   if (
     priceId === stripeArtistProPriceIdMonth ||
     priceId === stripeArtistProPriceIdYear ||
-    priceId === stripeFoundingArtistPriceId
+    priceId === stripeFoundingArtistPriceId ||
+    (stripeFoundingArtistYearlyPriceId && priceId === stripeFoundingArtistYearlyPriceId)
   )
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)

@@ -79,6 +79,7 @@ export const artistFields = {
   aiCredits: artists.aiCredits,
   isFoundingArtist: artists.isFoundingArtist,
   foundingTrialEndsAt: artists.foundingTrialEndsAt,
+  profileViewCount: artists.profileViewCount,
   createdAt: artists.createdAt,
   updatedAt: artists.updatedAt,
 };

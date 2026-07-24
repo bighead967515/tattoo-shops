@@ -59,31 +59,7 @@ const PLANS: PlanDef[] = [
       { label: "Analytics & profile insights", included: false },
     ],
   },
-  {
-    key: "payg",
-    canonicalTier: "artist_paygo",
-    name: "Pay-as-you-go",
-    tagline: "Bid on client posts. Pay per booking.",
-    Icon: Zap,
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    transactionFee: "10% booking fee",
-    stripeTierArg: null,
-    badge: "No subscription",
-    isMostPopular: false,
-    isElite: false,
-    features: [
-      { label: "10 portfolio photos", included: true },
-      { label: "Directory listing & search visibility", included: true },
-      { label: "Receive client inquiries", included: true },
-      { label: "Up to 3 monthly bids", included: true },
-      { label: "10% booking fee on successful deals", included: true },
-      { label: "Booking calendar", included: false },
-      { label: "Stripe payment processing", included: false },
-      { label: "Verified artist badge", included: false },
-      { label: "Analytics & profile insights", included: false },
-    ],
-  },
+
   {
     key: "pro",
     canonicalTier: "artist_pro",
@@ -218,19 +194,16 @@ export default function ArtistBilling() {
   const currentPlan = PLANS.find((p) => p.canonicalTier === currentCanonical) ?? PLANS[0];
 
   const handleSubscribe = async (plan: PlanDef) => {
-    if (plan.key === "payg") {
-      setLoadingTier(plan.key);
-      await paygMutation.mutateAsync();
-      return;
-    }
+
 
     if (!plan.stripeTierArg) return;
     setLoadingTier(plan.key);
 
-    const isFoundingActive = plan.key === "pro" && foundingStatus && !foundingStatus.isSoldOut && !yearly;
+    const isFoundingActive = plan.key === "pro" && foundingStatus && !foundingStatus.isSoldOut;
 
     if (isFoundingActive) {
       await foundingCheckoutMutation.mutateAsync({
+        interval: yearly ? "year" : "month",
         successUrl: `${BASE_URL}/artist/billing/success?tier=artist_pro&founding=true`,
         cancelUrl: `${BASE_URL}/artist/billing`,
       });
@@ -316,7 +289,7 @@ export default function ArtistBilling() {
                   👑 Founding Artist Pro Offer — First 50 Artists Only
                 </p>
                 <p className="text-sm text-amber-800 dark:text-amber-400 mt-0.5">
-                  Lock in <strong>Pro Studio features</strong> (reduced 5% platform booking fee, unlimited portfolio photos, calendar + deposits, and 50 AI generations/mo) at just <strong>$19/mo</strong> (normally $49/mo) with a <strong>3-Month Free Trial</strong>! Only {50 - (foundingStatus?.count ?? 0)} spots remaining.
+                  Lock in <strong>Pro Studio features</strong> (reduced 5% platform booking fee, unlimited portfolio photos, calendar + deposits, and 50 AI generations/mo) at just <strong>$19/mo</strong> (normally $49/mo) or <strong>$9.99/mo billed annually</strong> (normally $490/yr) with a <strong>3-Month Free Trial</strong>! Only {50 - (foundingStatus?.count ?? 0)} spots remaining.
                 </p>
               </div>
               <Button
@@ -350,8 +323,8 @@ export default function ArtistBilling() {
                   ? plan.yearlyPrice / 100
                   : plan.monthlyPrice / 100;
 
-              if (isFoundingActive && !yearly) {
-                price = 19;
+              if (isFoundingActive) {
+                price = yearly ? 119.88 : 19;
               }
 
               return (
@@ -366,15 +339,13 @@ export default function ArtistBilling() {
                       ? "border-2 border-primary bg-gradient-to-br from-primary/10 to-background shadow-lg scale-[1.02]"
                       : plan.isElite
                       ? "border-2 border-amber-400 bg-amber-50/50 dark:bg-amber-950/10"
-                      : plan.key === "payg"
-                      ? "border-2 border-blue-300 bg-blue-50/50 dark:bg-blue-950/10"
                       : isCurrent
                       ? "border-2 border-green-500/60 bg-green-500/5"
                       : "border-border hover:border-primary/40",
                   )}
                 >
                   {/* Top badge */}
-                  {(plan.badge || (isFoundingActive && !yearly)) && !isCurrent && (
+                  {(plan.badge || isFoundingActive) && !isCurrent && (
                     <div className="absolute top-0 -translate-y-1/2 w-full flex justify-center">
                       <div
                         className={cn(
@@ -384,11 +355,11 @@ export default function ArtistBilling() {
                             : plan.isElite
                             ? "bg-amber-500 text-white"
                             : "bg-blue-500 text-white",
-                          isFoundingActive && !yearly && "bg-emerald-600 text-white",
+                          isFoundingActive && "bg-emerald-600 text-white",
                         )}
                       >
-                        {isFoundingActive && !yearly ? <Crown className="h-3 w-3" /> : plan.isMostPopular && <Crown className="h-3 w-3" />}
-                        {isFoundingActive && !yearly ? "Founding Offer" : plan.badge}
+                        {isFoundingActive ? <Crown className="h-3 w-3" /> : plan.isMostPopular && <Crown className="h-3 w-3" />}
+                        {isFoundingActive ? "Founding Offer" : plan.badge}
                       </div>
                     </div>
                   )}
@@ -407,28 +378,24 @@ export default function ArtistBilling() {
                       <div
                         className={cn(
                           "p-3 rounded-full",
-                          isFoundingActive && !yearly
+                          isFoundingActive
                             ? "bg-emerald-100 dark:bg-emerald-950/40"
                             : plan.isMostPopular
                             ? "bg-primary/20"
                             : plan.isElite
                             ? "bg-amber-100 dark:bg-amber-900/30"
-                            : plan.key === "payg"
-                            ? "bg-blue-100 dark:bg-blue-900/30"
                             : "bg-muted",
                         )}
                       >
                         <plan.Icon
                           className={cn(
                             "h-6 w-6",
-                            isFoundingActive && !yearly
+                            isFoundingActive
                               ? "text-emerald-600 dark:text-emerald-400"
                               : plan.isMostPopular
                               ? "text-primary"
                               : plan.isElite
                               ? "text-amber-500"
-                              : plan.key === "payg"
-                              ? "text-blue-500"
                               : "text-muted-foreground",
                           )}
                         />
@@ -461,7 +428,7 @@ export default function ArtistBilling() {
                         )}
                         {plan.key === "pro" && (
                           <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-                            {isFoundingActive && !yearly ? "🔒 Locked-in price + 3-Month Free Trial!" : "🎁 Includes 1-Month Free Trial!"}
+                            {isFoundingActive ? "🔒 Locked-in price + 3-Month Free Trial!" : "🎁 Includes 1-Month Free Trial!"}
                           </p>
                         )}
                         {plan.transactionFee && (
@@ -477,12 +444,10 @@ export default function ArtistBilling() {
                   <Button
                     className={cn(
                       "w-full mb-5",
-                      isFoundingActive && !yearly && !isCurrent
+                      isFoundingActive && !isCurrent
                         ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0"
                         : plan.isElite && !isCurrent
                         ? "bg-amber-500 hover:bg-amber-600 text-white border-0"
-                        : plan.key === "payg" && !isCurrent
-                        ? "bg-blue-600 hover:bg-blue-700 text-white border-0"
                         : "",
                     )}
                     variant={
@@ -504,11 +469,9 @@ export default function ArtistBilling() {
                       ? "Always Free"
                       : plan.key === "elite"
                       ? "Go Elite Icon"
-                      : plan.key === "payg"
-                      ? "Start Bidding Free"
                       : isLoading
                       ? "Redirecting..."
-                      : isFoundingActive && !yearly
+                      : isFoundingActive
                       ? "Claim Pro Offer"
                       : "Upgrade to Pro"}
                   </Button>
