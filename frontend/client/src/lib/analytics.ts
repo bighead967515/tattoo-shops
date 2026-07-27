@@ -38,4 +38,4 @@ export function initAnalytics() {
   analyticsInitialized = true;
 }
 
-// Build trigger: GA4 tracking enabled (G-93DVKJBFDV)
+// GA4 tracking is enabled when VITE_GA4_MEASUREMENT_ID is set.
