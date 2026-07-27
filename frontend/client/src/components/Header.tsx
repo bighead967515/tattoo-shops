@@ -53,6 +53,9 @@ export default function Header() {
             >
               For Artists
             </Link>
+            <Link href="/blog" className={`text-sm font-medium transition-colors hover:text-primary ${location.startsWith("/blog") ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+              Blog
+            </Link>
           </nav>
         </div>
 
