@@ -275,6 +275,61 @@ app.use(csrfTokenMiddleware); // Read res.locals.csrfToken and set X-CSRF-Token 
 // Supabase auth routes under /api/auth
 registerSupabaseAuthRoutes(app);
 
+// Blog API endpoints
+app.post("/api/blog/posts", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || authHeader !== `Bearer ${ENV.n8nBlogSecret}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { title, slug, content, summary } = req.body;
+    if (!title || !slug || !content) {
+      return res.status(400).json({ error: "Missing required fields: title, slug, and content are required." });
+    }
+
+    const { createBlogPost } = await import("../db");
+    const newPost = await createBlogPost({
+      title,
+      slug,
+      content,
+      summary: summary || null,
+      publishedAt: new Date(),
+    });
+
+    res.status(201).json({ status: "success", post: newPost });
+  } catch (error: any) {
+    logger.error("Failed to create blog post", { error });
+    res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+});
+
+app.get("/api/blog/posts", async (_req, res) => {
+  try {
+    const { getAllBlogPosts } = await import("../db");
+    const posts = await getAllBlogPosts();
+    res.json(posts);
+  } catch (error: any) {
+    logger.error("Failed to fetch blog posts", { error });
+    res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+});
+
+app.get("/api/blog/posts/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { getBlogPostBySlug } = await import("../db");
+    const post = await getBlogPostBySlug(slug);
+    if (!post) {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+    res.json(post);
+  } catch (error: any) {
+    logger.error("Failed to fetch blog post by slug", { error });
+    res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+});
+
 // Enqueue-first image analysis route for Supabase Storage webhook triggers
 app.post("/api/portfolio/enqueue-analysis", async (req: Request, res: Response) => {
   try {
@@ -454,15 +509,14 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-// Dynamic sitemap for SEO - Ink Connect artist and shop pages
+// Dynamic sitemap for SEO - includes all approved artists and blog posts
 app.get("/sitemap.xml", async (_req, res) => {
   try {
-    const { getAllArtists } = await import("../db");
+    const { getAllArtists, getAllBlogPosts } = await import("../db");
     const artists = await getAllArtists();
-    const protocol = res.req.protocol || "http";
-    const host = res.req.get("host");
-    const baseUrl = ENV.publicBaseUrl || (host ? `${protocol}://${host}` : "http://localhost:3000");
-
+    const posts = await getAllBlogPosts();
+    const baseUrl = "https://universalinc.com";
+    
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },
       { loc: "/artists", changefreq: "daily", priority: "0.9" },
@@ -470,11 +524,12 @@ app.get("/sitemap.xml", async (_req, res) => {
       { loc: "/for-artists", changefreq: "monthly", priority: "0.7" },
       { loc: "/pricing", changefreq: "monthly", priority: "0.6" },
       { loc: "/help", changefreq: "monthly", priority: "0.5" },
+      { loc: "/blog", changefreq: "daily", priority: "0.8" },
     ];
-
+    
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
-
+    
     // Add static pages
     for (const page of staticPages) {
       xml += `
@@ -484,10 +539,10 @@ app.get("/sitemap.xml", async (_req, res) => {
     <priority>${page.priority}</priority>
   </url>`;
     }
-
+    
     // Add dynamic artist pages
     for (const artist of artists) {
-      const lastmod = artist.updatedAt.toISOString().split("T")[0];
+      const lastmod = artist.updatedAt.toISOString().split('T')[0];
       xml += `
   <url>
     <loc>${baseUrl}/artist/${artist.id}</loc>
@@ -496,7 +551,19 @@ app.get("/sitemap.xml", async (_req, res) => {
     <priority>0.8</priority>
   </url>`;
     }
-
+    
+    // Add dynamic blog post pages
+    for (const post of posts) {
+      const lastmod = post.updatedAt.toISOString().split('T')[0];
+      xml += `
+  <url>
+    <loc>${baseUrl}/blog/${post.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+    }
+    
     xml += `
 </urlset>`;
 

@@ -36,12 +36,15 @@ var init_env = __esm({
       STRIPE_ARTIST_ICON_PRICE_ID_YEAR: z.string().min(1, "STRIPE_ARTIST_ICON_PRICE_ID_YEAR is required"),
       // Founding Artist offer — same base price as amateur ($19/mo) but with 180-day free trial
       STRIPE_FOUNDING_ARTIST_PRICE_ID: z.string().min(1, "STRIPE_FOUNDING_ARTIST_PRICE_ID is required"),
+      STRIPE_FOUNDING_ARTIST_YEARLY_PRICE_ID: z.string().optional(),
       RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
       SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
       SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
       SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
       GROQ_API_KEY: z.string().min(1, "GROQ_API_KEY is required"),
       HUGGINGFACE_API_KEY: z.string().min(1, "HUGGINGFACE_API_KEY is required"),
+      GOOGLE_AI_API_KEY: z.string().default("mock-google-ai-key"),
+      N8N_BLOG_SECRET: z.string().default("dev-blog-secret"),
       OPENAI_API_KEY: z.string().optional(),
       GROQ_BASE_URL: z.string().url().optional(),
       GROQ_MODEL: z.string().optional(),
@@ -81,12 +84,15 @@ var init_env = __esm({
       stripeArtistIconPriceIdMonth: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_MONTH,
       stripeArtistIconPriceIdYear: parsed.data.STRIPE_ARTIST_ICON_PRICE_ID_YEAR,
       stripeFoundingArtistPriceId: parsed.data.STRIPE_FOUNDING_ARTIST_PRICE_ID,
+      stripeFoundingArtistYearlyPriceId: parsed.data.STRIPE_FOUNDING_ARTIST_YEARLY_PRICE_ID,
       resendApiKey: parsed.data.RESEND_API_KEY,
       supabaseUrl: parsed.data.SUPABASE_URL,
       supabaseServiceKey: parsed.data.SUPABASE_SERVICE_KEY,
       supabaseAnonKey: parsed.data.SUPABASE_ANON_KEY,
       groqApiKey: parsed.data.GROQ_API_KEY,
       huggingFaceApiKey: parsed.data.HUGGINGFACE_API_KEY,
+      googleAiApiKey: parsed.data.GOOGLE_AI_API_KEY,
+      n8nBlogSecret: parsed.data.N8N_BLOG_SECRET,
       openaiApiKey: parsed.data.OPENAI_API_KEY,
       groqBaseUrl: parsed.data.GROQ_BASE_URL,
       groqModel: parsed.data.GROQ_MODEL,
@@ -170,6 +176,7 @@ __export(schema_exports, {
   artists: () => artists,
   bidStatusEnum: () => bidStatusEnum,
   bids: () => bids,
+  blogPosts: () => blogPosts,
   bookingStatusEnum: () => bookingStatusEnum,
   bookings: () => bookings,
   clients: () => clients,
@@ -205,7 +212,7 @@ import {
   unique,
   jsonb
 } from "drizzle-orm/pg-core";
-var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, flashArt, invitations;
+var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, flashArt, invitations, blogPosts;
 var init_schema = __esm({
   "backend/drizzle/schema.ts"() {
     "use strict";
@@ -690,6 +697,16 @@ var init_schema = __esm({
       // 'sent', 'opened', 'registered', 'approved'
       userId: integer("userId").references(() => users.id, { onDelete: "set null" })
     });
+    blogPosts = pgTable("blog_posts", {
+      id: serial("id").primaryKey(),
+      title: varchar("title", { length: 255 }).notNull(),
+      slug: varchar("slug", { length: 255 }).notNull().unique(),
+      content: text("content").notNull(),
+      summary: text("summary"),
+      publishedAt: timestamp("publishedAt").defaultNow().notNull(),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull()
+    });
   }
 });
 
@@ -936,6 +953,7 @@ __export(db_exports, {
   addPortfolioImage: () => addPortfolioImage,
   artistFields: () => artistFields,
   createArtist: () => createArtist,
+  createBlogPost: () => createBlogPost,
   createBooking: () => createBooking,
   createFlashArt: () => createFlashArt,
   createReview: () => createReview,
@@ -945,9 +963,11 @@ __export(db_exports, {
   getAllActiveFlashArt: () => getAllActiveFlashArt,
   getAllArtists: () => getAllArtists,
   getAllArtistsAdmin: () => getAllArtistsAdmin,
+  getAllBlogPosts: () => getAllBlogPosts,
   getAllShops: () => getAllShops,
   getArtistById: () => getArtistById,
   getArtistByUserId: () => getArtistByUserId,
+  getBlogPostBySlug: () => getBlogPostBySlug,
   getBookingById: () => getBookingById,
   getBookingsByArtistId: () => getBookingsByArtistId,
   getBookingsByUserId: () => getBookingsByUserId,
@@ -1534,6 +1554,23 @@ async function getReviewById(id) {
   const result = await db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
   return result[0] || null;
 }
+async function createBlogPost(post) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [inserted] = await db.insert(blogPosts).values(post).returning();
+  return inserted;
+}
+async function getBlogPostBySlug(slug) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug)).limit(1);
+  return result[0] || null;
+}
+async function getAllBlogPosts() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(blogPosts).orderBy(desc(blogPosts.publishedAt));
+}
 async function createFlashArt(flash) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1648,6 +1685,7 @@ var init_db = __esm({
       aiCredits: artists.aiCredits,
       isFoundingArtist: artists.isFoundingArtist,
       foundingTrialEndsAt: artists.foundingTrialEndsAt,
+      profileViewCount: artists.profileViewCount,
       createdAt: artists.createdAt,
       updatedAt: artists.updatedAt
     };
@@ -2102,24 +2140,39 @@ async function createCheckoutSession({
   customerEmail,
   metadata,
   successUrl,
-  cancelUrl
+  cancelUrl,
+  bookingProtectionFeeInCents
 }) {
   return stripeCircuit.execute(async () => {
+    const lineItems = [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: productName,
+            description: productDescription
+          },
+          unit_amount: priceInCents
+        },
+        quantity: 1
+      }
+    ];
+    if (bookingProtectionFeeInCents) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "Booking Protection & Service Fee",
+            description: "Guarantees secure deposit handling and cancellation refund protection."
+          },
+          unit_amount: bookingProtectionFeeInCents
+        },
+        quantity: 1
+      });
+    }
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: productName,
-              description: productDescription
-            },
-            unit_amount: priceInCents
-          },
-          quantity: 1
-        }
-      ],
+      line_items: lineItems,
       mode: "payment",
       customer_email: customerEmail,
       metadata,
@@ -2138,9 +2191,10 @@ function stripePriceToArtistTier(priceId) {
     stripeArtistProPriceIdYear,
     stripeArtistIconPriceIdMonth,
     stripeArtistIconPriceIdYear,
-    stripeFoundingArtistPriceId
+    stripeFoundingArtistPriceId,
+    stripeFoundingArtistYearlyPriceId
   } = ENV;
-  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear || priceId === stripeFoundingArtistPriceId)
+  if (priceId === stripeArtistProPriceIdMonth || priceId === stripeArtistProPriceIdYear || priceId === stripeFoundingArtistPriceId || stripeFoundingArtistYearlyPriceId && priceId === stripeFoundingArtistYearlyPriceId)
     return "artist_pro";
   if (priceId === stripeArtistIconPriceIdMonth || priceId === stripeArtistIconPriceIdYear)
     return "artist_elite";
@@ -2231,7 +2285,7 @@ var init_stripe = __esm({
       throw new Error("STRIPE_SECRET_KEY is required");
     }
     stripe = new Stripe(ENV.stripeSecretKey, {
-      apiVersion: "2025-10-29.clover",
+      apiVersion: "2026-06-24.dahlia",
       timeout: 3e4,
       // 30 second timeout
       maxNetworkRetries: 2
@@ -2658,8 +2712,8 @@ var ARTIST_TIER_LIMITS = {
   artist_paygo: {
     name: "Pay-as-you-go",
     portfolioPhotos: 10,
-    canBid: true,
-    freeBidsPerMonth: 3,
+    canBid: false,
+    freeBidsPerMonth: 0,
     transactionFeePercent: 10,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
@@ -4063,7 +4117,7 @@ var bidsRouter = router({
     if (bidsPerMonth === 0) {
       throw new TRPCError2({
         code: "FORBIDDEN",
-        message: "Bidding on client posts requires a paid plan. Upgrade to Pro or switch to pay-as-you-go to start submitting proposals."
+        message: "Bidding on client posts requires a paid plan. Upgrade to Pro or Elite to start submitting proposals."
       });
     }
     if (bidsPerMonth !== Number.MAX_SAFE_INTEGER) {
@@ -5239,6 +5293,7 @@ var appRouter = router({
      */
     startFoundingCheckout: protectedProcedure.input(
       z7.object({
+        interval: z7.enum(["month", "year"]).default("month"),
         successUrl: z7.string().url(),
         cancelUrl: z7.string().url()
       })
@@ -5261,11 +5316,11 @@ var appRouter = router({
         });
       }
       const [user] = await database.select({ email: users.email, stripeCustomerId: users.stripeCustomerId }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
-      const priceId = ENV.stripeFoundingArtistPriceId;
+      const priceId = input.interval === "year" ? ENV.stripeFoundingArtistYearlyPriceId || ENV.stripeFoundingArtistPriceId : ENV.stripeFoundingArtistPriceId;
       if (!priceId) {
         throw new TRPCError6({
           code: "PRECONDITION_FAILED",
-          message: "Founding Artist price is not configured."
+          message: `Founding Artist price for ${input.interval} is not configured.`
         });
       }
       const session = await createFoundingArtistCheckout({
@@ -5276,7 +5331,7 @@ var appRouter = router({
           userId: String(ctx.user.id),
           artistId: String(artist.id),
           tier: "artist_pro",
-          interval: "month",
+          interval: input.interval,
           isFoundingArtist: "true"
         },
         successUrl: input.successUrl,
@@ -5408,36 +5463,11 @@ var appRouter = router({
      * Enable the no-subscription transaction plan.
      * Sets canonical tier to artist_pro (mapped to pay-as-you-go fee logic).
      */
-    enablePayAsYouGo: protectedProcedure.mutation(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) {
-        throw new TRPCError6({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Database unavailable"
-        });
-      }
-      const [artist] = await database.select({ id: artists.id }).from(artists).where(eq5(artists.userId, ctx.user.id)).limit(1);
-      if (!artist) {
-        throw new TRPCError6({
-          code: "FORBIDDEN",
-          message: "You must have an artist profile first."
-        });
-      }
-      const [userRow] = await database.select({
-        stripeSubscriptionId: users.stripeSubscriptionId,
-        subscriptionTier: users.subscriptionTier
-      }).from(users).where(eq5(users.id, ctx.user.id)).limit(1);
-      if (!userRow) {
-        throw new TRPCError6({ code: "NOT_FOUND", message: "User not found" });
-      }
-      if (userRow.stripeSubscriptionId) {
-        throw new TRPCError6({
-          code: "PRECONDITION_FAILED",
-          message: "You already have an active subscription. Cancel it first before switching to pay-as-you-go."
-        });
-      }
-      await database.update(users).set({ subscriptionTier: "artist_pro" }).where(eq5(users.id, ctx.user.id));
-      return { success: true, tier: "artist_pro" };
+    enablePayAsYouGo: protectedProcedure.mutation(async () => {
+      throw new TRPCError6({
+        code: "FORBIDDEN",
+        message: "Pay-as-you-go is no longer available. You must subscribe to a paid tier to bid."
+      });
     })
   }),
   portfolio: router({
@@ -5562,7 +5592,7 @@ var appRouter = router({
     create: protectedProcedure.input(
       z7.object({
         artistId: z7.number(),
-        rating: z7.number().min(1).max(5),
+        rating: z7.number().min(0).max(5),
         comment: z7.string().optional()
       })
     ).mutation(async ({ ctx, input }) => {
@@ -6015,6 +6045,7 @@ var appRouter = router({
         productName: `Lock Flash: "${flash.title}"`,
         productDescription: `Non-refundable deposit to claim and book this custom flash art by ${artist.shopName}.`,
         customerEmail: ctx.user.email ?? "",
+        bookingProtectionFeeInCents: 399,
         metadata: {
           paymentType: "flash_deposit",
           flashId: String(flash.id),
@@ -6200,8 +6231,8 @@ init_stripe();
 init_db();
 init_db();
 init_schema();
-init_logger();
 import { eq as eq8 } from "drizzle-orm";
+init_logger();
 
 // backend/server/webhookQueue.ts
 init_db();
@@ -6690,7 +6721,10 @@ async function handleArtistSubscriptionChange(subscription, tier, eventType) {
   await database.transaction(async (tx) => {
     await tx.update(users).set({ stripeCustomerId, subscriptionTier: tier, stripeSubscriptionId: subscription.id, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(users.id, user.id));
     const isFoundingArtist = subscription.metadata?.isFoundingArtist === "true";
-    const artistUpdate = { updatedAt: /* @__PURE__ */ new Date() };
+    const artistUpdate = {
+      updatedAt: /* @__PURE__ */ new Date(),
+      aiCredits: getArtistTierLimits(tier).aiGenerationsPerMonth
+    };
     if (isFoundingArtist) {
       artistUpdate.isFoundingArtist = true;
       const trialEnd = subscription.trial_end;
@@ -6738,6 +6772,7 @@ async function handleSubscriptionCancelled(subscription) {
         updatedAt: /* @__PURE__ */ new Date()
       }).where(eq8(users.id, user.id));
       await tx.update(artists).set({
+        aiCredits: 0,
         updatedAt: /* @__PURE__ */ new Date()
       }).where(eq8(artists.userId, user.id));
     } else {
@@ -6984,6 +7019,54 @@ app.use(express2.urlencoded({ limit: "1mb", extended: true }));
 app.use(csrfProtectionMiddleware);
 app.use(csrfTokenMiddleware);
 registerSupabaseAuthRoutes(app);
+app.post("/api/blog/posts", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || authHeader !== `Bearer ${ENV.n8nBlogSecret}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const { title, slug, content, summary } = req.body;
+    if (!title || !slug || !content) {
+      return res.status(400).json({ error: "Missing required fields: title, slug, and content are required." });
+    }
+    const { createBlogPost: createBlogPost2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const newPost = await createBlogPost2({
+      title,
+      slug,
+      content,
+      summary: summary || null,
+      publishedAt: /* @__PURE__ */ new Date()
+    });
+    res.status(201).json({ status: "success", post: newPost });
+  } catch (error) {
+    logger.error("Failed to create blog post", { error });
+    res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+});
+app.get("/api/blog/posts", async (_req, res) => {
+  try {
+    const { getAllBlogPosts: getAllBlogPosts2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const posts = await getAllBlogPosts2();
+    res.json(posts);
+  } catch (error) {
+    logger.error("Failed to fetch blog posts", { error });
+    res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+});
+app.get("/api/blog/posts/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { getBlogPostBySlug: getBlogPostBySlug2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const post = await getBlogPostBySlug2(slug);
+    if (!post) {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+    res.json(post);
+  } catch (error) {
+    logger.error("Failed to fetch blog post by slug", { error });
+    res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+});
 app.post("/api/portfolio/enqueue-analysis", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -7117,18 +7200,18 @@ app.get("/api/health", async (_req, res) => {
 });
 app.get("/sitemap.xml", async (_req, res) => {
   try {
-    const { getAllArtists: getAllArtists2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { getAllArtists: getAllArtists2, getAllBlogPosts: getAllBlogPosts2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const artists2 = await getAllArtists2();
-    const protocol = res.req.protocol || "http";
-    const host = res.req.get("host");
-    const baseUrl = ENV.publicBaseUrl || (host ? `${protocol}://${host}` : "http://localhost:3000");
+    const posts = await getAllBlogPosts2();
+    const baseUrl = "https://universalinc.com";
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },
       { loc: "/artists", changefreq: "daily", priority: "0.9" },
       { loc: "/artist-finder", changefreq: "weekly", priority: "0.8" },
       { loc: "/for-artists", changefreq: "monthly", priority: "0.7" },
       { loc: "/pricing", changefreq: "monthly", priority: "0.6" },
-      { loc: "/help", changefreq: "monthly", priority: "0.5" }
+      { loc: "/help", changefreq: "monthly", priority: "0.5" },
+      { loc: "/blog", changefreq: "daily", priority: "0.8" }
     ];
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
@@ -7148,6 +7231,16 @@ app.get("/sitemap.xml", async (_req, res) => {
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>`;
+    }
+    for (const post of posts) {
+      const lastmod = post.updatedAt.toISOString().split("T")[0];
+      xml += `
+  <url>
+    <loc>${baseUrl}/blog/${post.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>`;
     }
     xml += `

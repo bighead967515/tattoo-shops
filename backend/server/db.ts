@@ -20,6 +20,8 @@ import {
   flashArt,
   type FlashArt,
   type InsertFlashArt,
+  blogPosts,
+  type InsertBlogPost,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { logger } from "./_core/logger";
@@ -1038,13 +1040,44 @@ export async function getFlaggedReviews() {
 export async function getReviewById(id: number) {
   const db = await getDb();
   if (!db) return null;
-
+  
   const result = await db
     .select()
     .from(reviews)
     .where(eq(reviews.id, id))
     .limit(1);
   return result[0] || null;
+}
+
+// Blog post functions
+export async function createBlogPost(post: InsertBlogPost) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const [inserted] = await db.insert(blogPosts).values(post).returning();
+  return inserted;
+}
+
+export async function getBlogPostBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db
+    .select()
+    .from(blogPosts)
+    .where(eq(blogPosts.slug, slug))
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function getAllBlogPosts() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db
+    .select()
+    .from(blogPosts)
+    .orderBy(desc(blogPosts.publishedAt));
 }
 
 /**

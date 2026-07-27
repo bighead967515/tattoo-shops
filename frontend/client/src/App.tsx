@@ -1,40 +1,43 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import HomeHeader from "./components/HomeHeader";
 import Sidebar from "./components/Sidebar";
-import Home from "./pages/Home";
-import ArtistBrowse from "./pages/ArtistBrowse";
-import ArtistProfile from "./pages/ArtistProfile";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import AuthCallback from "./pages/AuthCallback";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ForArtists from "./pages/ForArtists";
-import Pricing from "./pages/Pricing";
-import Help from "./pages/Help";
-import CancellationPolicy from "./pages/CancellationPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import ArtistRegister from "./pages/ArtistRegister";
-import NewRequest from "./pages/NewRequest";
-import RequestBoard from "./pages/RequestBoard";
-import RequestDetail from "./pages/RequestDetail";
-import ClientDashboard from "./pages/ClientDashboard";
-import DesignLab from "./pages/DesignLab";
-import ArtistDesignLab from "./pages/ArtistDesignLab";
-import ArtistBilling from "./pages/ArtistBilling";
-import SubscriptionSuccess from "./pages/SubscriptionSuccess";
-import LicenseUpload from "./pages/LicenseUpload";
-import ArtistSignupLanding from "./pages/ArtistSignupLanding";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
+// Lazy loaded page components
+const Home = lazy(() => import("./pages/Home"));
+const ArtistBrowse = lazy(() => import("./pages/ArtistBrowse"));
+const ArtistProfile = lazy(() => import("./pages/ArtistProfile"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Login = lazy(() => import("./pages/Login"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ForArtists = lazy(() => import("./pages/ForArtists"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Help = lazy(() => import("./pages/Help"));
+const CancellationPolicy = lazy(() => import("./pages/CancellationPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const ArtistSignupLanding = lazy(() => import("./pages/ArtistSignupLanding"));
+const NewRequest = lazy(() => import("./pages/NewRequest"));
+const RequestBoard = lazy(() => import("./pages/RequestBoard"));
+const RequestDetail = lazy(() => import("./pages/RequestDetail"));
+const ClientDashboard = lazy(() => import("./pages/ClientDashboard"));
+const DesignLab = lazy(() => import("./pages/DesignLab"));
+const ArtistDesignLab = lazy(() => import("./pages/ArtistDesignLab"));
+const ArtistBilling = lazy(() => import("./pages/ArtistBilling"));
+const SubscriptionSuccess = lazy(() => import("./pages/SubscriptionSuccess"));
+const LicenseUpload = lazy(() => import("./pages/LicenseUpload"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function Redirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
@@ -44,63 +47,75 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
+const PageLoader = () => (
+  <div className="min-h-[60vh] w-full flex items-center justify-center bg-background/50">
+    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+  </div>
+);
+
 function Router() {
   return (
-    <Switch>
-      {/* 5 Core Pages */}
-      <Route path="/" component={Home} />
-      <Route path="/artists" component={ArtistBrowse} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Login} />
-      <Route path="/dashboard" component={Dashboard} />
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        {/* 5 Core Pages */}
+        <Route path="/" component={Home} />
+        <Route path="/artists" component={ArtistBrowse} />
+        <Route path="/login" component={Login} />
+        <Route path="/signup" component={Login} />
+        <Route path="/dashboard" component={Dashboard} />
 
-      {/* Informational Pages */}
-      <Route path="/for-artists" component={ForArtists} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/help" component={Help} />
-      <Route path="/cancellation-policy" component={CancellationPolicy} />
-      <Route path="/terms-of-service" component={TermsOfService} />
-      <Route path="/privacy-policy" component={PrivacyPolicy} />
+        {/* Informational Pages */}
+        <Route path="/for-artists" component={ForArtists} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/help" component={Help} />
+        <Route path="/cancellation-policy" component={CancellationPolicy} />
+        <Route path="/terms-of-service" component={TermsOfService} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
 
-      {/* Active Feature Pages */}
-      <Route path="/artist/register"><Redirect to="/artist/signup" /></Route>
-      <Route path="/artist/signup" component={ArtistSignupLanding} />
-      <Route path="/client/new-request" component={NewRequest} />
-      <Route path="/requests" component={RequestBoard} />
-      <Route path="/requests/:id" component={RequestDetail} />
-      <Route path="/client/dashboard" component={ClientDashboard} />
-      <Route path="/client/design-lab" component={DesignLab} />
-      <Route path="/artist/design-lab" component={ArtistDesignLab} />
-      <Route path="/artist/billing" component={ArtistBilling} />
-      <Route path="/artist/billing/success" component={SubscriptionSuccess} />
-      <Route path="/artist/:id" component={ArtistProfile} />
-      <Route path="/license-upload" component={LicenseUpload} />
+        {/* Blog routes */}
+        <Route path="/blog" component={Blog} />
+        <Route path="/blog/:slug" component={BlogPost} />
 
-      {/* Supporting Auth routes */}
-      <Route path="/auth/callback" component={AuthCallback} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/auth/reset-password" component={ResetPassword} />
+        {/* Active Feature Pages */}
+        <Route path="/artist/register"><Redirect to="/artist/signup" /></Route>
+        <Route path="/artist/signup" component={ArtistSignupLanding} />
+        <Route path="/client/new-request" component={NewRequest} />
+        <Route path="/requests" component={RequestBoard} />
+        <Route path="/requests/:id" component={RequestDetail} />
+        <Route path="/client/dashboard" component={ClientDashboard} />
+        <Route path="/client/design-lab" component={DesignLab} />
+        <Route path="/artist/design-lab" component={ArtistDesignLab} />
+        <Route path="/artist/billing" component={ArtistBilling} />
+        <Route path="/artist/billing/success" component={SubscriptionSuccess} />
+        <Route path="/artist/:id" component={ArtistProfile} />
+        <Route path="/license-upload" component={LicenseUpload} />
 
-      {/* Artist dashboard convenience routes */}
-      <Route path="/artist/dashboard"><Redirect to="/dashboard" /></Route>
-      <Route path="/artist/manage"><Redirect to="/dashboard" /></Route>
+        {/* Supporting Auth routes */}
+        <Route path="/auth/callback" component={AuthCallback} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/auth/reset-password" component={ResetPassword} />
 
-      {/* Redirects for retired pages */}
-      <Route path="/artist-finder"><Redirect to="/artists" /></Route>
-      <Route path="/cover-ups"><Redirect to="/" /></Route>
-      <Route path="/tattoo-planning"><Redirect to="/" /></Route>
-      <Route path="/request-flow"><Redirect to="/dashboard" /></Route>
-      <Route path="/artist-dashboard"><Redirect to="/dashboard" /></Route>
-      <Route path="/client/onboarding"><Redirect to="/dashboard" /></Route>
-      <Route path="/admin"><Redirect to="/dashboard" /></Route>
-      <Route path="/admin/moderation"><Redirect to="/dashboard" /></Route>
-      <Route path="/terms"><Redirect to="/terms-of-service" /></Route>
-      <Route path="/privacy"><Redirect to="/privacy-policy" /></Route>
+        {/* Artist dashboard convenience routes */}
+        <Route path="/artist/dashboard"><Redirect to="/dashboard" /></Route>
+        <Route path="/artist/manage"><Redirect to="/dashboard" /></Route>
 
-      <Route path="/404" component={NotFound} />
-      {/* Final fallback route */}
-      <Route><Redirect to="/" /></Route>
-    </Switch>
+        {/* Redirects for retired pages */}
+        <Route path="/artist-finder"><Redirect to="/artists" /></Route>
+        <Route path="/cover-ups"><Redirect to="/" /></Route>
+        <Route path="/tattoo-planning"><Redirect to="/" /></Route>
+        <Route path="/request-flow"><Redirect to="/dashboard" /></Route>
+        <Route path="/artist-dashboard"><Redirect to="/dashboard" /></Route>
+        <Route path="/client/onboarding"><Redirect to="/dashboard" /></Route>
+        <Route path="/admin"><Redirect to="/dashboard" /></Route>
+        <Route path="/admin/moderation"><Redirect to="/dashboard" /></Route>
+        <Route path="/terms"><Redirect to="/terms-of-service" /></Route>
+        <Route path="/privacy"><Redirect to="/privacy-policy" /></Route>
+
+        <Route path="/404" component={NotFound} />
+        {/* Final fallback route */}
+        <Route><Redirect to="/" /></Route>
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -116,10 +131,12 @@ function usesPageHeader(path: string) {
     "/terms-of-service",
     "/privacy-policy",
     "/client/design-lab",
+    "/blog",
   ];
   return (
     customPages.includes(path) ||
-    path.startsWith("/artist/")
+    path.startsWith("/artist/") ||
+    path.startsWith("/blog/")
   );
 }
 

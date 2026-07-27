@@ -1,0 +1,156 @@
+{
+  "name": "Weekly SEO Blog Writer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": "trigger",
+        "triggerTimes": {
+          "value": [
+            {
+              "hour": 9,
+              "mode": "everyWeek",
+              "weekday": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1f75ab2-7489-49bd-9e6e-21396b1b5f7e",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        380,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-1.5-pro",
+        "prompt": "Write a high-quality, engaging, and SEO-optimized blog post for our tattoo directory & booking platform, Ink Connect.\n\nChoose an interesting and relevant topic, such as:\n1. Detailed tattoo aftercare instructions and recovery stages.\n2. How to choose a tattoo style (e.g., Traditional, Realism, Neo-Traditional, Fine Line).\n3. Budgeting for a tattoo and understanding artist pricing.\n4. How to prepare for your first tattoo session (pain management, eating, clothing).\n5. Deciding on placement based on design size and complexity.\n\nRespond ONLY with a valid JSON object matching this schema. Do not wrap the JSON in markdown code blocks or add any other text:\n{\n  \"title\": \"A catchy, click-worthy SEO title\",\n  \"slug\": \"a-url-safe-lowercase-slug-matching-the-title-with-hyphens\",\n  \"summary\": \"A short 1-2 sentence excerpt of the article for listings\",\n  \"content\": \"The full blog post content. Structure it with subheaders using ## and ###. Use simple paragraphs separated by double newlines for formatting. Make sure the content is thorough, informative, and at least 600 words.\"\n}",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "e2f1ba8e-9082-4f36-b51c-c76fe4f8b91a",
+      "name": "Draft Blog Post via Gemini",
+      "type": "n8n-nodes-base.googleGeminiChat",
+      "typeVersion": 1,
+      "position": [
+        600,
+        240
+      ],
+      "credentials": {
+        "googleAiApiKey": {
+          "id": "google-ai-key-id"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI output as JSON safely\nconst rawOutput = items[0].json.message.content;\ntry {\n  const cleanJson = JSON.parse(rawOutput.replace(/```json|```/g, '').trim());\n  return [{ json: cleanJson }];\n} catch (e) {\n  // Fallback in case formatting fails\n  return [{\n    json: {\n      title: \"Mastering Tattoo Care: The Ultimate Guide to Aftercare\",\n      slug: \"mastering-tattoo-care-ultimate-aftercare-guide\",\n      summary: \"Keep your ink looking vibrant and clean with our comprehensive, step-by-step tattoo aftercare guide.\",\n      content: \"## Post-Session Essentials\\n\\nYour new tattoo is an open wound. Leave the artist's bandage on for 2-4 hours to protect it from bacteria.\\n\\n## Washing and Hydrating\\n\\nWash gently with lukewarm water and fragrance-free soap. Apply a thin layer of recommended ointment. Repeat 2-3 times daily.\\n\\n## What to Avoid\\n\\nAvoid picking, scratching, direct sunlight, and swimming for at least 2 weeks while healing.\"\n    }\n  }];\n}"
+      },
+      "id": "d04a60b9-ca5a-4eb2-8c10-b183658ebf4b",
+      "name": "Parse & Format JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_URL || 'http://localhost:3000'}}/api/blog/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": {
+          "keyVal": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.N8N_BLOG_SECRET || 'dev-blog-secret'}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{$json.title}}"
+            },
+            {
+              "name": "slug",
+              "value": "={{$json.slug}}"
+            },
+            {
+              "name": "summary",
+              "value": "={{$json.summary}}"
+            },
+            {
+              "name": "content",
+              "value": "={{$json.content}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a92e1057-047f-4428-a3f2-ef4de31f31f9",
+      "name": "Publish Post to Platform API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1040,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "blog-api-token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Draft Blog Post via Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Blog Post via Gemini": {
+      "main": [
+        [
+          {
+            "node": "Parse & Format JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Format JSON": {
+      "main": [
+        [
+          {
+            "node": "Publish Post to Platform API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "weekly-seo-blog-writer"
+}

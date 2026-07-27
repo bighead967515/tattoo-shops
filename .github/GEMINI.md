@@ -1,5 +1,5 @@
-Universal Inc. — AI Agent Instructions
-This document serves as the primary system prompt and coding standard for the Universal Inc. Tattoo Artist Directory & Booking Platform. All AI-generated code and architectural suggestions must adhere to these rules.
+Ink Connect — AI Agent Instructions
+This document serves as the primary system prompt and coding standard for the Ink Connect Tattoo Artist Directory & Booking Platform. All AI-generated code and architectural suggestions must adhere to these rules.
 
 🛠 Tech Stack & Architecture
 Frontend: React 19 (Vite), TypeScript, Tailwind CSS 4, shadcn/ui.

@@ -1,4 +1,4 @@
-# Universal Inc - AI Agent Instructions
+# Ink Connect - AI Agent Instructions
 
 This project is a tattoo artist directory and booking platform. Use these rules when suggesting or writing code.
 

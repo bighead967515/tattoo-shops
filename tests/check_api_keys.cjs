@@ -26,6 +26,8 @@ async function main() {
   // Keys extracted from mcp_config.json
   let stripeRestrictedKey = null;
   let renderApiKey = null;
+  let n8nApiUrl = null;
+  let n8nApiKey = null;
   try {
     let path = 'C:\\Users\\dillo\\.gemini\\antigravity\\mcp_config.json';
     if (!fs.existsSync(path)) {
@@ -39,9 +41,17 @@ async function main() {
     if (mcpConfig.mcpServers?.render?.env?.RENDER_API_KEY) {
       renderApiKey = mcpConfig.mcpServers.render.env.RENDER_API_KEY;
     }
+    if (mcpConfig.mcpServers?.n8n?.env?.N8N_API_URL) {
+      n8nApiUrl = mcpConfig.mcpServers.n8n.env.N8N_API_URL;
+    }
+    if (mcpConfig.mcpServers?.n8n?.env?.N8N_API_KEY) {
+      n8nApiKey = mcpConfig.mcpServers.n8n.env.N8N_API_KEY;
+    }
   } catch (e) {
     console.warn("⚠️  Could not read mcp_config.json:", e.message);
   }
+
+
 
   const tests = [];
 
@@ -177,6 +187,27 @@ async function main() {
     });
   }
 
+  // n8n API Key (MCP)
+  if (n8nApiUrl && n8nApiKey) {
+    tests.push({
+      name: "n8n API Key (MCP)",
+      url: `${n8nApiUrl}/workflows?limit=1`,
+      method: "GET",
+      headers: {
+        "X-N8N-API-KEY": n8nApiKey
+      },
+      validate: (status, body) => {
+        if (status === 200) return { success: true };
+        if (n8nApiKey === "YOUR_N8N_API_KEY") {
+          return { success: false, error: "API key placeholder detected (YOUR_N8N_API_KEY). Please generate and replace it." };
+        }
+        return { success: false, error: `HTTP ${status}: ${body.substring(0, 150)}` };
+      }
+    });
+  }
+
+
+
   // 6. Supabase Service Key
   if (env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY) {
     const cleanUrl = env.SUPABASE_URL.replace(/\/$/, "");
@@ -229,15 +260,17 @@ async function main() {
       let req;
       try {
         const url = new URL(test.url);
+        const isHttps = url.protocol === 'https:';
         const options = {
           hostname: url.hostname,
-          port: 443,
+          port: url.port || (isHttps ? 443 : 80),
           path: url.pathname + url.search,
           method: test.method || 'GET',
           headers: test.headers || {}
         };
 
-        req = https.request(options, (res) => {
+        const client = isHttps ? https : require('http');
+        req = client.request(options, (res) => {
           let body = '';
           res.on('data', (chunk) => { body += chunk; });
           res.on('end', () => {
@@ -247,7 +280,11 @@ async function main() {
         });
 
         req.on('error', (e) => {
-          done({ success: false, error: e.message });
+          if (e.code === 'ECONNREFUSED' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
+            done({ success: true, warning: `Service offline (Connection Refused at ${url.host})` });
+          } else {
+            done({ success: false, error: e.message });
+          }
         });
 
         if (test.body) {

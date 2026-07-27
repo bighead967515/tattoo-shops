@@ -64,6 +64,13 @@
       "when": 1782520306993,
       "tag": "0008_green_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785002095810,
+      "tag": "0009_unusual_earthquake",
+      "breakpoints": true
     }
   ]
 }

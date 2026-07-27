@@ -1,4 +1,4 @@
-# AI Coding Agent Instructions — Universal Inc. Tattoo Artist Directory
+# AI Coding Agent Instructions — Ink Connect Tattoo Artist Directory
 
 ## Project Overview
 

@@ -587,4 +587,21 @@ export const invitations = pgTable("invitations", {
 export type Invitation = typeof invitations.$inferSelect;
 export type InsertInvitation = typeof invitations.$inferInsert;
 
+/**
+ * Blog posts for SEO and AI search indexing
+ */
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  content: text("content").notNull(),
+  summary: text("summary"),
+  publishedAt: timestamp("publishedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = typeof blogPosts.$inferInsert;
+
 
