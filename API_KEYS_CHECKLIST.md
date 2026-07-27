@@ -54,6 +54,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 3. Go to Developers > API keys
 4. Copy these to `.env`:
    - `STRIPE_SECRET_KEY` - Secret key (starts with `sk_test_` for testing)
+   - Optional: `STRIPE_RESTRICTED_KEY` - Restricted key for MCP or automation-only tasks
 5. Go to Developers > Webhooks
 6. Add endpoint: `https://yourdomain.com/api/webhooks/stripe`
 7. Select events: `checkout.session.completed`, `payment_intent.payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
@@ -83,7 +84,28 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 ---
 
-### 3. Resend (Email Service)
+### 3. MCP Automation Keys (Optional)
+
+**Priority**: 🟡 HIGH - Needed only if you use MCP servers for operational tooling
+
+#### 3A. Render MCP / Render API
+
+1. Go to https://dashboard.render.com/u/settings#api-keys
+2. Create a personal API key with the minimum access you need
+3. Copy to `.env`:
+   - `RENDER_API_KEY`
+4. The workspace MCP config reads this from `.env` via `.vscode/mcp.json`
+
+#### 3B. n8n API access for MCP or automation
+
+1. Open your n8n instance settings and create an API key
+2. Copy these to `.env`:
+   - `N8N_API_URL` - Base API URL, for example `https://your-name.app.n8n.cloud/api/v1`
+   - `N8N_API_KEY`
+
+---
+
+### 4. Resend (Email Service)
 
 **Priority**: 🟡 HIGH - Needed for booking confirmations
 
@@ -103,7 +125,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 
 ---
 
-### 4. AI Services (Groq + Hugging Face)
+### 5. AI Services (Groq + Hugging Face)
 
 #### 4A. Groq (Structured Text AI)
 
@@ -158,6 +180,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 2. **Stripe** (15 min) - Payment processing
 3. **Resend** (10 min) - Email notifications
 4. **Groq + Hugging Face** (10 min) - AI features
+5. **Render/n8n MCP keys** (optional) - Operational automation
 
 **Total Setup Time**: ~1.1 hours
 
@@ -169,6 +192,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
 - [ ] Keep `SUPABASE_SERVICE_KEY` backend-only (never expose it in frontend code)
 - [ ] Enable and verify Supabase RLS policies (anon key is public)
 - [ ] Use different keys for development and production
+- [ ] Prefer restricted or least-privilege keys for MCP automation
 - [ ] Restrict API keys by domain/IP when possible
 - [ ] Store production keys in hosting platform's environment variables
 - [ ] Rotate keys every 90 days
@@ -200,6 +224,7 @@ Complete this checklist to get all required API keys for your tattoo artist dire
    - [ ] Can create test booking (Stripe)
    - [ ] Receive confirmation email (Resend)
    - [ ] AI features work (Groq/Hugging Face)
+   - [ ] MCP servers can start with `.vscode/mcp.json` if you use Render or other automation
 
 ---
 

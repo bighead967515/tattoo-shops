@@ -1,5 +1,73 @@
 const https = require('https');
 const fs = require('fs');
+const path = require('path');
+
+function readEnvFile(filePath) {
+  const env = {};
+  const envContent = fs.readFileSync(filePath, 'utf8');
+  envContent.split('\n').forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const parts = trimmed.split('=');
+    if (parts.length >= 2) {
+      const key = parts[0].trim();
+      const val = parts.slice(1).join('=').trim();
+      env[key] = val;
+    }
+  });
+  return env;
+}
+
+function readJsonIfExists(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function readMcpServerConfig() {
+  const workspaceConfigPath = path.join('.vscode', 'mcp.json');
+  const legacyConfigPath = '.mcp.json';
+  const externalLegacyPaths = [
+    'C:\\Users\\dillo\\.gemini\\antigravity\\mcp_config.json',
+    'C:\\Users\\dillo\\.gemini\\antigravity-ide\\mcp_config.json',
+  ];
+
+  const workspaceConfig = readJsonIfExists(workspaceConfigPath);
+  if (workspaceConfig) {
+    return {
+      config: workspaceConfig,
+      servers: workspaceConfig.servers ?? workspaceConfig.mcpServers ?? {},
+      source: workspaceConfigPath,
+    };
+  }
+
+  const legacyConfig = readJsonIfExists(legacyConfigPath);
+  if (legacyConfig) {
+    return {
+      config: legacyConfig,
+      servers: legacyConfig.servers ?? legacyConfig.mcpServers ?? {},
+      source: legacyConfigPath,
+    };
+  }
+
+  for (const externalPath of externalLegacyPaths) {
+    const externalConfig = readJsonIfExists(externalPath);
+    if (externalConfig) {
+      return {
+        config: externalConfig,
+        servers: externalConfig.servers ?? externalConfig.mcpServers ?? {},
+        source: externalPath,
+      };
+    }
+  }
+
+  return {
+    config: null,
+    servers: {},
+    source: null,
+  };
+}
 
 async function main() {
   console.log("=========================================");
@@ -9,46 +77,38 @@ async function main() {
   // Read .env keys
   let env = {};
   try {
-    const envContent = fs.readFileSync('.env', 'utf8');
-    envContent.split('\n').forEach(line => {
-      const parts = line.split('=');
-      if (parts.length >= 2) {
-        const key = parts[0].trim();
-        const val = parts.slice(1).join('=').trim();
-        env[key] = val;
-      }
-    });
+    env = readEnvFile('.env');
     console.log("✅ Loaded .env variables.");
   } catch (e) {
     console.error("❌ Failed to read .env file:", e.message);
   }
 
-  // Keys extracted from mcp_config.json
-  let stripeRestrictedKey = null;
-  let renderApiKey = null;
-  let n8nApiUrl = null;
-  let n8nApiKey = null;
+  // Keys extracted from workspace MCP config (preferred) or legacy MCP config.
+  const { servers: mcpServers, source: mcpConfigSource } = readMcpServerConfig();
+  let stripeRestrictedKey = env.STRIPE_RESTRICTED_KEY ?? null;
+  let renderApiKey = env.RENDER_API_KEY ?? null;
+  let n8nApiUrl = env.N8N_API_URL ?? null;
+  let n8nApiKey = env.N8N_API_KEY ?? null;
   try {
-    let path = 'C:\\Users\\dillo\\.gemini\\antigravity\\mcp_config.json';
-    if (!fs.existsSync(path)) {
-      path = 'C:\\Users\\dillo\\.gemini\\antigravity-ide\\mcp_config.json';
+    if (mcpConfigSource) {
+      console.log(`✅ Loaded MCP config from ${mcpConfigSource}.`);
     }
-    const mcpConfig = JSON.parse(fs.readFileSync(path, 'utf8'));
-    const stripeArg = mcpConfig.mcpServers?.stripe?.args?.find(a => a.startsWith('--api-key='));
-    if (stripeArg) {
+
+    const stripeArg = mcpServers?.stripe?.args?.find((a) => a.startsWith('--api-key='));
+    if (!stripeRestrictedKey && stripeArg) {
       stripeRestrictedKey = stripeArg.replace('--api-key=', '');
     }
-    if (mcpConfig.mcpServers?.render?.env?.RENDER_API_KEY) {
-      renderApiKey = mcpConfig.mcpServers.render.env.RENDER_API_KEY;
+    if (!renderApiKey && mcpServers?.render?.env?.RENDER_API_KEY && !String(mcpServers.render.env.RENDER_API_KEY).startsWith('${')) {
+      renderApiKey = mcpServers.render.env.RENDER_API_KEY;
     }
-    if (mcpConfig.mcpServers?.n8n?.env?.N8N_API_URL) {
-      n8nApiUrl = mcpConfig.mcpServers.n8n.env.N8N_API_URL;
+    if (!n8nApiUrl && mcpServers?.n8n?.env?.N8N_API_URL && !String(mcpServers.n8n.env.N8N_API_URL).startsWith('${')) {
+      n8nApiUrl = mcpServers.n8n.env.N8N_API_URL;
     }
-    if (mcpConfig.mcpServers?.n8n?.env?.N8N_API_KEY) {
-      n8nApiKey = mcpConfig.mcpServers.n8n.env.N8N_API_KEY;
+    if (!n8nApiKey && mcpServers?.n8n?.env?.N8N_API_KEY && !String(mcpServers.n8n.env.N8N_API_KEY).startsWith('${')) {
+      n8nApiKey = mcpServers.n8n.env.N8N_API_KEY;
     }
   } catch (e) {
-    console.warn("⚠️  Could not read mcp_config.json:", e.message);
+    console.warn("⚠️  Could not read MCP configuration:", e.message);
   }
 
 
