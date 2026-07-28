@@ -10,15 +10,16 @@ import { trpc } from "@/lib/trpc";
 
 const artistTierOrder: ArtistSubscriptionTier[] = [
   "artist_free",
+  "artist_paygo",
   "artist_pro",
   "artist_elite",
 ];
 
 const ARTIST_TIER_DESCRIPTIONS: Record<ArtistSubscriptionTier, string> = {
-  artist_free: "A free profile to get discovered.",
-  artist_paygo: "Pay-as-you-go bidding. Pay only when booked.",
-  artist_pro: "Pro Studio features to supercharge your business.",
-  artist_elite: "Elite status, sponsored placement, ultimate growth.",
+  artist_free: "Start free, build your profile, and get discovered.",
+  artist_paygo: "Flexible option for occasional artists who want to pay only when it pays off.",
+  artist_pro: "The main growth tier for artists ready to take on more clients.",
+  artist_elite: "Premium visibility and tools for studios that want maximum momentum.",
 };
 
 export default function Pricing() {
@@ -33,11 +34,11 @@ export default function Pricing() {
         <section className="py-20 bg-gradient-to-b from-primary/5 to-transparent">
           <div className="container text-center">
             <h1 className="text-5xl font-bold mb-6">
-              Pricing for <span className="text-primary">Every Path</span>
+              Pricing that grows with <span className="text-primary">your studio</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Artists: start free, subscribe to Pro, or pay per win.
-              Clients: post requests and find your perfect artist.
+              Start free, get discovered, and upgrade when you are ready to take on more clients.
+              Clients can still post requests and compare artists without paying anything.
             </p>
           </div>
         </section>
@@ -49,7 +50,7 @@ export default function Pricing() {
             <p className="text-muted-foreground">Choose how you want to grow your studio</p>
           </div>
 
-          <div className="grid xl:grid-cols-3 lg:grid-cols-3 md:grid-cols-1 gap-6 max-w-5xl mx-auto">
+          <div className="grid xl:grid-cols-4 lg:grid-cols-2 md:grid-cols-1 gap-6 max-w-6xl mx-auto">
             {artistTierOrder.map((tier) => {
               const limits = ARTIST_TIER_LIMITS[tier];
               const pricing = ARTIST_TIER_PRICING[tier];
@@ -128,14 +129,13 @@ export default function Pricing() {
                   >
                     <Link href="/artist/billing">
                       <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                      {tier === "artist_free" ? "Start Free" : isElite ? "Go Elite" : "Choose Plan"}
-                    </Link>
-                  </Button>
-
-                  <div className="space-y-3 text-sm flex-1">
-                    <FeatureRow
-                      enabled
-                      label={`${limits.portfolioPhotos === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.portfolioPhotos} portfolio photos`}
+                      {tier === "artist_free"
+                        ? "Start Free"
+                        : tier === "artist_paygo"
+                        ? "Choose Flex Plan"
+                        : isElite
+                        ? "Go Elite"
+                        : "Choose Pro"}
                       highlight={limits.portfolioPhotos === Number.MAX_SAFE_INTEGER}
                     />
                     <FeatureRow enabled={limits.canBid} label="Bid on client requests" />

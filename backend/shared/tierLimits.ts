@@ -72,14 +72,14 @@ export const ARTIST_TIER_PRICING = {
     stripePriceIdYear: null,
   },
   artist_pro: {
-    monthly: 4900,   // $49.00/mo
-    yearly: 49000,   // $490.00/yr (2 months free)
+    monthly: 2900,   // $29.00/mo
+    yearly: 29000,   // $290.00/yr
     stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_MONTH"),
     stripePriceIdYear:  readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_YEAR"),
   },
   artist_elite: {
-    monthly: 9900,   // $99.00/mo
-    yearly: 99000,   // $990.00/yr (2 months free)
+    monthly: 7900,   // $79.00/mo
+    yearly: 79000,   // $790.00/yr
     stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_MONTH"),
     stripePriceIdYear:  readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_YEAR"),
   },

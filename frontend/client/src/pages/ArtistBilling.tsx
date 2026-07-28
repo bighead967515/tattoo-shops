@@ -37,7 +37,7 @@ const PLANS: PlanDef[] = [
   {
     key: "free",
     canonicalTier: "artist_free",
-    name: "Free Profile",
+    name: "Free Starter",
     tagline: "Get discovered. No credit card needed.",
     Icon: Users,
     monthlyPrice: 0,
@@ -59,15 +59,35 @@ const PLANS: PlanDef[] = [
       { label: "Analytics & profile insights", included: false },
     ],
   },
-
+  {
+    key: "payg",
+    canonicalTier: "artist_paygo",
+    name: "Flex Pay-As-You-Go",
+    tagline: "Pay only when it pays off.",
+    Icon: Zap,
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    transactionFee: "10% booking fee",
+    stripeTierArg: null,
+    badge: "Flexible",
+    isMostPopular: false,
+    isElite: false,
+    features: [
+      { label: "Lightweight entry point", included: true },
+      { label: "Pay only when you win a booking", included: true },
+      { label: "Good for occasional artists", included: true },
+      { label: "Keeps your options open", included: true },
+      { label: "Upgrade later for lower fees", included: true },
+    ],
+  },
   {
     key: "pro",
     canonicalTier: "artist_pro",
     name: "Pro Studio",
-    tagline: "Unlimit your reach and minimize fees.",
+    tagline: "The main growth tier for artists ready to take on more clients.",
     Icon: Star,
-    monthlyPrice: 4900, // $49/mo
-    yearlyPrice: 49000, // $490/yr
+    monthlyPrice: 2900, // $29/mo
+    yearlyPrice: 29000, // $290/yr
     transactionFee: "5% booking fee",
     stripeTierArg: "artist_pro",
     badge: "Most Popular",
@@ -89,13 +109,13 @@ const PLANS: PlanDef[] = [
     key: "elite",
     canonicalTier: "artist_elite",
     name: "Elite Icon",
-    tagline: "Elite sponsored placement, lowest fees.",
+    tagline: "Premium visibility and tools for high-growth studios.",
     Icon: Crown,
-    monthlyPrice: 9900, // $99/mo
-    yearlyPrice: 99000, // $990/yr
+    monthlyPrice: 7900, // $79/mo
+    yearlyPrice: 79000, // $790/yr
     transactionFee: "3% booking fee",
     stripeTierArg: "artist_elite",
-    badge: "Elite sponsored",
+    badge: "Elite",
     isMostPopular: false,
     isElite: true,
     features: [
@@ -194,7 +214,11 @@ export default function ArtistBilling() {
   const currentPlan = PLANS.find((p) => p.canonicalTier === currentCanonical) ?? PLANS[0];
 
   const handleSubscribe = async (plan: PlanDef) => {
-
+    if (plan.key === "payg") {
+      setLoadingTier(plan.key);
+      await paygMutation.mutateAsync();
+      return;
+    }
 
     if (!plan.stripeTierArg) return;
     setLoadingTier(plan.key);
@@ -229,8 +253,8 @@ export default function ArtistBilling() {
               Choose Your <span className="text-primary">Artist Plan</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-5">
-              Start free and grow at your own pace. Upgrade when you're ready to
-              take on more clients.
+              Start free, get discovered, and upgrade when you are ready to take on
+              more clients and lower your fees.
             </p>
 
             {/* Current plan pill */}
@@ -467,6 +491,8 @@ export default function ArtistBilling() {
                       ? "Current Plan"
                       : plan.key === "free"
                       ? "Always Free"
+                      : plan.key === "payg"
+                      ? "Choose Flex Plan"
                       : plan.key === "elite"
                       ? "Go Elite Icon"
                       : isLoading

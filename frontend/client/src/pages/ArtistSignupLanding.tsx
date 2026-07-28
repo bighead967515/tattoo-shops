@@ -66,31 +66,31 @@ const US_STATES = [
 
 const PLAN_OPTIONS = [
   {
-    id: "pro_studio",
-    name: "Pro Studio",
-    price: "$19/mo",
-    desc: "Founding Artist Offer (or $9.99/mo billed annually)",
-    details: "3-Month Free Trial, 5% booking fee, unlimited portfolio photos, booking calendar + deposits, 50 AI generations/mo, Verified badge.",
-    popular: true,
-    color: "border-emerald-500/50 bg-emerald-500/5 text-emerald-500",
-  },
-  {
-    id: "elite_icon",
-    name: "Elite Icon",
-    price: "$99/mo",
-    desc: "Ultimate visibility & tools",
-    details: "3% booking fee, homepage feature spotlight, unlimited portfolio photos, unlimited AI generations, VIP support.",
-    popular: false,
-    color: "border-accent bg-accent/5 text-accent-foreground",
-  },
-  {
     id: "free",
-    name: "Free Trial",
+    name: "Free Starter",
     price: "$0/mo",
-    desc: "Start your footprint",
-    details: "10 portfolio photos, appear in directory, standard support.",
+    desc: "Start with a profile and get discovered",
+    details: "10 portfolio photos, directory visibility, and a simple way to start building momentum.",
     popular: false,
     color: "border-border/60 bg-muted/30 text-muted-foreground",
+  },
+  {
+    id: "payg",
+    name: "Flex Pay-As-You-Go",
+    price: "$0/mo",
+    desc: "Pay only when it pays off",
+    details: "A flexible option for artists who want to stay lightweight and upgrade only when they win.",
+    popular: false,
+    color: "border-primary/20 bg-primary/5 text-primary",
+  },
+  {
+    id: "pro_studio",
+    name: "Pro Studio",
+    price: "$29/mo",
+    desc: "Best for artists ready to grow",
+    details: "Unlock bidding, booking tools, verified status, lower fees, and more visibility.",
+    popular: true,
+    color: "border-emerald-500/50 bg-emerald-500/5 text-emerald-500",
   },
 ];
 
@@ -103,7 +103,7 @@ export default function ArtistSignupLanding() {
   const pendingUserEmailRef = useRef<string | null>(null);
   
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
-  const [selectedPlan, setSelectedPlan] = useState("pro_studio");
+  const [selectedPlan, setSelectedPlan] = useState("free");
   const [showLegal, setShowLegal] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -491,10 +491,14 @@ export default function ArtistSignupLanding() {
           {step === 1 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Select your studio tier</h2>
+                <h2 className="text-2xl font-bold">Start with the path that fits you</h2>
                 <p className="text-muted-foreground text-sm">
-                  Choose a subscription plan to kick off onboarding. You can change plans at any time.
+                  Most artists begin with a free profile, build momentum, and upgrade after they see their first inquiry. You can change your plan later.
                 </p>
+              </div>
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">Why this works:</span> the free profile gets you started fast, while Pro unlocks the tools that make your first bookings easier.
               </div>
 
               <div className="grid gap-4">
