@@ -22,6 +22,46 @@ const ARTIST_TIER_DESCRIPTIONS: Record<ArtistSubscriptionTier, string> = {
   artist_elite: "Premium visibility and tools for studios that want maximum momentum.",
 };
 
+const TIER_FEATURES: Record<ArtistSubscriptionTier, Array<{ label: string; included: boolean }>> = {
+  artist_free: [
+    { label: "Profile, styles, and location", included: true },
+    { label: "10 portfolio photos", included: true },
+    { label: "Appear in search results", included: true },
+    { label: "Receive direct inquiries", included: true },
+    { label: "Bid on client requests", included: false },
+    { label: "Booking calendar + deposits", included: false },
+    { label: "AI design generation", included: false },
+    { label: "Verified badge", included: false },
+  ],
+  artist_paygo: [
+    { label: "Keep your profile live", included: true },
+    { label: "Flexible pace for occasional work", included: true },
+    { label: "Pay only when you win a booking", included: true },
+    { label: "3 lightweight bids to stay active", included: true },
+    { label: "Upgrade later for lower fees", included: true },
+    { label: "Verified badge", included: false },
+    { label: "Priority visibility", included: false },
+  ],
+  artist_pro: [
+    { label: "Unlimited portfolio photos", included: true },
+    { label: "Unlimited bidding", included: true },
+    { label: "Lower 5% booking fee", included: true },
+    { label: "50 AI generations per month", included: true },
+    { label: "Booking calendar + deposits", included: true },
+    { label: "Verified badge", included: true },
+    { label: "Messaging credits", included: true },
+  ],
+  artist_elite: [
+    { label: "Everything in Pro Studio", included: true },
+    { label: "Lowest 3% booking fee", included: true },
+    { label: "Unlimited AI generations", included: true },
+    { label: "Sponsored placement", included: true },
+    { label: "Priority support", included: true },
+    { label: "Advanced analytics", included: true },
+    { label: "Unlimited messaging credits", included: true },
+  ],
+};
+
 export default function Pricing() {
   const { data: foundingStatus } = trpc.artists.getFoundingStatus.useQuery();
 
@@ -58,6 +98,7 @@ export default function Pricing() {
               const isElite = tier === "artist_elite";
               const isFoundingActive = isMostPopular && foundingStatus && !foundingStatus.isSoldOut;
               const displayedPrice = isFoundingActive ? 1900 : pricing.monthly;
+              const tierFeatures = TIER_FEATURES[tier];
 
               return (
                 <Card
@@ -112,10 +153,10 @@ export default function Pricing() {
                       </div>
                     ) : null}
                     {tier === "artist_pro" && !isFoundingActive && (
-                      <div className="text-xs text-muted-foreground mb-1">or $490/yr (2 months free)</div>
+                      <div className="text-xs text-muted-foreground mb-1">or $290/yr</div>
                     )}
                     {tier === "artist_elite" && (
-                      <div className="text-xs text-muted-foreground mb-1">or $990/yr (2 months free)</div>
+                      <div className="text-xs text-muted-foreground mb-1">or $790/yr</div>
                     )}
                     <p className="text-muted-foreground text-xs mt-2">
                       {ARTIST_TIER_DESCRIPTIONS[tier]}
@@ -136,19 +177,19 @@ export default function Pricing() {
                         : isElite
                         ? "Go Elite"
                         : "Choose Pro"}
-                      highlight={limits.portfolioPhotos === Number.MAX_SAFE_INTEGER}
-                    />
-                    <FeatureRow enabled={limits.canBid} label="Bid on client requests" />
-                    <FeatureRow enabled={limits.freeBidsPerMonth > 0} label={`${limits.freeBidsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.freeBidsPerMonth} free bids/month`} />
-                    <FeatureRow enabled={limits.aiGenerationsPerMonth > 0} label={`${limits.aiGenerationsPerMonth === Number.MAX_SAFE_INTEGER ? "Unlimited" : limits.aiGenerationsPerMonth} AI design generations`} />
-                    <FeatureRow enabled={limits.chatTokensPerMonth > 0} label="Free client messaging credits" />
-                    <FeatureRow enabled={limits.sponsoredListing} label="Sponsored placement" />
-                    <FeatureRow enabled={limits.verifiedBadge} label="Verified Badge" />
-                    <FeatureRow
-                      enabled
-                      label={`${limits.transactionFeePercent}% booking fee`}
-                      neutral={(limits.transactionFeePercent as number) === 0}
-                    />
+                    </Link>
+                  </Button>
+
+                  <div className="space-y-3 text-sm flex-1">
+                    {tierFeatures.map((feature) => (
+                      <FeatureRow
+                        key={feature.label}
+                        enabled={feature.included}
+                        label={feature.label}
+                        highlight={tier === "artist_pro" && feature.label.includes("Unlimited")}
+                        neutral={tier === "artist_free" && !feature.included}
+                      />
+                    ))}
                   </div>
                 </Card>
               );

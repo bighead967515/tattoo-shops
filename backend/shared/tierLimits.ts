@@ -24,10 +24,10 @@ export const ARTIST_TIER_LIMITS = {
     verifiedBadge: false,
   },
   artist_paygo: {
-    name: "Pay-as-you-go",
+    name: "Flex Pay-As-You-Go",
     portfolioPhotos: 10,
-    canBid: false,
-    freeBidsPerMonth: 0,
+    canBid: true,
+    freeBidsPerMonth: 3,
     transactionFeePercent: 10,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
@@ -41,7 +41,7 @@ export const ARTIST_TIER_LIMITS = {
     freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
     transactionFeePercent: 5,
     aiGenerationsPerMonth: 50,
-    chatTokensPerMonth: 0, // Still must buy extra if client didn't pay
+    chatTokensPerMonth: 250,
     sponsoredListing: false,
     verifiedBadge: true,
   },
@@ -52,9 +52,9 @@ export const ARTIST_TIER_LIMITS = {
     freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
     transactionFeePercent: 3,
     aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
-    chatTokensPerMonth: Number.MAX_SAFE_INTEGER, // Unlimited free chats
+    chatTokensPerMonth: Number.MAX_SAFE_INTEGER,
     sponsoredListing: true,
-    verifiedBadge: true, // "Elite Sponsored" badge applied via UI
+    verifiedBadge: true,
   },
 } as const;
 
