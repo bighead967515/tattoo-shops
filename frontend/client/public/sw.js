@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ink-connect-v1';
+const CACHE_NAME = 'ink-connect-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -35,24 +35,41 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
-  // Only handle HTTP/HTTPS (ignore chrome-extension, etc.)
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Never cache non-GET requests (Cache API only supports GET)
+  if (request.method !== 'GET') return;
+
+  // Only handle same-origin requests
+  if (url.origin !== self.location.origin) return;
+
+  // Never cache API/auth traffic; these must always hit the network
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
+    fetch(request)
+      .then(async (response) => {
         // If valid response, clone and cache it
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(request, responseToCache);
         }
         return response;
       })
-      .catch(() => {
+      .catch(async () => {
         // Fallback to cache if network fails
-        return caches.match(event.request);
+        const cached = await caches.match(request);
+        if (cached) return cached;
+
+        // For navigations, fallback to app shell if present
+        if (request.mode === 'navigate') {
+          const appShell = await caches.match('/index.html');
+          if (appShell) return appShell;
+        }
+
+        return Response.error();
       })
   );
 });
