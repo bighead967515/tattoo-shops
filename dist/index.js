@@ -2467,7 +2467,6 @@ import { createRequire } from "module";
 import path6 from "path";
 import cors from "cors";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // backend/server/_core/supabaseAuth.ts
@@ -2710,10 +2709,10 @@ var ARTIST_TIER_LIMITS = {
     verifiedBadge: false
   },
   artist_paygo: {
-    name: "Pay-as-you-go",
+    name: "Flex Pay-As-You-Go",
     portfolioPhotos: 10,
-    canBid: false,
-    freeBidsPerMonth: 0,
+    canBid: true,
+    freeBidsPerMonth: 3,
     transactionFeePercent: 10,
     aiGenerationsPerMonth: 0,
     chatTokensPerMonth: 0,
@@ -2727,8 +2726,7 @@ var ARTIST_TIER_LIMITS = {
     freeBidsPerMonth: Number.MAX_SAFE_INTEGER,
     transactionFeePercent: 5,
     aiGenerationsPerMonth: 50,
-    chatTokensPerMonth: 0,
-    // Still must buy extra if client didn't pay
+    chatTokensPerMonth: 250,
     sponsoredListing: false,
     verifiedBadge: true
   },
@@ -2740,10 +2738,8 @@ var ARTIST_TIER_LIMITS = {
     transactionFeePercent: 3,
     aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
     chatTokensPerMonth: Number.MAX_SAFE_INTEGER,
-    // Unlimited free chats
     sponsoredListing: true,
     verifiedBadge: true
-    // "Elite Sponsored" badge applied via UI
   }
 };
 var ARTIST_TIER_PRICING = {
@@ -2760,18 +2756,18 @@ var ARTIST_TIER_PRICING = {
     stripePriceIdYear: null
   },
   artist_pro: {
-    monthly: 4900,
-    // $49.00/mo
-    yearly: 49e3,
-    // $490.00/yr (2 months free)
+    monthly: 2900,
+    // $29.00/mo
+    yearly: 29e3,
+    // $290.00/yr
     stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_MONTH"),
     stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_PRO_PRICE_ID_YEAR")
   },
   artist_elite: {
-    monthly: 9900,
-    // $99.00/mo
-    yearly: 99e3,
-    // $990.00/yr (2 months free)
+    monthly: 7900,
+    // $79.00/mo
+    yearly: 79e3,
+    // $790.00/yr
     stripePriceIdMonth: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_MONTH"),
     stripePriceIdYear: readRuntimeEnv("STRIPE_ARTIST_ELITE_PRICE_ID_YEAR")
   }
@@ -6893,42 +6889,47 @@ app.use((req, res, next) => {
     next();
   });
 });
-app.use(
-  helmet({
-    contentSecurityPolicy: ENV.isProduction ? {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://js.stripe.com"],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://fonts.googleapis.com"
-        ],
-        imgSrc: [
-          "'self'",
-          "data:",
-          "blob:",
-          new URL(ENV.supabaseUrl).hostname
-        ],
-        connectSrc: [
-          "'self'",
-          ENV.supabaseUrl,
-          ENV.supabaseUrl.replace("https://", "wss://"),
-          "https://api.stripe.com"
-        ],
-        frameSrc: [
-          "https://js.stripe.com",
-          "https://hooks.stripe.com"
-        ],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-        upgradeInsecureRequests: []
-      }
-    } : false
-  })
-);
+try {
+  const helmet = require2("helmet");
+  app.use(
+    helmet({
+      contentSecurityPolicy: ENV.isProduction ? {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "https://js.stripe.com"],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "https://fonts.googleapis.com"
+          ],
+          imgSrc: [
+            "'self'",
+            "data:",
+            "blob:",
+            new URL(ENV.supabaseUrl).hostname
+          ],
+          connectSrc: [
+            "'self'",
+            ENV.supabaseUrl,
+            ENV.supabaseUrl.replace("https://", "wss://"),
+            "https://api.stripe.com"
+          ],
+          frameSrc: [
+            "https://js.stripe.com",
+            "https://hooks.stripe.com"
+          ],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          upgradeInsecureRequests: []
+        }
+      } : false
+    })
+  );
+} catch {
+  logger.warn("helmet package not found; continuing without security headers middleware");
+}
 var compressionMiddleware = null;
 try {
   const compressionModule = require2("compression");

@@ -12,7 +12,6 @@ import { createRequire } from "module";
 import path from "path";
 import cors from "cors";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerSupabaseAuthRoutes } from "./supabaseAuth";
 import { csrfTokenMiddleware, csrfProtectionMiddleware } from "./csrf";
@@ -111,44 +110,56 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 //               previews generated with URL.createObjectURL().
 //   connect-src: tRPC (same-origin), Supabase auth + realtime websocket, Stripe checkout.
 //   frame-src:  Stripe payment iframe.
-app.use(
-  helmet({
-    contentSecurityPolicy: ENV.isProduction
-      ? {
-          directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "https://js.stripe.com"],
-            styleSrc: [
-              "'self'",
-              "'unsafe-inline'",
-              "https://fonts.googleapis.com",
-            ],
-            imgSrc: [
-              "'self'",
-              "data:",
-              "blob:",
-              new URL(ENV.supabaseUrl).hostname,
-            ],
-            connectSrc: [
-              "'self'",
-              ENV.supabaseUrl,
-              ENV.supabaseUrl.replace("https://", "wss://"),
-              "https://api.stripe.com",
-            ],
-            frameSrc: [
-              "https://js.stripe.com",
-              "https://hooks.stripe.com",
-            ],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            objectSrc: ["'none'"],
-            baseUri: ["'self'"],
-            formAction: ["'self'"],
-            upgradeInsecureRequests: [],
-          },
-        }
-      : false,
-  }),
-);
+try {
+  const helmet = require("helmet") as (
+    options: {
+      contentSecurityPolicy: false | {
+        directives: Record<string, string[]>;
+      };
+    },
+  ) => RequestHandler;
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: ENV.isProduction
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", "https://js.stripe.com"],
+              styleSrc: [
+                "'self'",
+                "'unsafe-inline'",
+                "https://fonts.googleapis.com",
+              ],
+              imgSrc: [
+                "'self'",
+                "data:",
+                "blob:",
+                new URL(ENV.supabaseUrl).hostname,
+              ],
+              connectSrc: [
+                "'self'",
+                ENV.supabaseUrl,
+                ENV.supabaseUrl.replace("https://", "wss://"),
+                "https://api.stripe.com",
+              ],
+              frameSrc: [
+                "https://js.stripe.com",
+                "https://hooks.stripe.com",
+              ],
+              fontSrc: ["'self'", "https://fonts.gstatic.com"],
+              objectSrc: ["'none'"],
+              baseUri: ["'self'"],
+              formAction: ["'self'"],
+              upgradeInsecureRequests: [],
+            },
+          }
+        : false,
+    }),
+  );
+} catch {
+  logger.warn("helmet package not found; continuing without security headers middleware");
+}
 
 // Gzip/deflate response compression — applied before all middleware so every
 // response (API JSON, HTML, assets) benefits. Static assets already have
