@@ -65,7 +65,7 @@ export default function ClientDashboard() {
 
   const { data: myRequests, isLoading: requestsLoading, refetch: refetchRequests } =
     trpc.requests.getMyRequests.useQuery(undefined, {
-      enabled: user?.role === "client",
+      enabled: user?.role === "client" || user?.role === "admin",
     });
 
   const cancelRequestMutation = trpc.requests.updateStatus.useMutation({
@@ -94,7 +94,7 @@ export default function ClientDashboard() {
     );
   }
 
-  if (user.role !== "client") {
+  if (user.role !== "client" && user.role !== "admin") {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
         <h1 className="text-2xl font-bold mb-4">Client Account Required</h1>

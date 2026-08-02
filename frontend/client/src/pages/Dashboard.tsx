@@ -45,6 +45,15 @@ export default function Dashboard() {
   // redirect on fresh login where the auth.me query hasn't resolved yet.
   const [authWaitMs, setAuthWaitMs] = useState(0);
 
+  const [adminViewMode, setAdminViewMode] = useState<"admin" | "artist" | "client">(() => {
+    return (localStorage.getItem("admin_dashboard_view") as "admin" | "artist" | "client") || "admin";
+  });
+
+  const handleAdminViewChange = (mode: "admin" | "artist" | "client") => {
+    setAdminViewMode(mode);
+    localStorage.setItem("admin_dashboard_view", mode);
+  };
+
   useEffect(() => {
     if (!loading && (!isAuthenticated || !user)) {
       // Give the auth.me query up to 3 seconds to resolve before redirecting.
@@ -84,7 +93,63 @@ export default function Dashboard() {
 
   // Unified Dashboard Router
   if (user.role === "admin") {
-    return <AdminDashboard />;
+    return (
+      <div className="flex flex-col min-h-screen">
+        {/* Admin View Switcher Bar */}
+        <div className="bg-primary text-primary-foreground py-2.5 px-4 flex flex-col sm:flex-row gap-2 justify-between items-center text-sm font-semibold sticky top-0 z-[100] shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="bg-primary-foreground/15 px-2 py-0.5 rounded text-xs uppercase tracking-wider font-extrabold border border-primary-foreground/20">
+              Admin Mode
+            </span>
+            <span>You are viewing the dashboard as: <span className="underline decoration-2 underline-offset-2 capitalize">{adminViewMode}</span></span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={adminViewMode === "admin" ? "secondary" : "ghost"}
+              className={`h-7 px-3 text-xs font-bold transition-all ${
+                adminViewMode === "admin"
+                  ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                  : "text-primary-foreground hover:bg-primary-foreground/15"
+              }`}
+              onClick={() => handleAdminViewChange("admin")}
+            >
+              Admin Dashboard
+            </Button>
+            <Button
+              size="sm"
+              variant={adminViewMode === "artist" ? "secondary" : "ghost"}
+              className={`h-7 px-3 text-xs font-bold transition-all ${
+                adminViewMode === "artist"
+                  ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                  : "text-primary-foreground hover:bg-primary-foreground/15"
+              }`}
+              onClick={() => handleAdminViewChange("artist")}
+            >
+              Artist Dashboard
+            </Button>
+            <Button
+              size="sm"
+              variant={adminViewMode === "client" ? "secondary" : "ghost"}
+              className={`h-7 px-3 text-xs font-bold transition-all ${
+                adminViewMode === "client"
+                  ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                  : "text-primary-foreground hover:bg-primary-foreground/15"
+              }`}
+              onClick={() => handleAdminViewChange("client")}
+            >
+              Client Dashboard
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col">
+          {adminViewMode === "admin" && <AdminDashboard />}
+          {adminViewMode === "artist" && <ArtistDashboard />}
+          {adminViewMode === "client" && <ClientDashboardView />}
+        </div>
+      </div>
+    );
   }
 
   if (user.role === "artist") {
