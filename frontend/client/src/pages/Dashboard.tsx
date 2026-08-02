@@ -29,6 +29,7 @@ import {
   CheckCircle,
   XCircle,
   UserCheck,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +38,7 @@ import AdminDashboard from "./AdminDashboard";
 import ArtistDashboard from "./ArtistDashboard";
 import ClientOnboarding from "./ClientOnboarding";
 import ArtistRegister from "./ArtistRegister";
+import ClientDashboard from "./ClientDashboard";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -330,8 +332,12 @@ function ClientDashboardView() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="bookings" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+        <Tabs defaultValue="requests" className="space-y-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-4">
+            <TabsTrigger value="requests">
+              <FileText className="w-4 h-4 mr-2" />
+              Requests
+            </TabsTrigger>
             <TabsTrigger value="bookings">
               <Calendar className="w-4 h-4 mr-2" />
               Bookings
@@ -345,6 +351,11 @@ function ClientDashboardView() {
               Profile
             </TabsTrigger>
           </TabsList>
+
+          {/* Requests Tab */}
+          <TabsContent value="requests" className="space-y-4">
+            <ClientDashboard isTab />
+          </TabsContent>
 
           {/* Bookings Tab */}
           <TabsContent value="bookings" className="space-y-4">

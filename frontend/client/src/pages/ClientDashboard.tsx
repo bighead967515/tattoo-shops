@@ -60,7 +60,7 @@ function getStatusColor(status: string) {
 }
 
 
-export default function ClientDashboard() {
+export default function ClientDashboard({ isTab = false }: { isTab?: boolean; params?: any }) {
   const { user, loading: authLoading } = useAuth();
 
   const { data: myRequests, isLoading: requestsLoading, refetch: refetchRequests } =
@@ -127,11 +127,11 @@ export default function ClientDashboard() {
       0,
     ) ?? 0;
 
-  return (
-    <div className="container mx-auto py-8 px-4">
+  const renderContent = () => (
+    <>
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Curation Hub</h1>
+          <h2 className="text-2xl font-bold">Curation Hub</h2>
           <p className="text-muted-foreground mt-1">
             Manage your tattoo requests and artist bids
           </p>
@@ -256,6 +256,16 @@ export default function ClientDashboard() {
           />
         </TabsContent>
       </Tabs>
+    </>
+  );
+
+  if (isTab) {
+    return renderContent();
+  }
+
+  return (
+    <div className="container mx-auto py-8 px-4">
+      {renderContent()}
     </div>
   );
 }
