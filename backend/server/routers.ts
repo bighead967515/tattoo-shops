@@ -153,6 +153,31 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Admin: hide or unhide an artist from public discovery */
+    adminSetVisibility: adminProcedure
+      .input(z.object({ artistId: z.number(), hidden: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await db.updateArtist(input.artistId, {
+          isHidden: input.hidden,
+          updatedAt: new Date(),
+        });
+
+        return { success: true };
+      }),
+
+    /** Admin: delete an artist profile, typically for cleanup/testing */
+    adminDelete: adminProcedure
+      .input(z.object({ artistId: z.number() }))
+      .mutation(async ({ input }) => {
+        const deleted = await db.deleteArtistAdmin(input.artistId);
+
+        return {
+          success: true,
+          deletedArtistId: deleted.id,
+          deletedArtistName: deleted.shopName,
+        };
+      }),
+
     adminSendInvitations: adminProcedure
       .input(
         z.object({

@@ -299,6 +299,7 @@ var init_schema = __esm({
       averageRating: text("averageRating"),
       totalReviews: integer("totalReviews").default(0),
       isApproved: boolean("isApproved").default(false),
+      isHidden: boolean("isHidden").default(false).notNull(),
       // artists.subscriptionTier was deprecated in favour of users.subscriptionTier.
       // The column has been removed from this schema; run `pnpm db:push` to drop it from
       // the database (generates: ALTER TABLE artists DROP COLUMN subscriptionTier).
@@ -957,6 +958,7 @@ __export(db_exports, {
   createBooking: () => createBooking,
   createFlashArt: () => createFlashArt,
   createReview: () => createReview,
+  deleteArtistAdmin: () => deleteArtistAdmin,
   deleteFlashArt: () => deleteFlashArt,
   deletePortfolioImage: () => deletePortfolioImage,
   discoverArtists: () => discoverArtists,
@@ -1180,7 +1182,7 @@ async function getAllArtists() {
   return await db.select({
     ...artistFields,
     subscriptionTier: users.subscriptionTier
-  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(eq(artists.isApproved, true)).orderBy(
+  }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(and(eq(artists.isApproved, true), eq(artists.isHidden, false))).orderBy(
     // Founding artists appear first
     sql`${artists.isFoundingArtist} DESC`,
     desc(artists.createdAt)
@@ -1195,11 +1197,16 @@ async function getAllArtistsAdmin() {
     city: artists.city,
     state: artists.state,
     isApproved: artists.isApproved,
+    isHidden: artists.isHidden,
+    isFoundingArtist: artists.isFoundingArtist,
+    foundingTrialEndsAt: artists.foundingTrialEndsAt,
+    profileViewCount: artists.profileViewCount,
     createdAt: artists.createdAt,
     userId: artists.userId,
     userName: users.name,
     userEmail: users.email,
-    verificationStatus: users.verificationStatus
+    verificationStatus: users.verificationStatus,
+    subscriptionTier: users.subscriptionTier
   }).from(artists).innerJoin(users, eq(artists.userId, users.id)).orderBy(desc(artists.createdAt));
 }
 async function searchArtists(filters) {
@@ -1208,7 +1215,7 @@ async function searchArtists(filters) {
   const normalizedShopName = filters.shopName?.trim();
   const normalizedCity = filters.city?.trim();
   const normalizedState = filters.state?.trim();
-  const conditions = [eq(artists.isApproved, true)];
+  const conditions = [eq(artists.isApproved, true), eq(artists.isHidden, false)];
   if (normalizedShopName) {
     conditions.push(sql`${artists.shopName} ILIKE ${`%${normalizedShopName}%`}`);
   }
@@ -1262,6 +1269,27 @@ async function updateArtist(id, data) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return await db.update(artists).set(data).where(eq(artists.id, id));
+}
+async function deleteArtistAdmin(artistId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.transaction(async (tx) => {
+    const [artist] = await tx.select({
+      id: artists.id,
+      userId: artists.userId,
+      shopName: artists.shopName
+    }).from(artists).where(eq(artists.id, artistId)).limit(1);
+    if (!artist) {
+      throw new Error("Artist not found");
+    }
+    await tx.delete(artists).where(eq(artists.id, artistId));
+    await tx.update(users).set({
+      role: "user",
+      subscriptionTier: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(users.id, artist.userId));
+    return artist;
+  });
 }
 async function addPortfolioImage(image) {
   const db = await getDb();
@@ -1677,6 +1705,7 @@ var init_db = __esm({
       averageRating: artists.averageRating,
       totalReviews: artists.totalReviews,
       isApproved: artists.isApproved,
+      isHidden: artists.isHidden,
       bidsUsed: artists.bidsUsed,
       bidsThisMonth: artists.bidsThisMonth,
       bidsMonthYear: artists.bidsMonthYear,
@@ -5052,6 +5081,23 @@ var appRouter = router({
         }
       }
       return { success: true };
+    }),
+    /** Admin: hide or unhide an artist from public discovery */
+    adminSetVisibility: adminProcedure.input(z7.object({ artistId: z7.number(), hidden: z7.boolean() })).mutation(async ({ input }) => {
+      await updateArtist(input.artistId, {
+        isHidden: input.hidden,
+        updatedAt: /* @__PURE__ */ new Date()
+      });
+      return { success: true };
+    }),
+    /** Admin: delete an artist profile, typically for cleanup/testing */
+    adminDelete: adminProcedure.input(z7.object({ artistId: z7.number() })).mutation(async ({ input }) => {
+      const deleted = await deleteArtistAdmin(input.artistId);
+      return {
+        success: true,
+        deletedArtistId: deleted.id,
+        deletedArtistName: deleted.shopName
+      };
     }),
     adminSendInvitations: adminProcedure.input(
       z7.object({

@@ -73,6 +73,7 @@ export const artistFields = {
   averageRating: artists.averageRating,
   totalReviews: artists.totalReviews,
   isApproved: artists.isApproved,
+  isHidden: artists.isHidden,
   bidsUsed: artists.bidsUsed,
   bidsThisMonth: artists.bidsThisMonth,
   bidsMonthYear: artists.bidsMonthYear,
@@ -332,7 +333,7 @@ export async function getAllArtists() {
     })
     .from(artists)
     .innerJoin(users, eq(artists.userId, users.id))
-    .where(eq(artists.isApproved, true))
+    .where(and(eq(artists.isApproved, true), eq(artists.isHidden, false)))
     .orderBy(
       // Founding artists appear first
       sql`${artists.isFoundingArtist} DESC`,
@@ -351,11 +352,16 @@ export async function getAllArtistsAdmin() {
       city: artists.city,
       state: artists.state,
       isApproved: artists.isApproved,
+      isHidden: artists.isHidden,
+      isFoundingArtist: artists.isFoundingArtist,
+      foundingTrialEndsAt: artists.foundingTrialEndsAt,
+      profileViewCount: artists.profileViewCount,
       createdAt: artists.createdAt,
       userId: artists.userId,
       userName: users.name,
       userEmail: users.email,
       verificationStatus: users.verificationStatus,
+      subscriptionTier: users.subscriptionTier,
     })
     .from(artists)
     .innerJoin(users, eq(artists.userId, users.id))
@@ -377,7 +383,7 @@ export async function searchArtists(filters: {
   const normalizedCity = filters.city?.trim();
   const normalizedState = filters.state?.trim();
 
-  const conditions: any[] = [eq(artists.isApproved, true)];
+  const conditions: any[] = [eq(artists.isApproved, true), eq(artists.isHidden, false)];
 
   // Filter by shop name (case-insensitive partial match)
   if (normalizedShopName) {
@@ -462,6 +468,40 @@ export async function updateArtist(id: number, data: Partial<InsertArtist>) {
   if (!db) throw new Error("Database not available");
 
   return await db.update(artists).set(data).where(eq(artists.id, id));
+}
+
+export async function deleteArtistAdmin(artistId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.transaction(async (tx) => {
+    const [artist] = await tx
+      .select({
+        id: artists.id,
+        userId: artists.userId,
+        shopName: artists.shopName,
+      })
+      .from(artists)
+      .where(eq(artists.id, artistId))
+      .limit(1);
+
+    if (!artist) {
+      throw new Error("Artist not found");
+    }
+
+    await tx.delete(artists).where(eq(artists.id, artistId));
+
+    await tx
+      .update(users)
+      .set({
+        role: "user",
+        subscriptionTier: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, artist.userId));
+
+    return artist;
+  });
 }
 
 // Portfolio functions
@@ -1205,5 +1245,4 @@ export async function isAiEnabled(): Promise<boolean> {
     return false;
   }
 }
-
 

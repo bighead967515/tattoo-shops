@@ -116,6 +116,7 @@ export const artists = pgTable("artists", {
   averageRating: text("averageRating"),
   totalReviews: integer("totalReviews").default(0),
   isApproved: boolean("isApproved").default(false),
+  isHidden: boolean("isHidden").default(false).notNull(),
   // artists.subscriptionTier was deprecated in favour of users.subscriptionTier.
   // The column has been removed from this schema; run `pnpm db:push` to drop it from
   // the database (generates: ALTER TABLE artists DROP COLUMN subscriptionTier).
@@ -603,5 +604,4 @@ export const blogPosts = pgTable("blog_posts", {
 
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = typeof blogPosts.$inferInsert;
-
 
