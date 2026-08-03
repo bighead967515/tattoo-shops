@@ -594,6 +594,7 @@ var init_schema = __esm({
         selectedBidId: integer("selectedBidId"),
         // Will be set when client accepts a bid
         viewCount: integer("viewCount").default(0),
+        isCoverUp: boolean("isCoverUp").default(false).notNull(),
         createdAt: timestamp("createdAt").defaultNow().notNull(),
         updatedAt: timestamp("updatedAt").defaultNow().notNull(),
         expiresAt: timestamp("expiresAt")
@@ -616,6 +617,7 @@ var init_schema = __esm({
       // Supabase Storage key
       caption: text("caption"),
       isMainImage: boolean("isMainImage").default(false),
+      isExistingTattoo: boolean("isExistingTattoo").default(false).notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull()
     });
     bids = pgTable(
@@ -3798,6 +3800,7 @@ var requestsRouter = router({
       preferredCity: z3.string().max(100).optional(),
       preferredState: z3.string().max(50).optional(),
       willingToTravel: z3.boolean().default(false),
+      isCoverUp: z3.boolean().default(false),
       desiredTimeframe: z3.string().max(100).optional(),
       addOns: z3.object({
         priorityPlacement: z3.boolean().default(false),
@@ -3946,7 +3949,8 @@ var requestsRouter = router({
       requestId: z3.number(),
       imageKey: z3.string(),
       caption: z3.string().max(500).optional(),
-      isMainImage: z3.boolean().default(false)
+      isMainImage: z3.boolean().default(false),
+      isExistingTattoo: z3.boolean().default(false)
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
@@ -3984,7 +3988,8 @@ var requestsRouter = router({
       imageKey: input.imageKey,
       imageUrl,
       caption: input.caption,
-      isMainImage: input.isMainImage
+      isMainImage: input.isMainImage,
+      isExistingTattoo: input.isExistingTattoo
     }).returning();
     return image;
   }),

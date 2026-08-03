@@ -62,6 +62,7 @@ import {
   Sparkles,
   Zap,
   Crown,
+  AlertTriangle,
 } from "lucide-react";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import {
@@ -225,19 +226,22 @@ export default function RequestDetail() {
   type BidType = NonNullable<typeof request>["bids"][number];
   type ImageType = NonNullable<typeof request>["images"][number];
 
+  const referenceImages = request?.images?.filter((img: ImageType) => !img.isExistingTattoo) ?? [];
+  const existingTattooImage = request?.images?.find((img: ImageType) => img.isExistingTattoo) ?? null;
+
   useEffect(() => {
-    if (!request?.images?.length) {
+    if (!referenceImages.length) {
       setSelectedImageId(null);
       return;
     }
 
-    const stillExists = request.images.some(
+    const stillExists = referenceImages.some(
       (image: ImageType) => image.id === selectedImageId,
     );
     if (!stillExists) {
-      setSelectedImageId(request.images[0].id);
+      setSelectedImageId(referenceImages[0].id);
     }
-  }, [request?.images, selectedImageId]);
+  }, [referenceImages, selectedImageId]);
 
   const isClient = user?.role === "client";
   const isArtist = user?.role === "artist";
@@ -366,10 +370,41 @@ export default function RequestDetail() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Cover-up Panel */}
+              {request.isCoverUp && (
+                <div className="border border-yellow-500/25 bg-yellow-500/5 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-start">
+                  {existingTattooImage ? (
+                    <div className="w-full sm:w-1/3 max-w-[200px] aspect-square rounded-lg overflow-hidden border border-border shadow-sm flex-shrink-0">
+                      <img
+                        src={existingTattooImage.imageUrl}
+                        alt="Tattoo to cover up or fix"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full sm:w-1/3 max-w-[200px] aspect-square rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs text-muted-foreground text-center px-4">No image of existing tattoo provided</span>
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <Badge className="bg-yellow-500 text-yellow-950 hover:bg-yellow-500/90 gap-1.5 py-0.5">
+                      <AlertTriangle className="h-3 w-3" />
+                      Cover-up / Repair Request
+                    </Badge>
+                    <h4 className="font-semibold text-foreground text-sm pt-1">
+                      Existing Tattoo Details
+                    </h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      This client has specified that this request is to cover up, fix, or integrate into an existing tattoo. Bids and designs should account for covering or modifying the existing tattoo shown here.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Images */}
-              {request.images.length > 0 && (
+              {referenceImages.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {request.images.map((image: ImageType) => (
+                  {referenceImages.map((image: ImageType) => (
                     <div
                       key={image.id}
                       className={`relative aspect-square overflow-hidden rounded-lg ${

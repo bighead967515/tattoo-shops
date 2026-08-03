@@ -445,6 +445,7 @@ export const tattooRequests = pgTable(
     status: requestStatusEnum("status").default("open").notNull(),
     selectedBidId: integer("selectedBidId"), // Will be set when client accepts a bid
     viewCount: integer("viewCount").default(0),
+    isCoverUp: boolean("isCoverUp").default(false).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
     expiresAt: timestamp("expiresAt"), // Optional expiration date
@@ -477,6 +478,7 @@ export const requestImages = pgTable("requestImages", {
   imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
   caption: text("caption"),
   isMainImage: boolean("isMainImage").default(false),
+  isExistingTattoo: boolean("isExistingTattoo").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

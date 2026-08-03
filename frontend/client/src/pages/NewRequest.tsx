@@ -43,6 +43,7 @@ import {
   ShieldCheck,
   ArrowRight,
   UserPlus,
+  Camera,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -345,6 +346,25 @@ export default function NewRequest() {
     { file: File; preview: string }[]
   >([]);
   const blobUrlsRef = useRef<string[]>([]);
+  const [isCoverUp, setIsCoverUp] = useState(false);
+  const [existingTattooImage, setExistingTattooImage] = useState<{ file: File; preview: string } | null>(null);
+
+  const handleExistingTattooUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    blobUrlsRef.current.push(preview);
+    setExistingTattooImage({ file, preview });
+  };
+
+  const removeExistingTattooImage = () => {
+    if (existingTattooImage) {
+      const urlToRevoke = existingTattooImage.preview;
+      URL.revokeObjectURL(urlToRevoke);
+      blobUrlsRef.current = blobUrlsRef.current.filter((url) => url !== urlToRevoke);
+      setExistingTattooImage(null);
+    }
+  };
 
   useEffect(() => {
     const draft = sessionStorage.getItem("newRequestDraft");
@@ -466,9 +486,37 @@ export default function NewRequest() {
         willingToTravel: formData.willingToTravel,
         desiredTimeframe: formData.desiredTimeframe || undefined,
         addOns,
+        isCoverUp,
         // Only send guestEmail if user is not logged in
         guestEmail: !user && guestEmail ? guestEmail : undefined,
       });
+
+      // Upload existing tattoo picture if this is a cover-up
+      if (isCoverUp && existingTattooImage) {
+        toast.info("Uploading existing tattoo photo…");
+        try {
+          const { signedUrl, path } = await getUploadUrl.mutateAsync({
+            fileName: existingTattooImage.file.name,
+            contentType: existingTattooImage.file.type,
+          });
+          const response = await fetch(signedUrl, {
+            method: "PUT",
+            body: existingTattooImage.file,
+            headers: { "Content-Type": existingTattooImage.file.type },
+          });
+          if (!response.ok) throw new Error("Upload failed for existing tattoo photo");
+          await addImageToRequest.mutateAsync({
+            requestId: newRequest.id,
+            imageKey: path,
+            caption: "Existing tattoo to cover/fix",
+            isMainImage: false,
+            isExistingTattoo: true,
+          });
+        } catch (err) {
+          toast.error("Failed to upload existing tattoo picture. Artists won't see the coverup reference.");
+          console.error(err);
+        }
+      }
 
       if (uploadedImages.length > 0) {
         toast.info("Uploading reference images…");
@@ -489,6 +537,7 @@ export default function NewRequest() {
               requestId: newRequest.id,
               imageKey: path,
               isMainImage: index === 0,
+              isExistingTattoo: false,
             });
           }),
         );
@@ -916,6 +965,92 @@ export default function NewRequest() {
                     onChange={handleImageUpload}
                   />
                 </label>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 5: Cover-up or Repair */}
+          <Card className="bg-card border-border/60 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Cover-up or Repair?
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Let us know if you need to cover up, fix, or add onto an existing tattoo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isCoverUp"
+                  checked={isCoverUp}
+                  onChange={(e) => {
+                    setIsCoverUp(e.target.checked);
+                    if (!e.target.checked) {
+                      removeExistingTattooImage();
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="isCoverUp" className="text-sm font-medium cursor-pointer">
+                  Yes, this is a cover-up / fix for an existing tattoo
+                </Label>
+              </div>
+
+              {isCoverUp && (
+                <div className="space-y-3 pt-2 border-t border-border/30">
+                  <Label className="text-sm font-medium">
+                    Photo of your existing tattoo <span className="text-primary">*</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground -mt-1.5">
+                    Artists need to see the shape, size, and darkness of the tattoo you want covered or fixed.
+                  </p>
+
+                  {existingTattooImage ? (
+                    <div className="relative w-full max-w-xs aspect-square group">
+                      <img
+                        src={existingTattooImage.preview}
+                        alt="Existing tattoo preview"
+                        className="object-cover w-full h-full rounded-lg border-2 border-primary/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeExistingTattooImage}
+                        aria-label="Remove existing tattoo photo"
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full min-w-[44px] min-h-[44px] p-2 flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.currentTarget.click();
+                        }
+                      }}
+                      className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-border/50 rounded-xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <Camera className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-sm font-medium text-foreground">
+                        Take Photo or Upload Image
+                      </span>
+                      <span className="text-xs text-muted-foreground/60 mt-0.5">
+                        Camera or Gallery · PNG, JPG, WEBP
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleExistingTattooUpload}
+                      />
+                    </label>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -553,6 +553,7 @@ export const requestsRouter = router({
         preferredCity: z.string().max(100).optional(),
         preferredState: z.string().max(50).optional(),
         willingToTravel: z.boolean().default(false),
+        isCoverUp: z.boolean().default(false),
         desiredTimeframe: z.string().max(100).optional(),
         addOns: z
           .object({
@@ -755,6 +756,7 @@ export const requestsRouter = router({
         imageKey: z.string(),
         caption: z.string().max(500).optional(),
         isMainImage: z.boolean().default(false),
+        isExistingTattoo: z.boolean().default(false),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -820,6 +822,7 @@ export const requestsRouter = router({
           imageUrl,
           caption: input.caption,
           isMainImage: input.isMainImage,
+          isExistingTattoo: input.isExistingTattoo,
         })
         .returning();
 
