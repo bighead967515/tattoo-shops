@@ -734,10 +734,11 @@ export const requestsRouter = router({
       z.object({
         fileName: z.string(),
         contentType: z.string(),
+        requestId: z.number(),
+        guestToken: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Use client ID if logged in, otherwise use a guest prefix
       const db = await requireDb();
       let prefix = "guest";
       if (ctx.user) {
@@ -746,11 +747,60 @@ export const requestsRouter = router({
           .from(clients)
           .where(eq(clients.userId, ctx.user.id))
           .limit(1);
-        if (client) prefix = String(client.id);
+        if (!client) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Client profile not found",
+          });
+        }
+
+        // Verify request ownership
+        const [request] = await db
+          .select()
+          .from(tattooRequests)
+          .where(
+            and(
+              eq(tattooRequests.id, input.requestId),
+              eq(tattooRequests.clientId, client.id),
+            ),
+          )
+          .limit(1);
+        if (!request) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You do not own this request",
+          });
+        }
+        prefix = String(client.id);
+      } else {
+        // Guest: verify token matches request
+        if (!input.guestToken) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Guest request ownership token is required",
+          });
+        }
+        const [request] = await db
+          .select()
+          .from(tattooRequests)
+          .where(
+            and(
+              eq(tattooRequests.id, input.requestId),
+              sql`"clientId" IS NULL`,
+              eq(tattooRequests.guestToken, input.guestToken),
+            ),
+          )
+          .limit(1);
+        if (!request) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Invalid request ID or guest token",
+          });
+        }
       }
       // Sanitize filename to prevent path traversal
       const sanitizedFileName = sanitizeFileName(input.fileName);
-      const fileKey = `public/${prefix}/${Date.now()}-${sanitizedFileName}`;
+      const fileKey = `public/${prefix}/${input.requestId}/${Date.now()}-${sanitizedFileName}`;
       return await createSignedUploadUrl(BUCKETS.REQUEST_IMAGES, fileKey);
     }),
 
@@ -778,7 +828,7 @@ export const requestsRouter = router({
           .where(eq(clients.userId, ctx.user.id))
           .limit(1);
 
-        if (!client || !input.imageKey.startsWith(`public/${client.id}/`)) {
+        if (!client || !input.imageKey.startsWith(`public/${client.id}/${input.requestId}/`)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Invalid image upload path",
@@ -804,7 +854,7 @@ export const requestsRouter = router({
             message: "Guest request ownership token is required",
           });
         }
-        if (!input.imageKey.startsWith("public/guest/")) {
+        if (!input.imageKey.startsWith(`public/guest/${input.requestId}/`)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Invalid image upload path for guests",

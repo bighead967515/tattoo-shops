@@ -498,6 +498,8 @@ export default function NewRequest() {
           const { signedUrl, path } = await getUploadUrl.mutateAsync({
             fileName: existingTattooImage.file.name,
             contentType: existingTattooImage.file.type,
+            requestId: newRequest.id,
+            guestToken: (newRequest as any).guestToken,
           });
           const response = await fetch(signedUrl, {
             method: "PUT",
@@ -526,6 +528,8 @@ export default function NewRequest() {
             const { signedUrl, path } = await getUploadUrl.mutateAsync({
               fileName: img.file.name,
               contentType: img.file.type,
+              requestId: newRequest.id,
+              guestToken: (newRequest as any).guestToken,
             });
             const response = await fetch(signedUrl, {
               method: "PUT",

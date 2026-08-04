@@ -127,6 +127,13 @@
       "when": 1785787119227,
       "tag": "0017_trigram_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785787119228,
+      "tag": "0018_request_addon_payments",
+      "breakpoints": true
     }
   ]
 }

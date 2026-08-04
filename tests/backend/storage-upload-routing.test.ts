@@ -1,294 +1,245 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
 
-/**
- * Storage Upload Routing Tests
- * Verifies that each upload type routes to the correct Supabase bucket
- * and generates correctly structured file keys.
- *
- * Three upload paths:
- *  1. Portfolio images  → "portfolio-images" bucket (public), key: public/<artistId>/...
- *  2. Request images    → "request-images"   bucket (public), key: public/<clientId|guest>/...
- *  3. ID documents      → "id-documents"     bucket (private), key: private/<userId>/...
- */
+// ─── Mocks ───────────────────────────────────────────────────────────────────
 
-// ─── Shared constants ────────────────────────────────────────────────────────
+const mockCreateSignedUploadUrl = vi.fn(async (bucket: string, path: string) => {
+  return { signedUrl: `https://supabase.example/upload/${bucket}/${path}`, path };
+});
 
-const BUCKETS = {
-  PORTFOLIO_IMAGES: "portfolio-images",
-  REQUEST_IMAGES: "request-images",
-  ID_DOCUMENTS: "id-documents",
-} as const;
+vi.mock("../../backend/server/_core/supabaseStorage", () => ({
+  createSignedUploadUrl: mockCreateSignedUploadUrl,
+  BUCKETS: {
+    PORTFOLIO_IMAGES: "portfolio-images",
+    REQUEST_IMAGES: "request-images",
+    ID_DOCUMENTS: "id-documents",
+  },
+}));
 
-// ─── Helpers replicated from production code ─────────────────────────────────
+// Query chain mocks for Drizzle
+const mockLimit = vi.fn();
+const mockWhere = vi.fn(() => ({
+  limit: mockLimit,
+}));
+const mockFrom = vi.fn(() => ({
+  where: mockWhere,
+  limit: mockLimit,
+}));
+const mockSelect = vi.fn(() => ({
+  from: mockFrom,
+}));
 
-/** Mirror of sanitizeFileName in verificationRouter & routers.ts */
-function sanitizeFileName(fileName: string): string {
-  return fileName
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .replace(/\.{2,}/g, ".")
-    .slice(0, 100);
+const mockDb = {
+  select: mockSelect,
+};
+
+const mockGetDb = vi.fn(async () => mockDb);
+const mockGetArtistByUserId = vi.fn();
+const mockGetPortfolioCountByArtistId = vi.fn();
+
+vi.mock("../../backend/server/db", () => ({
+  getDb: mockGetDb,
+  getArtistByUserId: mockGetArtistByUserId,
+  getPortfolioCountByArtistId: mockGetPortfolioCountByArtistId,
+  isAiEnabled: () => false,
+}));
+
+// ─── Environment Seeding ─────────────────────────────────────────────────────
+
+function seedRequiredEnv() {
+  process.env.JWT_SECRET = "12345678901234567890123456789012";
+  process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/testdb";
+  process.env.OWNER_OPEN_ID = "owner-open-id";
+  process.env.NODE_ENV = "test";
+  process.env.STRIPE_SECRET_KEY = "sk_test_placeholder";
+  process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_placeholder";
+  process.env.RESEND_API_KEY = "re_test_placeholder";
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SERVICE_KEY = "service_role_key";
+  process.env.SUPABASE_ANON_KEY = "anon_key";
+  process.env.GROQ_API_KEY = "groq_api_key";
+  process.env.HUGGINGFACE_API_KEY = "hf_api_key";
+
+  process.env.STRIPE_ARTIST_AMATEUR_PRICE_ID_MONTH = "price_amateur_mo";
+  process.env.STRIPE_ARTIST_AMATEUR_PRICE_ID_YEAR = "price_amateur_yr";
+  process.env.STRIPE_ARTIST_PRO_PRICE_ID_MONTH = "price_pro_mo";
+  process.env.STRIPE_ARTIST_PRO_PRICE_ID_YEAR = "price_pro_yr";
+  process.env.STRIPE_ARTIST_ICON_PRICE_ID_MONTH = "price_icon_mo";
+  process.env.STRIPE_ARTIST_ICON_PRICE_ID_YEAR = "price_icon_yr";
+  process.env.STRIPE_FOUNDING_ARTIST_PRICE_ID = "price_founding";
 }
 
-/** Mirror of portfolio getUploadUrl key generation */
-function buildPortfolioKey(artistId: number, fileName: string): string {
-  const sanitized = sanitizeFileName(fileName);
-  return `public/${artistId}/${Date.now()}-${sanitized}`;
-}
+let appRouter: (typeof import("../../backend/server/routers"))["appRouter"];
 
-/** Mirror of request getUploadUrl key generation */
-function buildRequestKey(prefix: string | number, fileName: string): string {
-  const sanitized = sanitizeFileName(fileName);
-  return `public/${prefix}/${Date.now()}-${sanitized}`;
-}
+beforeAll(async () => {
+  seedRequiredEnv();
+  ({ appRouter } = await import("../../backend/server/routers"));
+});
 
-/** Mirror of verification getUploadUrl key generation */
-function buildDocumentKey(userId: number, fileName: string): string {
-  const sanitized = sanitizeFileName(fileName);
-  return `private/${userId}/${Date.now()}-${sanitized}`;
-}
-
-// ─── Mock for createSignedUploadUrl ──────────────────────────────────────────
-
-type UploadCall = { bucket: string; path: string };
-
-function makeStorageMock() {
-  const calls: UploadCall[] = [];
-  const createSignedUploadUrl = vi.fn(async (bucket: string, path: string) => {
-    calls.push({ bucket, path });
-    return { signedUrl: `https://supabase.example/upload/${bucket}/${path}`, path };
+function createCaller(user: any) {
+  return appRouter.createCaller({
+    req: {} as any,
+    res: {} as any,
+    user,
   });
-  return { createSignedUploadUrl, calls };
-}
-
-// ─── Simulated procedure logic ────────────────────────────────────────────────
-
-function makePortfolioUploadProcedure(
-  storage: ReturnType<typeof makeStorageMock>,
-  portfolioCount: number,
-  portfolioLimit: number,
-) {
-  return async (artistId: number, fileName: string, _contentType: string) => {
-    if (portfolioCount >= portfolioLimit) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `You have reached your tier's portfolio limit (${portfolioLimit}).`,
-      });
-    }
-    const fileKey = buildPortfolioKey(artistId, fileName);
-    return storage.createSignedUploadUrl(BUCKETS.PORTFOLIO_IMAGES, fileKey);
-  };
-}
-
-function makeRequestImageUploadProcedure(
-  storage: ReturnType<typeof makeStorageMock>,
-  clientId: number | null, // null = guest
-) {
-  return async (fileName: string, _contentType: string) => {
-    const prefix = clientId !== null ? String(clientId) : "guest";
-    const fileKey = buildRequestKey(prefix, fileName);
-    return storage.createSignedUploadUrl(BUCKETS.REQUEST_IMAGES, fileKey);
-  };
-}
-
-function makeDocumentUploadProcedure(
-  storage: ReturnType<typeof makeStorageMock>,
-) {
-  return async (userId: number, fileName: string, contentType: string, fileSize: number) => {
-    const allowedTypes = ["image/jpeg", "image/png", "application/pdf"];
-    if (!allowedTypes.includes(contentType)) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file type." });
-    }
-    if (fileSize > 10 * 1024 * 1024) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "File size cannot exceed 10MB." });
-    }
-    const fileKey = buildDocumentKey(userId, fileName);
-    return storage.createSignedUploadUrl(BUCKETS.ID_DOCUMENTS, fileKey);
-  };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe("Storage upload routing", () => {
-  let storage: ReturnType<typeof makeStorageMock>;
-
+describe("Storage upload routing (via tRPC Router)", () => {
   beforeEach(() => {
-    storage = makeStorageMock();
+    vi.clearAllMocks();
   });
 
   // ── Portfolio images ────────────────────────────────────────────────────────
 
   describe("Portfolio images → portfolio-images bucket", () => {
-    it("routes to the portfolio-images bucket", async () => {
-      const upload = makePortfolioUploadProcedure(storage, 0, 10);
-      await upload(42, "sleeve.jpg", "image/jpeg");
-      expect(storage.calls[0].bucket).toBe(BUCKETS.PORTFOLIO_IMAGES);
-    });
+    it("routes to the portfolio-images bucket and enforces tier limit", async () => {
+      mockGetArtistByUserId.mockResolvedValue({ id: 42, userId: 1 });
+      mockGetPortfolioCountByArtistId.mockResolvedValue(0);
 
-    it("generates a public/<artistId>/... file key", async () => {
-      const upload = makePortfolioUploadProcedure(storage, 0, 10);
-      await upload(42, "sleeve.jpg", "image/jpeg");
-      expect(storage.calls[0].path).toMatch(/^public\/42\//);
-    });
+      const caller = createCaller({ id: 1, role: "artist", subscriptionTier: "artist_free" });
+      const result = await caller.portfolio.getUploadUrl({
+        artistId: 42,
+        fileName: "sleeve.jpg",
+        contentType: "image/jpeg",
+      });
 
-    it("includes the sanitized filename in the key", async () => {
-      const upload = makePortfolioUploadProcedure(storage, 0, 10);
-      await upload(42, "my sleeve.jpg", "image/jpeg");
-      expect(storage.calls[0].path).toContain("my_sleeve.jpg");
+      expect(mockCreateSignedUploadUrl).toHaveBeenCalledTimes(1);
+      expect(mockCreateSignedUploadUrl).toHaveBeenCalledWith(
+        "portfolio-images",
+        expect.stringMatching(/^public\/42\//),
+      );
+      expect(result.path).toContain("sleeve.jpg");
     });
 
     it("throws FORBIDDEN when portfolio limit is reached", async () => {
-      const upload = makePortfolioUploadProcedure(storage, 10, 10);
-      await expect(upload(42, "one-more.jpg", "image/jpeg")).rejects.toThrow(TRPCError);
-      await expect(upload(42, "one-more.jpg", "image/jpeg")).rejects.toMatchObject({
-        code: "FORBIDDEN",
-      });
-    });
+      mockGetArtistByUserId.mockResolvedValue({ id: 42, userId: 1 });
+      mockGetPortfolioCountByArtistId.mockResolvedValue(10); // free tier limit is 10
 
-    it("does NOT route to request-images or id-documents", async () => {
-      const upload = makePortfolioUploadProcedure(storage, 0, 10);
-      await upload(42, "sleeve.jpg", "image/jpeg");
-      expect(storage.calls[0].bucket).not.toBe(BUCKETS.REQUEST_IMAGES);
-      expect(storage.calls[0].bucket).not.toBe(BUCKETS.ID_DOCUMENTS);
+      const caller = createCaller({ id: 1, role: "artist", subscriptionTier: "artist_free" });
+      await expect(
+        caller.portfolio.getUploadUrl({
+          artistId: 42,
+          fileName: "sleeve.jpg",
+          contentType: "image/jpeg",
+        }),
+      ).rejects.toThrow(/portfolio limit/);
     });
   });
 
   // ── Request images ──────────────────────────────────────────────────────────
 
   describe("Request images → request-images bucket", () => {
-    it("routes to the request-images bucket for logged-in clients", async () => {
-      const upload = makeRequestImageUploadProcedure(storage, 7);
-      await upload("reference.png", "image/png");
-      expect(storage.calls[0].bucket).toBe(BUCKETS.REQUEST_IMAGES);
+    it("generates a public/<clientId>/<requestId>/... key for logged-in clients", async () => {
+      mockLimit.mockResolvedValueOnce([{ id: 7 }]) // client.id
+               .mockResolvedValueOnce([{ id: 100, clientId: 7 }]); // request
+
+      const caller = createCaller({ id: 1, role: "client" });
+      const result = await caller.requests.getUploadUrl({
+        fileName: "reference.png",
+        contentType: "image/png",
+        requestId: 100,
+      });
+
+      expect(mockCreateSignedUploadUrl).toHaveBeenCalledWith(
+        "request-images",
+        expect.stringMatching(/^public\/7\/100\//),
+      );
+      expect(result.path).toContain("reference.png");
     });
 
-    it("routes to the request-images bucket for guests", async () => {
-      const upload = makeRequestImageUploadProcedure(storage, null);
-      await upload("reference.png", "image/png");
-      expect(storage.calls[0].bucket).toBe(BUCKETS.REQUEST_IMAGES);
+    it("generates a public/guest/<requestId>/... key for guests with a valid token", async () => {
+      mockLimit.mockResolvedValueOnce([{ id: 100, clientId: null, guestToken: "valid-token" }]);
+
+      const caller = createCaller(null);
+      const result = await caller.requests.getUploadUrl({
+        fileName: "reference.png",
+        contentType: "image/png",
+        requestId: 100,
+        guestToken: "valid-token",
+      });
+
+      expect(mockCreateSignedUploadUrl).toHaveBeenCalledWith(
+        "request-images",
+        expect.stringMatching(/^public\/guest\/100\//),
+      );
     });
 
-    it("generates a public/<clientId>/... key for logged-in clients", async () => {
-      const upload = makeRequestImageUploadProcedure(storage, 7);
-      await upload("reference.png", "image/png");
-      expect(storage.calls[0].path).toMatch(/^public\/7\//);
+    it("throws FORBIDDEN for guest uploads without a token", async () => {
+      const caller = createCaller(null);
+      await expect(
+        caller.requests.getUploadUrl({
+          fileName: "reference.png",
+          contentType: "image/png",
+          requestId: 100,
+        }),
+      ).rejects.toThrow(/Guest request ownership token is required/);
     });
 
-    it("generates a public/guest/... key for unauthenticated uploads", async () => {
-      const upload = makeRequestImageUploadProcedure(storage, null);
-      await upload("reference.png", "image/png");
-      expect(storage.calls[0].path).toMatch(/^public\/guest\//);
-    });
+    it("throws FORBIDDEN for guest uploads with an invalid token", async () => {
+      mockLimit.mockResolvedValueOnce([]); // request not found
 
-    it("does NOT use the artistId namespace", async () => {
-      const upload = makeRequestImageUploadProcedure(storage, 99);
-      await upload("ref.jpg", "image/jpeg");
-      // Key should start with "public/<clientId>" not "private/"
-      expect(storage.calls[0].path).toMatch(/^public\//);
+      const caller = createCaller(null);
+      await expect(
+        caller.requests.getUploadUrl({
+          fileName: "reference.png",
+          contentType: "image/png",
+          requestId: 100,
+          guestToken: "wrong-token",
+        }),
+      ).rejects.toThrow(/Invalid request ID or guest token/);
     });
   });
 
   // ── ID / verification documents ────────────────────────────────────────────
 
   describe("ID documents → id-documents bucket (private)", () => {
-    it("routes to the id-documents bucket", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
-      await upload(5, "license.pdf", "application/pdf", 1024);
-      expect(storage.calls[0].bucket).toBe(BUCKETS.ID_DOCUMENTS);
-    });
+    it("routes to the private id-documents bucket with user ID path prefix", async () => {
+      const caller = createCaller({ id: 5, role: "artist" });
+      const result = await caller.verification.getUploadUrl({
+        fileName: "license.pdf",
+        contentType: "application/pdf",
+        fileSize: 1024,
+      });
 
-    it("generates a private/<userId>/... file key", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
-      await upload(5, "license.pdf", "application/pdf", 1024);
-      expect(storage.calls[0].path).toMatch(/^private\/5\//);
-    });
-
-    it("includes the sanitized filename in the key", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
-      await upload(5, "my license!.pdf", "application/pdf", 512);
-      expect(storage.calls[0].path).toContain("my_license_.pdf");
-    });
-
-    it("does NOT use a public/ prefix (bucket is private)", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
-      await upload(5, "id.png", "image/png", 2048);
-      expect(storage.calls[0].path).not.toMatch(/^public\//);
+      expect(mockCreateSignedUploadUrl).toHaveBeenCalledWith(
+        "id-documents",
+        expect.stringMatching(/^private\/5\//),
+      );
+      expect(result.path).toContain("license.pdf");
     });
 
     it("throws BAD_REQUEST for oversized files (> 10 MB)", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
+      const caller = createCaller({ id: 5, role: "artist" });
       const oversized = 11 * 1024 * 1024;
-      await expect(upload(5, "big.pdf", "application/pdf", oversized)).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        message: expect.stringContaining("10MB"),
-      });
-    });
-
-    it("does NOT route to portfolio-images or request-images", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
-      await upload(5, "license.pdf", "application/pdf", 1024);
-      expect(storage.calls[0].bucket).not.toBe(BUCKETS.PORTFOLIO_IMAGES);
-      expect(storage.calls[0].bucket).not.toBe(BUCKETS.REQUEST_IMAGES);
+      await expect(
+        caller.verification.getUploadUrl({
+          fileName: "big.pdf",
+          contentType: "application/pdf",
+          fileSize: oversized,
+        }),
+      ).rejects.toThrow(/File size cannot exceed 10MB/);
     });
   });
 
-  // ── Filename sanitization (shared across all upload types) ─────────────────
+  // ── Filename sanitization ──────────────────────────────────────────────────
 
   describe("Filename sanitization (path traversal prevention)", () => {
-    it("strips path separators from filenames", () => {
-      expect(sanitizeFileName("../../etc/passwd")).not.toContain("/");
-      expect(sanitizeFileName("..\\windows\\system32")).not.toContain("\\");
-    });
+    it("sanitizes filenames via request upload path", async () => {
+      mockLimit.mockResolvedValueOnce([{ id: 100, clientId: null, guestToken: "valid-token" }]);
 
-    it("collapses multiple dots to prevent extension spoofing", () => {
-      expect(sanitizeFileName("file..php.jpg")).not.toContain("..");
-    });
+      const caller = createCaller(null);
+      const result = await caller.requests.getUploadUrl({
+        fileName: "../../etc/passwd",
+        contentType: "image/png",
+        requestId: 100,
+        guestToken: "valid-token",
+      });
 
-    it("replaces spaces and special chars with underscores", () => {
-      const result = sanitizeFileName("my file (1).jpg");
-      expect(result).toMatch(/^[a-zA-Z0-9._-]+$/);
-    });
-
-    it("truncates filenames longer than 100 characters", () => {
-      const long = "a".repeat(200) + ".jpg";
-      expect(sanitizeFileName(long).length).toBeLessThanOrEqual(100);
-    });
-
-    it("preserves safe filenames unchanged", () => {
-      expect(sanitizeFileName("sleeve-design_v2.jpg")).toBe("sleeve-design_v2.jpg");
-    });
-  });
-
-  // ── Cross-bucket isolation ──────────────────────────────────────────────────
-
-  describe("Cross-bucket isolation", () => {
-    it("three separate uploads each call the correct distinct bucket", async () => {
-      const portfolioUpload = makePortfolioUploadProcedure(storage, 0, 10);
-      const requestUpload = makeRequestImageUploadProcedure(storage, 3);
-      const docUpload = makeDocumentUploadProcedure(storage);
-
-      await portfolioUpload(1, "art.jpg", "image/jpeg");
-      await requestUpload("ref.jpg", "image/jpeg");
-      await docUpload(10, "id.png", "image/png", 500);
-
-      const buckets = storage.calls.map((c) => c.bucket);
-      expect(buckets).toEqual([
-        BUCKETS.PORTFOLIO_IMAGES,
-        BUCKETS.REQUEST_IMAGES,
-        BUCKETS.ID_DOCUMENTS,
-      ]);
-    });
-
-    it("portfolio key path never starts with private/", async () => {
-      const upload = makePortfolioUploadProcedure(storage, 0, 10);
-      await upload(1, "art.jpg", "image/jpeg");
-      expect(storage.calls[0].path).not.toMatch(/^private\//);
-    });
-
-    it("document key path never starts with public/", async () => {
-      const upload = makeDocumentUploadProcedure(storage);
-      await upload(1, "doc.pdf", "application/pdf", 512);
-      expect(storage.calls[0].path).not.toMatch(/^public\//);
+      expect(result.path).not.toContain("..");
+      expect(result.path).not.toContain("etc");
+      expect(result.path.endsWith("-passwd")).toBe(true);
     });
   });
 });
