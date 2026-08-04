@@ -373,7 +373,16 @@ DROP POLICY IF EXISTS tattoo_requests_admin_all ON "tattooRequests";
 CREATE POLICY tattoo_requests_visible_to_marketplace ON "tattooRequests"
   FOR SELECT
   TO anon, authenticated
-  USING (app_private.can_view_request(id));
+  USING (
+    app_private.can_view_request(id)
+    AND (
+      -- If the user is the owner, client, or admin, they can select
+      "clientId" = app_private.current_client_id()
+      OR app_private.is_admin()
+      -- Otherwise, for public marketplace viewing, guestEmail MUST be null
+      OR "guestEmail" IS NULL
+    )
+  );
 CREATE POLICY tattoo_requests_guest_insert ON "tattooRequests"
   FOR INSERT
   TO anon
@@ -526,3 +535,10 @@ CREATE POLICY flash_art_artist_all ON "flash_art"
   TO authenticated
   USING (app_private.owns_artist("artistId") OR app_private.is_admin())
   WITH CHECK (app_private.owns_artist("artistId") OR app_private.is_admin());
+
+-- Revoke general SELECT on tattooRequests table to protect guestEmail and guestToken from direct API queries
+REVOKE SELECT ON "tattooRequests" FROM PUBLIC, anon, authenticated;
+
+-- Grant SELECT only on safe columns for anon and authenticated roles
+GRANT SELECT("id", "clientId", "title", "description", "style", "placement", "size", "colorPreference", "budgetMin", "budgetMax", "preferredCity", "preferredState", "willingToTravel", "desiredTimeframe", "selectedAddons", "addOnTotalCents", "addOnPaymentStatus", "status", "selectedBidId", "viewCount", "isCoverUp", "createdAt", "updatedAt", "expiresAt")
+  ON "tattooRequests" TO anon, authenticated;

@@ -740,6 +740,19 @@ export const requestsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
+
+      // Count current images for this request to prevent storage quota abuse (max 10)
+      const [imgCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(requestImages)
+        .where(eq(requestImages.requestId, input.requestId));
+      if ((imgCount?.count ?? 0) >= 10) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Maximum image limit reached for this request (max 10)",
+        });
+      }
+
       let prefix = "guest";
       if (ctx.user) {
         const [client] = await db

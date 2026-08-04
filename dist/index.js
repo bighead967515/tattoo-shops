@@ -3952,6 +3952,13 @@ var requestsRouter = router({
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
+    const [imgCount] = await db.select({ count: sql2`count(*)::int` }).from(requestImages).where(eq2(requestImages.requestId, input.requestId));
+    if ((imgCount?.count ?? 0) >= 10) {
+      throw new TRPCError2({
+        code: "FORBIDDEN",
+        message: "Maximum image limit reached for this request (max 10)"
+      });
+    }
     let prefix = "guest";
     if (ctx.user) {
       const [client] = await db.select({ id: clients.id }).from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);

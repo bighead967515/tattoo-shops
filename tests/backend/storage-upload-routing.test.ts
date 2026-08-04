@@ -16,26 +16,31 @@ vi.mock("../../backend/server/_core/supabaseStorage", () => ({
   },
 }));
 
-// Query chain mocks for Drizzle
-const mockLimit = vi.fn();
-const mockWhere = vi.fn(() => ({
-  limit: mockLimit,
-}));
-const mockFrom = vi.fn(() => ({
-  where: mockWhere,
-  limit: mockLimit,
-}));
-const mockSelect = vi.fn(() => ({
-  from: mockFrom,
-}));
+const {
+  mockGetDb,
+  mockGetArtistByUserId,
+  mockGetPortfolioCountByArtistId,
+  queryResults,
+} = vi.hoisted(() => {
+  const queryResults = { results: [] as any[] };
+  const mockBuilder: any = {
+    from: vi.fn(() => mockBuilder),
+    where: vi.fn(() => mockBuilder),
+    limit: vi.fn(() => mockBuilder),
+    then: vi.fn((resolve) => resolve(queryResults.results.shift() ?? [])),
+  };
 
-const mockDb = {
-  select: mockSelect,
-};
+  const mockDb = {
+    select: vi.fn(() => mockBuilder),
+  };
 
-const mockGetDb = vi.fn(async () => mockDb);
-const mockGetArtistByUserId = vi.fn();
-const mockGetPortfolioCountByArtistId = vi.fn();
+  return {
+    mockGetDb: vi.fn(async () => mockDb),
+    mockGetArtistByUserId: vi.fn(),
+    mockGetPortfolioCountByArtistId: vi.fn(),
+    queryResults,
+  };
+});
 
 vi.mock("../../backend/server/db", () => ({
   getDb: mockGetDb,
@@ -132,8 +137,11 @@ describe("Storage upload routing (via tRPC Router)", () => {
 
   describe("Request images → request-images bucket", () => {
     it("generates a public/<clientId>/<requestId>/... key for logged-in clients", async () => {
-      mockLimit.mockResolvedValueOnce([{ id: 7 }]) // client.id
-               .mockResolvedValueOnce([{ id: 100, clientId: 7 }]); // request
+      queryResults.results = [
+        [{ count: 0 }], // count images
+        [{ id: 7 }], // client
+        [{ id: 100, clientId: 7 }] // request
+      ];
 
       const caller = createCaller({ id: 1, role: "client" });
       const result = await caller.requests.getUploadUrl({
@@ -150,7 +158,10 @@ describe("Storage upload routing (via tRPC Router)", () => {
     });
 
     it("generates a public/guest/<requestId>/... key for guests with a valid token", async () => {
-      mockLimit.mockResolvedValueOnce([{ id: 100, clientId: null, guestToken: "valid-token" }]);
+      queryResults.results = [
+        [{ count: 0 }], // count images
+        [{ id: 100, clientId: null, guestToken: "valid-token" }] // request
+      ];
 
       const caller = createCaller(null);
       const result = await caller.requests.getUploadUrl({
@@ -167,6 +178,10 @@ describe("Storage upload routing (via tRPC Router)", () => {
     });
 
     it("throws FORBIDDEN for guest uploads without a token", async () => {
+      queryResults.results = [
+        [{ count: 0 }] // count images
+      ];
+
       const caller = createCaller(null);
       await expect(
         caller.requests.getUploadUrl({
@@ -178,7 +193,10 @@ describe("Storage upload routing (via tRPC Router)", () => {
     });
 
     it("throws FORBIDDEN for guest uploads with an invalid token", async () => {
-      mockLimit.mockResolvedValueOnce([]); // request not found
+      queryResults.results = [
+        [{ count: 0 }], // count images
+        [] // request not found
+      ];
 
       const caller = createCaller(null);
       await expect(
@@ -189,6 +207,21 @@ describe("Storage upload routing (via tRPC Router)", () => {
           guestToken: "wrong-token",
         }),
       ).rejects.toThrow(/Invalid request ID or guest token/);
+    });
+
+    it("throws FORBIDDEN if the request already has 10 or more images", async () => {
+      queryResults.results = [
+        [{ count: 10 }] // count images limit reached
+      ];
+
+      const caller = createCaller({ id: 1, role: "client" });
+      await expect(
+        caller.requests.getUploadUrl({
+          fileName: "reference.png",
+          contentType: "image/png",
+          requestId: 100,
+        }),
+      ).rejects.toThrow(/Maximum image limit reached for this request/);
     });
   });
 
@@ -227,7 +260,10 @@ describe("Storage upload routing (via tRPC Router)", () => {
 
   describe("Filename sanitization (path traversal prevention)", () => {
     it("sanitizes filenames via request upload path", async () => {
-      mockLimit.mockResolvedValueOnce([{ id: 100, clientId: null, guestToken: "valid-token" }]);
+      queryResults.results = [
+        [{ count: 0 }],
+        [{ id: 100, clientId: null, guestToken: "valid-token" }]
+      ];
 
       const caller = createCaller(null);
       const result = await caller.requests.getUploadUrl({
