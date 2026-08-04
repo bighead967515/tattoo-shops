@@ -257,7 +257,7 @@ export default function ArtistDashboard() {
   });
 
 
-  const updateBookingStatusMutation = trpc.bookings.updateStatus.useMutation({
+  const updateBookingStatusMutation = trpc.bookings.artistUpdateStatus.useMutation({
     onSuccess: () => {
       toast.success("Booking status updated");
     },

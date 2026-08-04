@@ -12,10 +12,36 @@ import { initAnalytics } from "./lib/analytics";
 import "./index.css";
 
 Sentry.init({
-  dsn: "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752",
-  // Setting this option to true will send default PII data to Sentry.
-  // For example, automatic IP address collection on events
-  sendDefaultPii: true
+  dsn: import.meta.env.VITE_SENTRY_DSN || "https://e2de2529cc60ea38479b53231561460c@o4511500483231744.ingest.us.sentry.io/4511500485066752",
+  // Disable automatic collection of IP addresses/PII
+  sendDefaultPii: false,
+  beforeSend(event) {
+    if (event.request) {
+      if (event.request.headers) {
+        delete event.request.headers["Authorization"];
+        delete event.request.headers["Cookie"];
+        delete event.request.headers["cookie"];
+      }
+      if (event.request.url) {
+        event.request.url = event.request.url.replace(/([?&])(?:email|token|password)=[^&]*/g, "$1$2=[filtered]");
+      }
+    }
+    const sensitiveKeys = ["email", "phone", "password", "token", "tattooDescription", "description", "address", "guestEmail", "imageUrl", "imageKey"];
+    const scrubObject = (obj: any) => {
+      if (!obj || typeof obj !== "object") return;
+      for (const key in obj) {
+        if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
+          obj[key] = "[filtered]";
+        } else if (typeof obj[key] === "object") {
+          scrubObject(obj[key]);
+        }
+      }
+    };
+    scrubObject(event.extra);
+    scrubObject(event.breadcrumbs);
+    scrubObject(event.user);
+    return event;
+  }
 });
 
 initAnalytics();

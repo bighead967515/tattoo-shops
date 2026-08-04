@@ -1,4 +1,5 @@
 import { z } from "zod";
+import crypto from "crypto";
 import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import { getDb, isAiEnabled } from "./db";
@@ -609,11 +610,14 @@ export const requestsRouter = router({
         .filter(([_, value]) => value)
         .map(([key]) => key);
 
+      const guestToken = clientId ? null : crypto.randomUUID();
+
       const [newRequest] = await db
         .insert(tattooRequests)
         .values({
           clientId,
           guestEmail: clientId ? null : (guestEmail ?? null),
+          guestToken,
           selectedAddons: addOnArray,
           addOnTotalCents,
           addOnPaymentStatus:
@@ -631,6 +635,7 @@ export const requestsRouter = router({
           ...newRequest,
           addOnPaymentRequired: false,
           addOnCheckoutUrl: null,
+          guestToken: newRequest.guestToken,
         };
       }
 
@@ -672,6 +677,7 @@ export const requestsRouter = router({
           ...newRequest,
           addOnPaymentRequired: true,
           addOnCheckoutUrl: session.url,
+          guestToken: newRequest.guestToken,
         };
       } catch (error) {
         await db
@@ -757,6 +763,7 @@ export const requestsRouter = router({
         caption: z.string().max(500).optional(),
         isMainImage: z.boolean().default(false),
         isExistingTattoo: z.boolean().default(false),
+        guestToken: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -770,19 +777,40 @@ export const requestsRouter = router({
           .from(clients)
           .where(eq(clients.userId, ctx.user.id))
           .limit(1);
+
+        if (!client || !input.imageKey.startsWith(`public/${client.id}/`)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid image upload path",
+          });
+        }
+
         const rows = await db
           .select()
           .from(tattooRequests)
           .where(
             and(
               eq(tattooRequests.id, input.requestId),
-              eq(tattooRequests.clientId, client?.id ?? 0),
+              eq(tattooRequests.clientId, client.id),
             ),
           )
           .limit(1);
         request = rows[0];
       } else {
-        // Guest: only allow adding images to guest requests (clientId IS NULL)
+        // Guest: only allow adding images to guest requests matching guestToken
+        if (!input.guestToken) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Guest request ownership token is required",
+          });
+        }
+        if (!input.imageKey.startsWith("public/guest/")) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid image upload path for guests",
+          });
+        }
+
         const rows = await db
           .select()
           .from(tattooRequests)
@@ -790,6 +818,7 @@ export const requestsRouter = router({
             and(
               eq(tattooRequests.id, input.requestId),
               sql`"clientId" IS NULL`,
+              eq(tattooRequests.guestToken, input.guestToken),
             ),
           )
           .limit(1);

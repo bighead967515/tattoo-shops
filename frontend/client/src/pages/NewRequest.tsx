@@ -511,6 +511,7 @@ export default function NewRequest() {
             caption: "Existing tattoo to cover/fix",
             isMainImage: false,
             isExistingTattoo: true,
+            guestToken: (newRequest as any).guestToken,
           });
         } catch (err) {
           toast.error("Failed to upload existing tattoo picture. Artists won't see the coverup reference.");
@@ -538,6 +539,7 @@ export default function NewRequest() {
               imageKey: path,
               isMainImage: index === 0,
               isExistingTattoo: false,
+              guestToken: (newRequest as any).guestToken,
             });
           }),
         );

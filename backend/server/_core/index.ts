@@ -260,6 +260,8 @@ const aiLimiter = rateLimit({
 });
 // Applied before the generic /api/ limiter so AI routes hit this limit first.
 app.use("/api/trpc/ai.", aiLimiter);
+app.use("/api/trpc/bids.draftResponse", aiLimiter);
+app.use("/api/trpc/requests.refineDescription", aiLimiter);
 
 // Stripe webhook needs raw body for signature verification
 // MUST be registered BEFORE express.json()
@@ -526,7 +528,7 @@ app.get("/sitemap.xml", async (_req, res) => {
     const { getAllArtists, getAllBlogPosts } = await import("../db");
     const artists = await getAllArtists();
     const posts = await getAllBlogPosts();
-    const baseUrl = "https://universalinc.com";
+    const baseUrl = "https://inkedconnect.com";
     
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },

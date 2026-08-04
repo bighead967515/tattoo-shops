@@ -486,3 +486,43 @@ CREATE POLICY request_messages_admin_all ON "requestMessages"
   TO authenticated
   USING (app_private.is_admin())
   WITH CHECK (app_private.is_admin());
+--> statement-breakpoint
+
+-- Enable RLS for invitations, blog_posts, flash_art
+ALTER TABLE "invitations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "blog_posts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "flash_art" ENABLE ROW LEVEL SECURITY;
+
+-- Policies for invitations
+DROP POLICY IF EXISTS invitations_admin_all ON "invitations";
+CREATE POLICY invitations_admin_all ON "invitations"
+  FOR ALL
+  TO authenticated
+  USING (app_private.is_admin())
+  WITH CHECK (app_private.is_admin());
+
+-- Policies for blog_posts
+DROP POLICY IF EXISTS blog_posts_public_read ON "blog_posts";
+DROP POLICY IF EXISTS blog_posts_admin_all ON "blog_posts";
+CREATE POLICY blog_posts_public_read ON "blog_posts"
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+CREATE POLICY blog_posts_admin_all ON "blog_posts"
+  FOR ALL
+  TO authenticated
+  USING (app_private.is_admin())
+  WITH CHECK (app_private.is_admin());
+
+-- Policies for flash_art
+DROP POLICY IF EXISTS flash_art_public_read ON "flash_art";
+DROP POLICY IF EXISTS flash_art_artist_all ON "flash_art";
+CREATE POLICY flash_art_public_read ON "flash_art"
+  FOR SELECT
+  TO anon, authenticated
+  USING ("isLocked" = false OR app_private.owns_artist("artistId") OR app_private.is_admin());
+CREATE POLICY flash_art_artist_all ON "flash_art"
+  FOR ALL
+  TO authenticated
+  USING (app_private.owns_artist("artistId") OR app_private.is_admin())
+  WITH CHECK (app_private.owns_artist("artistId") OR app_private.is_admin());

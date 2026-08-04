@@ -60,17 +60,21 @@ END $$;
 -- ============================================================
 -- FIX #2: Migrate bookings.status from varchar to booking_status enum
 -- ============================================================
+ALTER TABLE "bookings" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE "bookings"
   ALTER COLUMN "status" TYPE "booking_status"
   USING "status"::"booking_status";
+ALTER TABLE "bookings" ALTER COLUMN "status" SET DEFAULT 'pending';
 --> statement-breakpoint
 
 -- ============================================================
 -- FIX #2: Migrate webhookQueue.status from varchar to webhook_status enum
 -- ============================================================
+ALTER TABLE "webhookQueue" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE "webhookQueue"
   ALTER COLUMN "status" TYPE "webhook_status"
   USING "status"::"webhook_status";
+ALTER TABLE "webhookQueue" ALTER COLUMN "status" SET DEFAULT 'pending';
 --> statement-breakpoint
 
 -- ============================================================
@@ -96,8 +100,8 @@ END $$;
 ALTER TABLE "artists"
   ALTER COLUMN "averageRating" TYPE NUMERIC(3, 2)
   USING CASE
-    WHEN "averageRating" IS NULL OR "averageRating" = '' THEN NULL
-    ELSE CAST("averageRating" AS NUMERIC(3, 2))
+    WHEN "averageRating" IS NULL OR TRIM("averageRating"::text) = '' THEN NULL
+    ELSE "averageRating"::numeric(3, 2)
   END;
 --> statement-breakpoint
 

@@ -12,11 +12,20 @@ ALTER TABLE "tattooRequests"
   ALTER COLUMN "clientId" DROP NOT NULL;
 
 -- Step 3: Re-add FK with SET NULL on delete
-ALTER TABLE "tattooRequests"
-  ADD CONSTRAINT "tattooRequests_clientId_clients_id_fk"
-  FOREIGN KEY ("clientId") REFERENCES "clients"("id")
-  ON DELETE SET NULL ON UPDATE NO ACTION;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'tattooRequests_clientId_clients_id_fk'
+      AND table_name = 'tattooRequests'
+  ) THEN
+    ALTER TABLE "tattooRequests"
+      ADD CONSTRAINT "tattooRequests_clientId_clients_id_fk"
+      FOREIGN KEY ("clientId") REFERENCES "clients"("id")
+      ON DELETE SET NULL ON UPDATE NO ACTION;
+  END IF;
+END $$;
 
--- Step 4: Add guestEmail column
+-- Step 4: Add guestEmail and guestToken columns
 ALTER TABLE "tattooRequests"
-  ADD COLUMN IF NOT EXISTS "guestEmail" varchar(255);
+  ADD COLUMN IF NOT EXISTS "guestEmail" varchar(255),
+  ADD COLUMN IF NOT EXISTS "guestToken" varchar(255);

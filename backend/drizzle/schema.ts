@@ -417,6 +417,7 @@ export const tattooRequests = pgTable(
     clientId: integer("clientId")
       .references(() => clients.id, { onDelete: "set null" }), // nullable — guests can post without an account
     guestEmail: varchar("guestEmail", { length: 255 }), // optional contact email for guests
+    guestToken: varchar("guestToken", { length: 255 }), // secure random token to verify guest request ownership
     title: varchar("title", { length: 255 }).notNull(),
     description: text("description").notNull(),
     style: varchar("style", { length: 100 }), // e.g., "Realism", "Traditional", "Watercolor"

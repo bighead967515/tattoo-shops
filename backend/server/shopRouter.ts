@@ -4,28 +4,36 @@ import { publicProcedure, router } from "./_core/trpc";
 import { getAllShops, searchShops } from "./db";
 
 export const shopRouter = router({
-  // Get all shops from the shops table.
-  getAll: publicProcedure.query(async () => {
-    try {
-      return await getAllShops();
-    } catch (error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to fetch shops",
-      });
-    }
-  }),
+  getAll: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20).optional(),
+        offset: z.number().min(0).default(0).optional(),
+      }).optional(),
+    )
+    .query(async ({ input }) => {
+      try {
+        return await getAllShops(input?.limit, input?.offset);
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to fetch shops",
+        });
+      }
+    }),
 
   // Search shops by name, city, or state.
   search: publicProcedure
     .input(
       z.object({
         searchTerm: z.string().trim(),
+        limit: z.number().min(1).max(100).default(20).optional(),
+        offset: z.number().min(0).default(0).optional(),
       }),
     )
     .query(async ({ input }) => {
       try {
-        return await searchShops(input.searchTerm);
+        return await searchShops(input.searchTerm, input.limit, input.offset);
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

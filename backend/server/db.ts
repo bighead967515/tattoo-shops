@@ -375,6 +375,8 @@ export async function searchArtists(filters: {
   minExperience?: number;
   city?: string;
   state?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const db = await getDb();
   if (!db) return [];
@@ -419,7 +421,7 @@ export async function searchArtists(filters: {
     conditions.push(sql`${artists.state} ILIKE ${`%${normalizedState}%`}`);
   }
 
-  return await db
+  let q = db
     .select({
       ...artistFields,
       subscriptionTier: users.subscriptionTier,
@@ -431,26 +433,30 @@ export async function searchArtists(filters: {
       sql`${artists.isFoundingArtist} DESC`,
       desc(artists.averageRating),
     );
+
+  if (filters.limit !== undefined) q = q.limit(filters.limit) as any;
+  if (filters.offset !== undefined) q = q.offset(filters.offset) as any;
+  return await q;
 }
 
-/**
- * Get all shops from the shops table.
- */
-export async function getAllShops() {
+export async function getAllShops(limit?: number, offset?: number) {
   const db = await getDb();
   if (!db) return [];
-  return await db.select().from(shops).orderBy(shops.shopName);
+  let q = db.select().from(shops).orderBy(shops.shopName);
+  if (limit !== undefined) q = q.limit(limit) as any;
+  if (offset !== undefined) q = q.offset(offset) as any;
+  return await q;
 }
 
 /**
  * Search shops by city or shop name (case-insensitive).
  */
-export async function searchShops(query: string) {
+export async function searchShops(query: string, limit?: number, offset?: number) {
   const db = await getDb();
   if (!db) return [];
-  if (!query.trim()) return getAllShops();
+  if (!query.trim()) return getAllShops(limit, offset);
   const term = `%${query.trim()}%`;
-  return await db
+  let q = db
     .select()
     .from(shops)
     .where(
@@ -461,6 +467,9 @@ export async function searchShops(query: string) {
       ),
     )
     .orderBy(shops.shopName);
+  if (limit !== undefined) q = q.limit(limit) as any;
+  if (offset !== undefined) q = q.offset(offset) as any;
+  return await q;
 }
 
 export async function updateArtist(id: number, data: Partial<InsertArtist>) {

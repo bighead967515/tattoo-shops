@@ -23,7 +23,7 @@ import {
 } from "./_core/supabaseStorage";
 import { clientsRouter, requestsRouter, bidsRouter } from "./clientRouters";
 import { createArtistSubscriptionCheckout, createFoundingArtistCheckout, createCheckoutSession } from "./stripe";
-import { artists, users, flashArt, bookings, invitations } from "../drizzle/schema";
+import { artists, users, flashArt, bookings, invitations, reviews } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -614,6 +614,8 @@ export const appRouter = router({
           minExperience: z.number().optional(),
           city: z.string().optional(),
           state: z.string().optional(),
+          limit: z.number().min(1).max(100).optional(),
+          offset: z.number().min(0).optional(),
         }),
       )
       .query(async ({ input }) => {
@@ -962,14 +964,60 @@ export const appRouter = router({
       .input(
         z.object({
           artistId: z.number(),
-          rating: z.number().min(0).max(5),
+          rating: z.number().min(1).max(5),
           comment: z.string().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
+        // 1. Prevent reviewing own artist profile
+        const artist = await db.getArtistById(input.artistId);
+        if (!artist) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Artist not found" });
+        }
+        if (artist.userId === ctx.user.id) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You cannot review your own artist profile",
+          });
+        }
+
+        // 2. Enforce completed booking with this artist
+        const userBookings = await db.getBookingsByUserId(ctx.user.id);
+        const hasCompletedBooking = userBookings.some(
+          (b) => b.booking.artistId === input.artistId && b.booking.status === "completed"
+        );
+        if (!hasCompletedBooking) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You must have a completed booking with this artist to leave a review",
+          });
+        }
+
+        // 3. Prevent duplicate reviews
+        const database = await getDb();
+        if (database) {
+          const [existingReview] = await database
+            .select({ id: reviews.id })
+            .from(reviews)
+            .where(
+              and(
+                eq(reviews.artistId, input.artistId),
+                eq(reviews.userId, ctx.user.id)
+              )
+            )
+            .limit(1);
+          if (existingReview) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "You have already reviewed this artist",
+            });
+          }
+        }
+
         const result = await db.createReview({
           ...input,
           userId: ctx.user.id,
+          verifiedBooking: true,
         });
 
         // Run Review Sentiment Analysis in the background (non-blocking)
@@ -978,7 +1026,7 @@ export const appRouter = router({
           analyzeReviewSentiment({
             rating: input.rating,
             comment: input.comment,
-            verifiedBooking: false,
+            verifiedBooking: true,
           })
             .then(async (analysis) => {
               if (result?.id) {
@@ -1109,70 +1157,105 @@ export const appRouter = router({
         return await db.getBookingsByArtistId(input.artistId);
       }),
 
-    updateStatus: protectedProcedure
+    customerCancelBooking: protectedProcedure
       .input(
         z.object({
           id: z.number(),
-          status: z.enum(["pending", "confirmed", "cancelled", "completed"]),
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        // Get booking and verify ownership
         const booking = await db.getBookingById(input.id);
         if (!booking) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Booking not found" });
         }
 
-        // Check if user is either the customer or owns the artist profile
-        const isCustomer = booking.userId === ctx.user.id;
-        let isArtist = false;
-
-        const artist = await db.getArtistById(booking.artistId);
-        if (artist && artist.userId === ctx.user.id) {
-          isArtist = true;
-        }
-
-        if (!isCustomer && !isArtist) {
+        if (booking.userId !== ctx.user.id) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "You can only update your own bookings or bookings for your artist profile",
+            message: "You can only cancel your own bookings",
           });
         }
 
-        // If the booking is being cancelled
+        if (booking.status === "cancelled" || booking.status === "completed") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot cancel a booking that is already finalized",
+          });
+        }
+
+        await db.updateBooking(input.id, {
+          status: "cancelled",
+          cancelledBy: "client",
+        });
+        return { success: true };
+      }),
+
+    artistUpdateStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          status: z.enum(["confirmed", "cancelled", "completed"]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const booking = await db.getBookingById(input.id);
+        if (!booking) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Booking not found" });
+        }
+
+        const artist = await db.getArtistById(booking.artistId);
+        if (!artist || artist.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only update bookings for your own artist profile",
+          });
+        }
+
+        // Validate state transitions
+        if (booking.status === "cancelled" || booking.status === "completed") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot update status of a finalized booking",
+          });
+        }
+
+        if (input.status === "confirmed" && booking.status !== "pending") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Can only confirm a pending booking",
+          });
+        }
+
+        if (input.status === "completed" && booking.status !== "confirmed") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Can only complete a confirmed booking",
+          });
+        }
+
         if (input.status === "cancelled") {
           let refundProcessed = false;
           let refundId: string | undefined = undefined;
 
-          // If the artist is the one cancelling, auto-refund deposit if paid
-          if (isArtist) {
-            if (booking.depositPaid && booking.stripePaymentIntentId) {
-              try {
-                const { refundPaymentIntent } = await import("./stripe");
-                const refund = await refundPaymentIntent(booking.stripePaymentIntentId);
-                refundProcessed = true;
-                refundId = refund.id;
-              } catch (err) {
-                logger.error("Failed to auto-refund deposit on artist cancellation:", err);
-              }
+          if (booking.depositPaid && booking.stripePaymentIntentId) {
+            try {
+              const { refundPaymentIntent } = await import("./stripe");
+              const refund = await refundPaymentIntent(booking.stripePaymentIntentId);
+              refundProcessed = true;
+              refundId = refund.id;
+            } catch (err) {
+              logger.error("Failed to auto-refund deposit on artist cancellation:", err);
             }
-
-            await db.updateBooking(input.id, {
-              status: "cancelled",
-              cancelledBy: "artist",
-              refundStatus: refundProcessed ? "refunded" : "not_requested",
-              stripeRefundId: refundId,
-              refundProcessedAt: refundProcessed ? new Date() : null,
-            });
-            return { success: true };
-          } else if (isCustomer) {
-            // Client cancelled
-            await db.updateBooking(input.id, {
-              status: "cancelled",
-              cancelledBy: "client",
-            });
-            return { success: true };
           }
+
+          await db.updateBooking(input.id, {
+            status: "cancelled",
+            cancelledBy: "artist",
+            refundStatus: refundProcessed ? "refunded" : "not_requested",
+            stripeRefundId: refundId,
+            refundProcessedAt: refundProcessed ? new Date() : null,
+          });
+          return { success: true };
         }
 
         return await db.updateBooking(input.id, { status: input.status });
