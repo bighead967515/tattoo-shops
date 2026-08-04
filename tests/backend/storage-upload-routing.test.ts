@@ -27,11 +27,19 @@ const {
     from: vi.fn(() => mockBuilder),
     where: vi.fn(() => mockBuilder),
     limit: vi.fn(() => mockBuilder),
+    values: vi.fn(() => mockBuilder),
+    set: vi.fn(() => mockBuilder),
+    returning: vi.fn(() => mockBuilder),
     then: vi.fn((resolve) => resolve(queryResults.results.shift() ?? [])),
   };
 
-  const mockDb = {
+  const mockDb: any = {
     select: vi.fn(() => mockBuilder),
+    delete: vi.fn(() => mockBuilder),
+    insert: vi.fn(() => mockBuilder),
+    update: vi.fn(() => mockBuilder),
+    execute: vi.fn(async () => []),
+    transaction: vi.fn(async (callback) => await callback(mockDb)),
   };
 
   return {
@@ -138,9 +146,11 @@ describe("Storage upload routing (via tRPC Router)", () => {
   describe("Request images → request-images bucket", () => {
     it("generates a public/<clientId>/<requestId>/... key for logged-in clients", async () => {
       queryResults.results = [
-        [{ count: 0 }], // count images
         [{ id: 7 }], // client
-        [{ id: 100, clientId: 7 }] // request
+        [{ id: 100, clientId: 7 }], // request
+        [], // delete expired
+        [{ count: 0 }], // count images
+        [] // insert
       ];
 
       const caller = createCaller({ id: 1, role: "client" });
@@ -159,8 +169,10 @@ describe("Storage upload routing (via tRPC Router)", () => {
 
     it("generates a public/guest/<requestId>/... key for guests with a valid token", async () => {
       queryResults.results = [
+        [{ id: 100, clientId: null, guestToken: "valid-token" }], // request
+        [], // delete expired
         [{ count: 0 }], // count images
-        [{ id: 100, clientId: null, guestToken: "valid-token" }] // request
+        [] // insert
       ];
 
       const caller = createCaller(null);
@@ -178,9 +190,7 @@ describe("Storage upload routing (via tRPC Router)", () => {
     });
 
     it("throws FORBIDDEN for guest uploads without a token", async () => {
-      queryResults.results = [
-        [{ count: 0 }] // count images
-      ];
+      queryResults.results = [];
 
       const caller = createCaller(null);
       await expect(
@@ -194,7 +204,6 @@ describe("Storage upload routing (via tRPC Router)", () => {
 
     it("throws FORBIDDEN for guest uploads with an invalid token", async () => {
       queryResults.results = [
-        [{ count: 0 }], // count images
         [] // request not found
       ];
 
@@ -211,6 +220,9 @@ describe("Storage upload routing (via tRPC Router)", () => {
 
     it("throws FORBIDDEN if the request already has 10 or more images", async () => {
       queryResults.results = [
+        [{ id: 7 }], // client
+        [{ id: 100, clientId: 7 }], // request
+        [], // delete expired
         [{ count: 10 }] // count images limit reached
       ];
 
@@ -261,8 +273,10 @@ describe("Storage upload routing (via tRPC Router)", () => {
   describe("Filename sanitization (path traversal prevention)", () => {
     it("sanitizes filenames via request upload path", async () => {
       queryResults.results = [
-        [{ count: 0 }],
-        [{ id: 100, clientId: null, guestToken: "valid-token" }]
+        [{ id: 100, clientId: null, guestToken: "valid-token" }], // request
+        [], // delete expired
+        [{ count: 0 }], // count images
+        [] // insert
       ];
 
       const caller = createCaller(null);

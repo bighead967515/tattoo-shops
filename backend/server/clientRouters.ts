@@ -1,7 +1,7 @@
 import { z } from "zod";
 import crypto from "crypto";
 import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
-import { eq, and, desc, sql, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, lt } from "drizzle-orm";
 import { getDb, isAiEnabled } from "./db";
 import {
   clients,
@@ -748,20 +748,8 @@ export const requestsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-
-      // Count current images for this request to prevent storage quota abuse (max 10)
-      const [imgCount] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(requestImages)
-        .where(eq(requestImages.requestId, input.requestId));
-      if ((imgCount?.count ?? 0) >= 10) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Maximum image limit reached for this request (max 10)",
-        });
-      }
-
       let prefix = "guest";
+
       if (ctx.user) {
         const [client] = await db
           .select({ id: clients.id })
@@ -819,9 +807,56 @@ export const requestsRouter = router({
           });
         }
       }
+
       // Sanitize filename to prevent path traversal
       const sanitizedFileName = sanitizeFileName(input.fileName);
       const fileKey = `public/${prefix}/${input.requestId}/${Date.now()}-${sanitizedFileName}`;
+
+      // Reserve slot in a transaction
+      await db.transaction(async (tx) => {
+        // Lock the tattoo request row to serialize slot reservations
+        await tx.execute(
+          sql`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
+        );
+
+        // Delete expired reservations (older than 10 minutes)
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        await tx
+          .delete(requestImages)
+          .where(
+            and(
+              eq(requestImages.requestId, input.requestId),
+              eq(requestImages.caption, "__reserved__"),
+              lt(requestImages.createdAt, tenMinutesAgo)
+            )
+          );
+
+        // Count non-expired images + active reservations
+        const [imgCount] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(requestImages)
+          .where(eq(requestImages.requestId, input.requestId));
+
+        if ((imgCount?.count ?? 0) >= 10) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Maximum image limit reached for this request (max 10)",
+          });
+        }
+
+        // Insert placeholder reservation
+        await tx
+          .insert(requestImages)
+          .values({
+            requestId: input.requestId,
+            imageKey: fileKey,
+            imageUrl: "reserved",
+            caption: "__reserved__",
+            isMainImage: false,
+            isExistingTattoo: false,
+          });
+      });
+
       return await createSignedUploadUrl(BUCKETS.REQUEST_IMAGES, fileKey);
     }),
 
@@ -839,19 +874,6 @@ export const requestsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-
-      // Count current images for this request to prevent storage quota abuse (max 10)
-      const [imgCount] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(requestImages)
-        .where(eq(requestImages.requestId, input.requestId));
-      if ((imgCount?.count ?? 0) >= 10) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Maximum image limit reached for this request (max 10)",
-        });
-      }
-
       let request: typeof tattooRequests.$inferSelect | undefined;
 
       if (ctx.user) {
@@ -916,28 +938,70 @@ export const requestsRouter = router({
         });
       }
 
-      // If this is main image, unset others
-      if (input.isMainImage) {
-        await db
-          .update(requestImages)
-          .set({ isMainImage: false })
-          .where(eq(requestImages.requestId, input.requestId));
-      }
-
       const imageUrl = getPublicUrl(BUCKETS.REQUEST_IMAGES, input.imageKey);
 
-      // Explicitly map only expected columns to avoid injecting unexpected fields
-      const [image] = await db
-        .insert(requestImages)
-        .values({
-          requestId: input.requestId,
-          imageKey: input.imageKey,
-          imageUrl,
-          caption: input.caption,
-          isMainImage: input.isMainImage,
-          isExistingTattoo: input.isExistingTattoo,
-        })
-        .returning();
+      // Perform updates inside a transaction to serialize reservation completion
+      const image = await db.transaction(async (tx) => {
+        // Lock the tattoo request row
+        await tx.execute(
+          sql`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
+        );
+
+        // Delete expired reservations (older than 10 minutes)
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        await tx
+          .delete(requestImages)
+          .where(
+            and(
+              eq(requestImages.requestId, input.requestId),
+              eq(requestImages.caption, "__reserved__"),
+              lt(requestImages.createdAt, tenMinutesAgo)
+            )
+          );
+
+        // Find the active reservation row for this imageKey
+        const [reservation] = await tx
+          .select()
+          .from(requestImages)
+          .where(
+            and(
+              eq(requestImages.imageKey, input.imageKey),
+              eq(requestImages.requestId, input.requestId),
+              eq(requestImages.caption, "__reserved__")
+            )
+          )
+          .limit(1);
+
+        if (!reservation) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "No active reservation found for this image upload. It may have expired or already been completed.",
+          });
+        }
+
+        // If this is main image, unset others
+        if (input.isMainImage) {
+          await tx
+            .update(requestImages)
+            .set({ isMainImage: false })
+            .where(eq(requestImages.requestId, input.requestId));
+        }
+
+        // Update the reservation row to be a completed image upload
+        const [updatedImage] = await tx
+          .update(requestImages)
+          .set({
+            imageUrl,
+            caption: input.caption || null,
+            isMainImage: input.isMainImage,
+            isExistingTattoo: input.isExistingTattoo,
+            createdAt: new Date(), // Reset creation time to completion time
+          })
+          .where(eq(requestImages.id, reservation.id))
+          .returning();
+
+        return updatedImage;
+      });
 
       return image;
     }),
@@ -1055,11 +1119,14 @@ export const bidsRouter = router({
       .where(eq(bids.artistId, artist.id))
       .orderBy(desc(bids.createdAt));
 
-    return myBids.map((b: (typeof myBids)[number]) => ({
-      ...b.bid,
-      request: b.request,
-      client: b.client,
-    }));
+    return myBids.map((b: (typeof myBids)[number]) => {
+      const maskedRequest = maskContactInfo(b.request, b.client, null, false);
+      return {
+        ...b.bid,
+        request: maskedRequest,
+        client: maskedRequest.client,
+      };
+    });
   }),
 
   // AI Bid Assistant — draft a bid response (Pro subscription/Icon tier only)

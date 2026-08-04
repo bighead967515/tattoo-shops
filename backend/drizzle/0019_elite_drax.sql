@@ -1,0 +1,1 @@
+-- Migration: Canonical schema snapshot update (columns already updated by previous migrations)

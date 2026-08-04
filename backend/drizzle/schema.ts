@@ -479,7 +479,7 @@ export const requestImages = pgTable("requestImages", {
     .notNull()
     .references(() => tattooRequests.id, { onDelete: "cascade" }),
   imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
-  imageKey: varchar("imageKey", { length: 500 }).notNull(), // Supabase Storage key
+  imageKey: varchar("imageKey", { length: 500 }).notNull().unique(), // Supabase Storage key
   caption: text("caption"),
   isMainImage: boolean("isMainImage").default(false),
   isExistingTattoo: boolean("isExistingTattoo").default(false).notNull(),

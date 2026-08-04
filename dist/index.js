@@ -618,7 +618,7 @@ var init_schema = __esm({
       id: serial("id").primaryKey(),
       requestId: integer("requestId").notNull().references(() => tattooRequests.id, { onDelete: "cascade" }),
       imageUrl: varchar("imageUrl", { length: 1e3 }).notNull(),
-      imageKey: varchar("imageKey", { length: 500 }).notNull(),
+      imageKey: varchar("imageKey", { length: 500 }).notNull().unique(),
       // Supabase Storage key
       caption: text("caption"),
       isMainImage: boolean("isMainImage").default(false),
@@ -3257,7 +3257,7 @@ init_db();
 init_schema();
 init_supabaseStorage();
 init_logger();
-import { eq as eq2, and as and2, desc as desc2, sql as sql2 } from "drizzle-orm";
+import { eq as eq2, and as and2, desc as desc2, sql as sql2, lt } from "drizzle-orm";
 import { TRPCError as TRPCError2 } from "@trpc/server";
 import path from "path";
 
@@ -3962,13 +3962,6 @@ var requestsRouter = router({
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
-    const [imgCount] = await db.select({ count: sql2`count(*)::int` }).from(requestImages).where(eq2(requestImages.requestId, input.requestId));
-    if ((imgCount?.count ?? 0) >= 10) {
-      throw new TRPCError2({
-        code: "FORBIDDEN",
-        message: "Maximum image limit reached for this request (max 10)"
-      });
-    }
     let prefix = "guest";
     if (ctx.user) {
       const [client] = await db.select({ id: clients.id }).from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
@@ -4014,6 +4007,34 @@ var requestsRouter = router({
     }
     const sanitizedFileName = sanitizeFileName(input.fileName);
     const fileKey = `public/${prefix}/${input.requestId}/${Date.now()}-${sanitizedFileName}`;
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql2`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
+      );
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1e3);
+      await tx.delete(requestImages).where(
+        and2(
+          eq2(requestImages.requestId, input.requestId),
+          eq2(requestImages.caption, "__reserved__"),
+          lt(requestImages.createdAt, tenMinutesAgo)
+        )
+      );
+      const [imgCount] = await tx.select({ count: sql2`count(*)::int` }).from(requestImages).where(eq2(requestImages.requestId, input.requestId));
+      if ((imgCount?.count ?? 0) >= 10) {
+        throw new TRPCError2({
+          code: "FORBIDDEN",
+          message: "Maximum image limit reached for this request (max 10)"
+        });
+      }
+      await tx.insert(requestImages).values({
+        requestId: input.requestId,
+        imageKey: fileKey,
+        imageUrl: "reserved",
+        caption: "__reserved__",
+        isMainImage: false,
+        isExistingTattoo: false
+      });
+    });
     return await createSignedUploadUrl(BUCKETS.REQUEST_IMAGES, fileKey);
   }),
   // Add image to request — open to guests (guest requests have clientId = NULL)
@@ -4028,13 +4049,6 @@ var requestsRouter = router({
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
-    const [imgCount] = await db.select({ count: sql2`count(*)::int` }).from(requestImages).where(eq2(requestImages.requestId, input.requestId));
-    if ((imgCount?.count ?? 0) >= 10) {
-      throw new TRPCError2({
-        code: "FORBIDDEN",
-        message: "Maximum image limit reached for this request (max 10)"
-      });
-    }
     let request;
     if (ctx.user) {
       const [client] = await db.select({ id: clients.id }).from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
@@ -4079,18 +4093,45 @@ var requestsRouter = router({
         message: "You can only add images to your own requests"
       });
     }
-    if (input.isMainImage) {
-      await db.update(requestImages).set({ isMainImage: false }).where(eq2(requestImages.requestId, input.requestId));
-    }
     const imageUrl = getPublicUrl(BUCKETS.REQUEST_IMAGES, input.imageKey);
-    const [image] = await db.insert(requestImages).values({
-      requestId: input.requestId,
-      imageKey: input.imageKey,
-      imageUrl,
-      caption: input.caption,
-      isMainImage: input.isMainImage,
-      isExistingTattoo: input.isExistingTattoo
-    }).returning();
+    const image = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql2`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
+      );
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1e3);
+      await tx.delete(requestImages).where(
+        and2(
+          eq2(requestImages.requestId, input.requestId),
+          eq2(requestImages.caption, "__reserved__"),
+          lt(requestImages.createdAt, tenMinutesAgo)
+        )
+      );
+      const [reservation] = await tx.select().from(requestImages).where(
+        and2(
+          eq2(requestImages.imageKey, input.imageKey),
+          eq2(requestImages.requestId, input.requestId),
+          eq2(requestImages.caption, "__reserved__")
+        )
+      ).limit(1);
+      if (!reservation) {
+        throw new TRPCError2({
+          code: "FORBIDDEN",
+          message: "No active reservation found for this image upload. It may have expired or already been completed."
+        });
+      }
+      if (input.isMainImage) {
+        await tx.update(requestImages).set({ isMainImage: false }).where(eq2(requestImages.requestId, input.requestId));
+      }
+      const [updatedImage] = await tx.update(requestImages).set({
+        imageUrl,
+        caption: input.caption || null,
+        isMainImage: input.isMainImage,
+        isExistingTattoo: input.isExistingTattoo,
+        createdAt: /* @__PURE__ */ new Date()
+        // Reset creation time to completion time
+      }).where(eq2(requestImages.id, reservation.id)).returning();
+      return updatedImage;
+    });
     return image;
   }),
   // Update request status
@@ -4155,11 +4196,14 @@ var bidsRouter = router({
       request: tattooRequests,
       client: clients
     }).from(bids).innerJoin(tattooRequests, eq2(bids.requestId, tattooRequests.id)).leftJoin(clients, eq2(tattooRequests.clientId, clients.id)).where(eq2(bids.artistId, artist.id)).orderBy(desc2(bids.createdAt));
-    return myBids.map((b) => ({
-      ...b.bid,
-      request: b.request,
-      client: b.client
-    }));
+    return myBids.map((b) => {
+      const maskedRequest = maskContactInfo(b.request, b.client, null, false);
+      return {
+        ...b.bid,
+        request: maskedRequest,
+        client: maskedRequest.client
+      };
+    });
   }),
   // AI Bid Assistant — draft a bid response (Pro subscription/Icon tier only)
   draftBid: protectedProcedure.input(z3.object({ requestId: z3.number() })).mutation(async ({ ctx, input }) => {
