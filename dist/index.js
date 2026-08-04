@@ -561,6 +561,8 @@ var init_schema = __esm({
         // nullable — guests can post without an account
         guestEmail: varchar("guestEmail", { length: 255 }),
         // optional contact email for guests
+        guestToken: varchar("guestToken", { length: 255 }),
+        // secure random token to verify guest request ownership
         title: varchar("title", { length: 255 }).notNull(),
         description: text("description").notNull(),
         style: varchar("style", { length: 100 }),
@@ -1241,31 +1243,40 @@ async function searchArtists(filters) {
   if (normalizedState) {
     conditions.push(sql`${artists.state} ILIKE ${`%${normalizedState}%`}`);
   }
-  return await db.select({
+  let q = db.select({
     ...artistFields,
     subscriptionTier: users.subscriptionTier
   }).from(artists).innerJoin(users, eq(artists.userId, users.id)).where(and(...conditions)).orderBy(
     sql`${artists.isFoundingArtist} DESC`,
     desc(artists.averageRating)
   );
+  if (filters.limit !== void 0) q = q.limit(filters.limit);
+  if (filters.offset !== void 0) q = q.offset(filters.offset);
+  return await q;
 }
-async function getAllShops() {
+async function getAllShops(limit, offset) {
   const db = await getDb();
   if (!db) return [];
-  return await db.select().from(shops).orderBy(shops.shopName);
+  let q = db.select().from(shops).orderBy(shops.shopName);
+  if (limit !== void 0) q = q.limit(limit);
+  if (offset !== void 0) q = q.offset(offset);
+  return await q;
 }
-async function searchShops(query) {
+async function searchShops(query, limit, offset) {
   const db = await getDb();
   if (!db) return [];
-  if (!query.trim()) return getAllShops();
+  if (!query.trim()) return getAllShops(limit, offset);
   const term = `%${query.trim()}%`;
-  return await db.select().from(shops).where(
+  let q = db.select().from(shops).where(
     or(
       sql`${shops.shopName} ILIKE ${term}`,
       sql`${shops.city} ILIKE ${term}`,
       sql`${shops.state} ILIKE ${term}`
     )
   ).orderBy(shops.shopName);
+  if (limit !== void 0) q = q.limit(limit);
+  if (offset !== void 0) q = q.offset(offset);
+  return await q;
 }
 async function updateArtist(id, data) {
   const db = await getDb();
@@ -3238,6 +3249,7 @@ init_supabaseStorage();
 
 // backend/server/clientRouters.ts
 import { z as z3 } from "zod";
+import crypto2 from "crypto";
 init_db();
 init_schema();
 init_supabaseStorage();
@@ -3838,9 +3850,11 @@ var requestsRouter = router({
       userEmail = userRow?.email ?? "";
     }
     const addOnArray = Object.entries(normalizedAddOns).filter(([_, value]) => value).map(([key]) => key);
+    const guestToken = clientId ? null : crypto2.randomUUID();
     const [newRequest] = await db.insert(tattooRequests).values({
       clientId,
       guestEmail: clientId ? null : guestEmail ?? null,
+      guestToken,
       selectedAddons: addOnArray,
       addOnTotalCents,
       addOnPaymentStatus: addOnTotalCents > 0 ? REQUEST_ADDON_PAYMENT_STATUSES.CHECKOUT_PENDING : REQUEST_ADDON_PAYMENT_STATUSES.NOT_REQUESTED,
@@ -3852,7 +3866,8 @@ var requestsRouter = router({
       return {
         ...newRequest,
         addOnPaymentRequired: false,
-        addOnCheckoutUrl: null
+        addOnCheckoutUrl: null,
+        guestToken: newRequest.guestToken
       };
     }
     const checkoutEmail = userEmail || guestEmail || "";
@@ -3884,7 +3899,8 @@ var requestsRouter = router({
       return {
         ...newRequest,
         addOnPaymentRequired: true,
-        addOnCheckoutUrl: session.url
+        addOnCheckoutUrl: session.url,
+        guestToken: newRequest.guestToken
       };
     } catch (error) {
       await db.update(tattooRequests).set({
@@ -3950,25 +3966,45 @@ var requestsRouter = router({
       imageKey: z3.string(),
       caption: z3.string().max(500).optional(),
       isMainImage: z3.boolean().default(false),
-      isExistingTattoo: z3.boolean().default(false)
+      isExistingTattoo: z3.boolean().default(false),
+      guestToken: z3.string().optional()
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     let request;
     if (ctx.user) {
       const [client] = await db.select({ id: clients.id }).from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);
+      if (!client || !input.imageKey.startsWith(`public/${client.id}/`)) {
+        throw new TRPCError2({
+          code: "BAD_REQUEST",
+          message: "Invalid image upload path"
+        });
+      }
       const rows = await db.select().from(tattooRequests).where(
         and2(
           eq2(tattooRequests.id, input.requestId),
-          eq2(tattooRequests.clientId, client?.id ?? 0)
+          eq2(tattooRequests.clientId, client.id)
         )
       ).limit(1);
       request = rows[0];
     } else {
+      if (!input.guestToken) {
+        throw new TRPCError2({
+          code: "FORBIDDEN",
+          message: "Guest request ownership token is required"
+        });
+      }
+      if (!input.imageKey.startsWith("public/guest/")) {
+        throw new TRPCError2({
+          code: "BAD_REQUEST",
+          message: "Invalid image upload path for guests"
+        });
+      }
       const rows = await db.select().from(tattooRequests).where(
         and2(
           eq2(tattooRequests.id, input.requestId),
-          sql2`"clientId" IS NULL`
+          sql2`"clientId" IS NULL`,
+          eq2(tattooRequests.guestToken, input.guestToken)
         )
       ).limit(1);
       request = rows[0];
@@ -4276,7 +4312,7 @@ init_schema();
 init_db();
 init_env();
 import { eq as eq5, and as and4, desc as desc3, sql as sql4 } from "drizzle-orm";
-import crypto2 from "crypto";
+import crypto3 from "crypto";
 
 // backend/server/verificationRouter.ts
 import { z as z4 } from "zod";
@@ -4958,10 +4994,14 @@ import { TRPCError as TRPCError5 } from "@trpc/server";
 import { z as z6 } from "zod";
 init_db();
 var shopRouter = router({
-  // Get all shops from the shops table.
-  getAll: publicProcedure.query(async () => {
+  getAll: publicProcedure.input(
+    z6.object({
+      limit: z6.number().min(1).max(100).default(20).optional(),
+      offset: z6.number().min(0).default(0).optional()
+    }).optional()
+  ).query(async ({ input }) => {
     try {
-      return await getAllShops();
+      return await getAllShops(input?.limit, input?.offset);
     } catch (error) {
       throw new TRPCError5({
         code: "INTERNAL_SERVER_ERROR",
@@ -4972,11 +5012,13 @@ var shopRouter = router({
   // Search shops by name, city, or state.
   search: publicProcedure.input(
     z6.object({
-      searchTerm: z6.string().trim()
+      searchTerm: z6.string().trim(),
+      limit: z6.number().min(1).max(100).default(20).optional(),
+      offset: z6.number().min(0).default(0).optional()
     })
   ).query(async ({ input }) => {
     try {
-      return await searchShops(input.searchTerm);
+      return await searchShops(input.searchTerm, input.limit, input.offset);
     } catch (error) {
       throw new TRPCError5({
         code: "INTERNAL_SERVER_ERROR",
@@ -5125,7 +5167,7 @@ var appRouter = router({
       const results = [];
       for (const invite of input.invitations) {
         try {
-          const inviteCode = crypto2.randomBytes(8).toString("hex");
+          const inviteCode = crypto3.randomBytes(8).toString("hex");
           const [existing] = await database.select().from(invitations).where(eq5(invitations.email, invite.email)).limit(1);
           if (existing) {
             await database.update(invitations).set({
@@ -5177,7 +5219,7 @@ var appRouter = router({
           message: "Invitation not found"
         });
       }
-      const newCode = crypto2.randomBytes(8).toString("hex");
+      const newCode = crypto3.randomBytes(8).toString("hex");
       await database.update(invitations).set({
         inviteCode: newCode,
         sentAt: /* @__PURE__ */ new Date(),
@@ -5393,7 +5435,9 @@ var appRouter = router({
         minRating: z7.number().optional(),
         minExperience: z7.number().optional(),
         city: z7.string().optional(),
-        state: z7.string().optional()
+        state: z7.string().optional(),
+        limit: z7.number().min(1).max(100).optional(),
+        offset: z7.number().min(0).optional()
       })
     ).query(async ({ input }) => {
       const normalizeText = (value, maxLen = 100) => {
@@ -5639,19 +5683,55 @@ var appRouter = router({
     create: protectedProcedure.input(
       z7.object({
         artistId: z7.number(),
-        rating: z7.number().min(0).max(5),
+        rating: z7.number().min(1).max(5),
         comment: z7.string().optional()
       })
     ).mutation(async ({ ctx, input }) => {
+      const artist = await getArtistById(input.artistId);
+      if (!artist) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Artist not found" });
+      }
+      if (artist.userId === ctx.user.id) {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "You cannot review your own artist profile"
+        });
+      }
+      const userBookings = await getBookingsByUserId(ctx.user.id);
+      const hasCompletedBooking = userBookings.some(
+        (b) => b.booking.artistId === input.artistId && b.booking.status === "completed"
+      );
+      if (!hasCompletedBooking) {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "You must have a completed booking with this artist to leave a review"
+        });
+      }
+      const database = await getDb();
+      if (database) {
+        const [existingReview] = await database.select({ id: reviews.id }).from(reviews).where(
+          and4(
+            eq5(reviews.artistId, input.artistId),
+            eq5(reviews.userId, ctx.user.id)
+          )
+        ).limit(1);
+        if (existingReview) {
+          throw new TRPCError6({
+            code: "BAD_REQUEST",
+            message: "You have already reviewed this artist"
+          });
+        }
+      }
       const result = await createReview({
         ...input,
-        userId: ctx.user.id
+        userId: ctx.user.id,
+        verifiedBooking: true
       });
       if (input.comment && input.comment.trim().length > 0) {
         analyzeReviewSentiment({
           rating: input.rating,
           comment: input.comment,
-          verifiedBooking: false
+          verifiedBooking: true
         }).then(async (analysis) => {
           if (result?.id) {
             let moderationStatus;
@@ -5754,57 +5834,89 @@ var appRouter = router({
     getByArtistId: artistOwnerProcedure.input(z7.object({ artistId: z7.number() })).query(async ({ input }) => {
       return await getBookingsByArtistId(input.artistId);
     }),
-    updateStatus: protectedProcedure.input(
+    customerCancelBooking: protectedProcedure.input(
       z7.object({
-        id: z7.number(),
-        status: z7.enum(["pending", "confirmed", "cancelled", "completed"])
+        id: z7.number()
       })
     ).mutation(async ({ ctx, input }) => {
       const booking = await getBookingById(input.id);
       if (!booking) {
         throw new TRPCError6({ code: "NOT_FOUND", message: "Booking not found" });
       }
-      const isCustomer = booking.userId === ctx.user.id;
-      let isArtist = false;
-      const artist = await getArtistById(booking.artistId);
-      if (artist && artist.userId === ctx.user.id) {
-        isArtist = true;
-      }
-      if (!isCustomer && !isArtist) {
+      if (booking.userId !== ctx.user.id) {
         throw new TRPCError6({
           code: "FORBIDDEN",
-          message: "You can only update your own bookings or bookings for your artist profile"
+          message: "You can only cancel your own bookings"
+        });
+      }
+      if (booking.status === "cancelled" || booking.status === "completed") {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "Cannot cancel a booking that is already finalized"
+        });
+      }
+      await updateBooking(input.id, {
+        status: "cancelled",
+        cancelledBy: "client"
+      });
+      return { success: true };
+    }),
+    artistUpdateStatus: protectedProcedure.input(
+      z7.object({
+        id: z7.number(),
+        status: z7.enum(["confirmed", "cancelled", "completed"])
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const booking = await getBookingById(input.id);
+      if (!booking) {
+        throw new TRPCError6({ code: "NOT_FOUND", message: "Booking not found" });
+      }
+      const artist = await getArtistById(booking.artistId);
+      if (!artist || artist.userId !== ctx.user.id) {
+        throw new TRPCError6({
+          code: "FORBIDDEN",
+          message: "You can only update bookings for your own artist profile"
+        });
+      }
+      if (booking.status === "cancelled" || booking.status === "completed") {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "Cannot update status of a finalized booking"
+        });
+      }
+      if (input.status === "confirmed" && booking.status !== "pending") {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "Can only confirm a pending booking"
+        });
+      }
+      if (input.status === "completed" && booking.status !== "confirmed") {
+        throw new TRPCError6({
+          code: "BAD_REQUEST",
+          message: "Can only complete a confirmed booking"
         });
       }
       if (input.status === "cancelled") {
         let refundProcessed = false;
         let refundId = void 0;
-        if (isArtist) {
-          if (booking.depositPaid && booking.stripePaymentIntentId) {
-            try {
-              const { refundPaymentIntent: refundPaymentIntent2 } = await Promise.resolve().then(() => (init_stripe(), stripe_exports));
-              const refund = await refundPaymentIntent2(booking.stripePaymentIntentId);
-              refundProcessed = true;
-              refundId = refund.id;
-            } catch (err) {
-              logger.error("Failed to auto-refund deposit on artist cancellation:", err);
-            }
+        if (booking.depositPaid && booking.stripePaymentIntentId) {
+          try {
+            const { refundPaymentIntent: refundPaymentIntent2 } = await Promise.resolve().then(() => (init_stripe(), stripe_exports));
+            const refund = await refundPaymentIntent2(booking.stripePaymentIntentId);
+            refundProcessed = true;
+            refundId = refund.id;
+          } catch (err) {
+            logger.error("Failed to auto-refund deposit on artist cancellation:", err);
           }
-          await updateBooking(input.id, {
-            status: "cancelled",
-            cancelledBy: "artist",
-            refundStatus: refundProcessed ? "refunded" : "not_requested",
-            stripeRefundId: refundId,
-            refundProcessedAt: refundProcessed ? /* @__PURE__ */ new Date() : null
-          });
-          return { success: true };
-        } else if (isCustomer) {
-          await updateBooking(input.id, {
-            status: "cancelled",
-            cancelledBy: "client"
-          });
-          return { success: true };
         }
+        await updateBooking(input.id, {
+          status: "cancelled",
+          cancelledBy: "artist",
+          refundStatus: refundProcessed ? "refunded" : "not_requested",
+          stripeRefundId: refundId,
+          refundProcessedAt: refundProcessed ? /* @__PURE__ */ new Date() : null
+        });
+        return { success: true };
       }
       return await updateBooking(input.id, { status: input.status });
     }),
@@ -6894,7 +7006,7 @@ init_env();
 init_logger();
 init_supabaseStorage();
 init_sentry();
-import crypto3 from "crypto";
+import crypto4 from "crypto";
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -6933,7 +7045,7 @@ var app = express2();
 app.set("trust proxy", 1);
 initSentry();
 app.use((req, res, next) => {
-  const requestId = req.headers["x-request-id"] || crypto3.randomUUID();
+  const requestId = req.headers["x-request-id"] || crypto4.randomUUID();
   res.setHeader("X-Request-ID", requestId);
   requestStorage.run({ requestId }, () => {
     globalThis.__requestStorageStore = { requestId };
@@ -7060,6 +7172,8 @@ var aiLimiter = rateLimit({
   }
 });
 app.use("/api/trpc/ai.", aiLimiter);
+app.use("/api/trpc/bids.draftResponse", aiLimiter);
+app.use("/api/trpc/requests.refineDescription", aiLimiter);
 app.post(
   "/api/stripe/webhook",
   express2.raw({ type: "application/json" }),
@@ -7255,7 +7369,7 @@ app.get("/sitemap.xml", async (_req, res) => {
     const { getAllArtists: getAllArtists2, getAllBlogPosts: getAllBlogPosts2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const artists2 = await getAllArtists2();
     const posts = await getAllBlogPosts2();
-    const baseUrl = "https://universalinc.com";
+    const baseUrl = "https://inkedconnect.com";
     const staticPages = [
       { loc: "/", changefreq: "weekly", priority: "1.0" },
       { loc: "/artists", changefreq: "daily", priority: "0.9" },
