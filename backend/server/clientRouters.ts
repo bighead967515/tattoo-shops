@@ -184,8 +184,10 @@ function maskContactInfo(
   const isOwner = userClientId !== null && request.clientId === userClientId;
   const shouldMask = !isOwner && !isAdmin;
 
+  const { guestToken, ...sanitizedRequest } = request;
+
   return {
-    ...request,
+    ...sanitizedRequest,
     guestEmail: shouldMask ? "[Masked - Use platform chat]" : request.guestEmail,
     client: client
       ? {
@@ -376,12 +378,15 @@ export const requestsRouter = router({
         .limit(filters.limit ?? 20)
         .offset(filters.offset ?? 0);
 
-      return results.map((r: (typeof results)[number]) => ({
-        ...r.request,
-        client: r.client,
-        images: r.images ? JSON.parse(r.images as unknown as string) : [],
-        bidCount: Number(r.bidCount),
-      }));
+      return results.map((r: (typeof results)[number]) => {
+        const { guestToken, ...sanitizedRequest } = r.request;
+        return {
+          ...sanitizedRequest,
+          client: r.client,
+          images: r.images ? JSON.parse(r.images as unknown as string) : [],
+          bidCount: Number(r.bidCount),
+        };
+      });
     }),
 
   // Get recent open requests for the homepage feed
@@ -531,10 +536,13 @@ export const requestsRouter = router({
       .where(eq(tattooRequests.clientId, client.id))
       .orderBy(desc(tattooRequests.createdAt));
 
-    return results.map((r: (typeof results)[number]) => ({
-      ...r.request,
-      bidCount: Number(r.bidCount),
-    }));
+    return results.map((r: (typeof results)[number]) => {
+      const { guestToken, ...sanitizedRequest } = r.request;
+      return {
+        ...sanitizedRequest,
+        bidCount: Number(r.bidCount),
+      };
+    });
   }),
 
   // Create a new tattoo request — open to everyone, including guests without an account
@@ -831,6 +839,19 @@ export const requestsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await requireDb();
+
+      // Count current images for this request to prevent storage quota abuse (max 10)
+      const [imgCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(requestImages)
+        .where(eq(requestImages.requestId, input.requestId));
+      if ((imgCount?.count ?? 0) >= 10) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Maximum image limit reached for this request (max 10)",
+        });
+      }
+
       let request: typeof tattooRequests.$inferSelect | undefined;
 
       if (ctx.user) {

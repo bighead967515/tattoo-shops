@@ -210,7 +210,8 @@ import {
   foreignKey,
   index,
   unique,
-  jsonb
+  jsonb,
+  numeric
 } from "drizzle-orm/pg-core";
 var roleEnum, bookingStatusEnum, webhookStatusEnum, verificationStatusEnum, users, artists, shops, portfolioImages, reviews, bookings, favorites, webhookQueue, verificationDocuments, requestStatusEnum, bidStatusEnum, clients, tattooRequests, requestImages, bids, requestMessages, flashArt, invitations, blogPosts;
 var init_schema = __esm({
@@ -296,7 +297,7 @@ var init_schema = __esm({
       facebook: varchar("facebook", { length: 500 }),
       lat: text("lat"),
       lng: text("lng"),
-      averageRating: text("averageRating"),
+      averageRating: numeric("averageRating", { precision: 3, scale: 2 }),
       totalReviews: integer("totalReviews").default(0),
       isApproved: boolean("isApproved").default(false),
       isHidden: boolean("isHidden").default(false).notNull(),
@@ -418,7 +419,9 @@ var init_schema = __esm({
       tattooDescription: text("tattooDescription").notNull(),
       placement: varchar("placement", { length: 255 }).notNull(),
       size: varchar("size", { length: 100 }).notNull(),
-      budget: varchar("budget", { length: 100 }),
+      budget: varchar("budgetNotes", { length: 100 }),
+      budgetMin: integer("budgetMin"),
+      budgetMax: integer("budgetMax"),
       additionalNotes: text("additionalNotes"),
       status: bookingStatusEnum("status").default("pending").notNull(),
       stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
@@ -3568,8 +3571,9 @@ var clientsRouter = router({
 function maskContactInfo(request, client, userClientId, isAdmin) {
   const isOwner = userClientId !== null && request.clientId === userClientId;
   const shouldMask = !isOwner && !isAdmin;
+  const { guestToken, ...sanitizedRequest } = request;
   return {
-    ...request,
+    ...sanitizedRequest,
     guestEmail: shouldMask ? "[Masked - Use platform chat]" : request.guestEmail,
     client: client ? {
       ...client,
@@ -3697,12 +3701,15 @@ var requestsRouter = router({
       ),
       desc2(tattooRequests.createdAt)
     ).limit(filters.limit ?? 20).offset(filters.offset ?? 0);
-    return results.map((r) => ({
-      ...r.request,
-      client: r.client,
-      images: r.images ? JSON.parse(r.images) : [],
-      bidCount: Number(r.bidCount)
-    }));
+    return results.map((r) => {
+      const { guestToken, ...sanitizedRequest } = r.request;
+      return {
+        ...sanitizedRequest,
+        client: r.client,
+        images: r.images ? JSON.parse(r.images) : [],
+        bidCount: Number(r.bidCount)
+      };
+    });
   }),
   // Get recent open requests for the homepage feed
   listForHomepage: publicProcedure.query(async ({ ctx }) => {
@@ -3793,10 +3800,13 @@ var requestsRouter = router({
           SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
         )`.as("bidCount")
     }).from(tattooRequests).where(eq2(tattooRequests.clientId, client.id)).orderBy(desc2(tattooRequests.createdAt));
-    return results.map((r) => ({
-      ...r.request,
-      bidCount: Number(r.bidCount)
-    }));
+    return results.map((r) => {
+      const { guestToken, ...sanitizedRequest } = r.request;
+      return {
+        ...sanitizedRequest,
+        bidCount: Number(r.bidCount)
+      };
+    });
   }),
   // Create a new tattoo request — open to everyone, including guests without an account
   create: publicProcedure.input(
@@ -4018,6 +4028,13 @@ var requestsRouter = router({
     })
   ).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
+    const [imgCount] = await db.select({ count: sql2`count(*)::int` }).from(requestImages).where(eq2(requestImages.requestId, input.requestId));
+    if ((imgCount?.count ?? 0) >= 10) {
+      throw new TRPCError2({
+        code: "FORBIDDEN",
+        message: "Maximum image limit reached for this request (max 10)"
+      });
+    }
     let request;
     if (ctx.user) {
       const [client] = await db.select({ id: clients.id }).from(clients).where(eq2(clients.userId, ctx.user.id)).limit(1);

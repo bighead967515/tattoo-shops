@@ -373,16 +373,7 @@ DROP POLICY IF EXISTS tattoo_requests_admin_all ON "tattooRequests";
 CREATE POLICY tattoo_requests_visible_to_marketplace ON "tattooRequests"
   FOR SELECT
   TO anon, authenticated
-  USING (
-    app_private.can_view_request(id)
-    AND (
-      -- If the user is the owner, client, or admin, they can select
-      "clientId" = app_private.current_client_id()
-      OR app_private.is_admin()
-      -- Otherwise, for public marketplace viewing, guestEmail MUST be null
-      OR "guestEmail" IS NULL
-    )
-  );
+  USING (app_private.can_view_request(id));
 CREATE POLICY tattoo_requests_guest_insert ON "tattooRequests"
   FOR INSERT
   TO anon

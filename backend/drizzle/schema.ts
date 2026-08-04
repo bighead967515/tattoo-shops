@@ -12,6 +12,7 @@ import {
   index,
   unique,
   jsonb,
+  numeric,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SubscriptionTier } from "@shared/const";
@@ -113,7 +114,7 @@ export const artists = pgTable("artists", {
   facebook: varchar("facebook", { length: 500 }),
   lat: text("lat"),
   lng: text("lng"),
-  averageRating: text("averageRating"),
+  averageRating: numeric("averageRating", { precision: 3, scale: 2 }),
   totalReviews: integer("totalReviews").default(0),
   isApproved: boolean("isApproved").default(false),
   isHidden: boolean("isHidden").default(false).notNull(),
@@ -250,7 +251,9 @@ export const bookings = pgTable("bookings", {
   tattooDescription: text("tattooDescription").notNull(),
   placement: varchar("placement", { length: 255 }).notNull(),
   size: varchar("size", { length: 100 }).notNull(),
-  budget: varchar("budget", { length: 100 }),
+  budget: varchar("budgetNotes", { length: 100 }),
+  budgetMin: integer("budgetMin"),
+  budgetMax: integer("budgetMax"),
   additionalNotes: text("additionalNotes"),
   status: bookingStatusEnum("status").default("pending").notNull(),
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }), // For deposit payments
