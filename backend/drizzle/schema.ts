@@ -481,6 +481,7 @@ export const requestImages = pgTable("requestImages", {
   imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
   imageKey: varchar("imageKey", { length: 500 }).notNull().unique(), // Supabase Storage key
   caption: text("caption"),
+  status: varchar("status", { length: 20 }).default("reserved").notNull(), // 'reserved' or 'finalized'
   isMainImage: boolean("isMainImage").default(false),
   isExistingTattoo: boolean("isExistingTattoo").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

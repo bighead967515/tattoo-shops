@@ -1,7 +1,7 @@
 import { z } from "zod";
 import crypto from "crypto";
 import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
-import { eq, and, desc, sql, ilike, lt } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, lt, inArray } from "drizzle-orm";
 import { getDb, isAiEnabled } from "./db";
 import {
   clients,
@@ -15,6 +15,7 @@ import {
   BUCKETS,
   createSignedUploadUrl,
   getPublicUrl,
+  deleteFiles,
 } from "./_core/supabaseStorage";
 import { TRPCError } from "@trpc/server";
 import { logger } from "./_core/logger";
@@ -65,6 +66,60 @@ async function requireDb() {
     });
   }
   return db;
+}
+
+/**
+ * Cleanup job to delete expired image reservations and their associated files in Supabase Storage.
+ */
+export async function cleanupExpiredReservations(db: any) {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  try {
+    const expired = await db
+      .select({ id: requestImages.id, imageKey: requestImages.imageKey })
+      .from(requestImages)
+      .where(
+        and(
+          eq(requestImages.status, "reserved"),
+          lt(requestImages.createdAt, tenMinutesAgo),
+        )
+      );
+
+    if (expired.length > 0) {
+      const keysToDelete = expired.map((e: any) => e.imageKey);
+      
+      // Delete files from Supabase Storage
+      try {
+        await deleteFiles(BUCKETS.REQUEST_IMAGES, keysToDelete);
+      } catch (err) {
+        console.error("[Cleanup Job] Failed to delete files from Supabase Storage:", err);
+      }
+
+      // Delete database rows
+      const idsToDelete = expired.map((e: any) => e.id);
+      await db
+        .delete(requestImages)
+        .where(inArray(requestImages.id, idsToDelete));
+      
+      console.log(`[Cleanup Job] Cleaned up ${idsToDelete.length} expired image reservations.`);
+    }
+  } catch (error) {
+    console.error("[Cleanup Job] Error running expired reservations cleanup:", error);
+  }
+}
+
+// Start periodic background cleanup job (every 15 minutes)
+const cleanupInterval = setInterval(async () => {
+  try {
+    const db = await getDb();
+    if (db) {
+      await cleanupExpiredReservations(db);
+    }
+  } catch (err) {
+    console.error("[Cleanup Job] Failed to run on interval:", err);
+  }
+}, 15 * 60 * 1000);
+if (cleanupInterval && typeof cleanupInterval.unref === "function") {
+  cleanupInterval.unref();
 }
 
 // ============================================
@@ -269,7 +324,7 @@ export const requestsRouter = router({
           images: sql<string>`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
-            WHERE ri."requestId" = "tattooRequests".id
+            WHERE ri."requestId" = "tattooRequests".id AND ri.status = 'finalized'
           )`.as("images"),
           bidCount: sql<number>`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
@@ -360,7 +415,7 @@ export const requestsRouter = router({
           images: sql<string>`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
-            WHERE ri."requestId" = "tattooRequests".id
+            WHERE ri."requestId" = "tattooRequests".id AND ri.status = 'finalized'
           )`.as("images"),
           bidCount: sql<number>`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
@@ -414,7 +469,7 @@ export const requestsRouter = router({
         images: sql<string>`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
-            WHERE ri."requestId" = "tattooRequests".id
+            WHERE ri."requestId" = "tattooRequests".id AND ri.status = 'finalized'
           )`.as("images"),
         bidCount: sql<number>`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
@@ -467,7 +522,12 @@ export const requestsRouter = router({
       const images = await db
         .select()
         .from(requestImages)
-        .where(eq(requestImages.requestId, input.id));
+        .where(
+          and(
+            eq(requestImages.requestId, input.id),
+            eq(requestImages.status, "finalized"),
+          ),
+        );
 
       // Get bids with artist info
       const requestBids = await db
@@ -819,17 +879,8 @@ export const requestsRouter = router({
           sql`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
         );
 
-        // Delete expired reservations (older than 10 minutes)
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-        await tx
-          .delete(requestImages)
-          .where(
-            and(
-              eq(requestImages.requestId, input.requestId),
-              eq(requestImages.caption, "__reserved__"),
-              lt(requestImages.createdAt, tenMinutesAgo)
-            )
-          );
+        // Delete expired reservations and files from Supabase Storage
+        await cleanupExpiredReservations(tx);
 
         // Count non-expired images + active reservations
         const [imgCount] = await tx
@@ -851,7 +902,7 @@ export const requestsRouter = router({
             requestId: input.requestId,
             imageKey: fileKey,
             imageUrl: "reserved",
-            caption: "__reserved__",
+            status: "reserved",
             isMainImage: false,
             isExistingTattoo: false,
           });
@@ -947,17 +998,8 @@ export const requestsRouter = router({
           sql`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
         );
 
-        // Delete expired reservations (older than 10 minutes)
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-        await tx
-          .delete(requestImages)
-          .where(
-            and(
-              eq(requestImages.requestId, input.requestId),
-              eq(requestImages.caption, "__reserved__"),
-              lt(requestImages.createdAt, tenMinutesAgo)
-            )
-          );
+        // Delete expired reservations and files from Supabase Storage
+        await cleanupExpiredReservations(tx);
 
         // Find the active reservation row for this imageKey
         const [reservation] = await tx
@@ -967,7 +1009,7 @@ export const requestsRouter = router({
             and(
               eq(requestImages.imageKey, input.imageKey),
               eq(requestImages.requestId, input.requestId),
-              eq(requestImages.caption, "__reserved__")
+              eq(requestImages.status, "reserved")
             )
           )
           .limit(1);
@@ -993,6 +1035,7 @@ export const requestsRouter = router({
           .set({
             imageUrl,
             caption: input.caption || null,
+            status: "finalized",
             isMainImage: input.isMainImage,
             isExistingTattoo: input.isExistingTattoo,
             createdAt: new Date(), // Reset creation time to completion time

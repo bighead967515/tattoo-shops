@@ -621,6 +621,8 @@ var init_schema = __esm({
       imageKey: varchar("imageKey", { length: 500 }).notNull().unique(),
       // Supabase Storage key
       caption: text("caption"),
+      status: varchar("status", { length: 20 }).default("reserved").notNull(),
+      // 'reserved' or 'finalized'
       isMainImage: boolean("isMainImage").default(false),
       isExistingTattoo: boolean("isExistingTattoo").default(false).notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull()
@@ -3257,7 +3259,7 @@ init_db();
 init_schema();
 init_supabaseStorage();
 init_logger();
-import { eq as eq2, and as and2, desc as desc2, sql as sql2, lt } from "drizzle-orm";
+import { eq as eq2, and as and2, desc as desc2, sql as sql2, lt, inArray } from "drizzle-orm";
 import { TRPCError as TRPCError2 } from "@trpc/server";
 import path from "path";
 
@@ -3500,6 +3502,43 @@ async function requireDb() {
   }
   return db;
 }
+async function cleanupExpiredReservations(db) {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1e3);
+  try {
+    const expired = await db.select({ id: requestImages.id, imageKey: requestImages.imageKey }).from(requestImages).where(
+      and2(
+        eq2(requestImages.status, "reserved"),
+        lt(requestImages.createdAt, tenMinutesAgo)
+      )
+    );
+    if (expired.length > 0) {
+      const keysToDelete = expired.map((e) => e.imageKey);
+      try {
+        await deleteFiles(BUCKETS.REQUEST_IMAGES, keysToDelete);
+      } catch (err) {
+        console.error("[Cleanup Job] Failed to delete files from Supabase Storage:", err);
+      }
+      const idsToDelete = expired.map((e) => e.id);
+      await db.delete(requestImages).where(inArray(requestImages.id, idsToDelete));
+      console.log(`[Cleanup Job] Cleaned up ${idsToDelete.length} expired image reservations.`);
+    }
+  } catch (error) {
+    console.error("[Cleanup Job] Error running expired reservations cleanup:", error);
+  }
+}
+var cleanupInterval = setInterval(async () => {
+  try {
+    const db = await getDb();
+    if (db) {
+      await cleanupExpiredReservations(db);
+    }
+  } catch (err) {
+    console.error("[Cleanup Job] Failed to run on interval:", err);
+  }
+}, 15 * 60 * 1e3);
+if (cleanupInterval && typeof cleanupInterval.unref === "function") {
+  cleanupInterval.unref();
+}
 var clientsRouter = router({
   // Get current user's client profile
   getMyProfile: protectedProcedure.query(async ({ ctx }) => {
@@ -3628,7 +3667,7 @@ var requestsRouter = router({
       images: sql2`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
-            WHERE ri."requestId" = "tattooRequests".id
+            WHERE ri."requestId" = "tattooRequests".id AND ri.status = 'finalized'
           )`.as("images"),
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
@@ -3690,7 +3729,7 @@ var requestsRouter = router({
       images: sql2`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
-            WHERE ri."requestId" = "tattooRequests".id
+            WHERE ri."requestId" = "tattooRequests".id AND ri.status = 'finalized'
           )`.as("images"),
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
@@ -3729,7 +3768,7 @@ var requestsRouter = router({
       images: sql2`(
             SELECT json_agg(json_build_object('id', ri.id, 'imageUrl', ri."imageUrl", 'isMainImage', ri."isMainImage"))
             FROM "requestImages" ri
-            WHERE ri."requestId" = "tattooRequests".id
+            WHERE ri."requestId" = "tattooRequests".id AND ri.status = 'finalized'
           )`.as("images"),
       bidCount: sql2`(
             SELECT COUNT(*) FROM bids WHERE bids."requestId" = "tattooRequests".id
@@ -3762,7 +3801,12 @@ var requestsRouter = router({
         message: "Request not found"
       });
     }
-    const images = await db.select().from(requestImages).where(eq2(requestImages.requestId, input.id));
+    const images = await db.select().from(requestImages).where(
+      and2(
+        eq2(requestImages.requestId, input.id),
+        eq2(requestImages.status, "finalized")
+      )
+    );
     const requestBids = await db.select({
       bid: bids,
       artist: artists
@@ -4011,14 +4055,7 @@ var requestsRouter = router({
       await tx.execute(
         sql2`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
       );
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1e3);
-      await tx.delete(requestImages).where(
-        and2(
-          eq2(requestImages.requestId, input.requestId),
-          eq2(requestImages.caption, "__reserved__"),
-          lt(requestImages.createdAt, tenMinutesAgo)
-        )
-      );
+      await cleanupExpiredReservations(tx);
       const [imgCount] = await tx.select({ count: sql2`count(*)::int` }).from(requestImages).where(eq2(requestImages.requestId, input.requestId));
       if ((imgCount?.count ?? 0) >= 10) {
         throw new TRPCError2({
@@ -4030,7 +4067,7 @@ var requestsRouter = router({
         requestId: input.requestId,
         imageKey: fileKey,
         imageUrl: "reserved",
-        caption: "__reserved__",
+        status: "reserved",
         isMainImage: false,
         isExistingTattoo: false
       });
@@ -4098,19 +4135,12 @@ var requestsRouter = router({
       await tx.execute(
         sql2`SELECT id FROM "tattooRequests" WHERE id = ${input.requestId} FOR UPDATE`
       );
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1e3);
-      await tx.delete(requestImages).where(
-        and2(
-          eq2(requestImages.requestId, input.requestId),
-          eq2(requestImages.caption, "__reserved__"),
-          lt(requestImages.createdAt, tenMinutesAgo)
-        )
-      );
+      await cleanupExpiredReservations(tx);
       const [reservation] = await tx.select().from(requestImages).where(
         and2(
           eq2(requestImages.imageKey, input.imageKey),
           eq2(requestImages.requestId, input.requestId),
-          eq2(requestImages.caption, "__reserved__")
+          eq2(requestImages.status, "reserved")
         )
       ).limit(1);
       if (!reservation) {
@@ -4125,6 +4155,7 @@ var requestsRouter = router({
       const [updatedImage] = await tx.update(requestImages).set({
         imageUrl,
         caption: input.caption || null,
+        status: "finalized",
         isMainImage: input.isMainImage,
         isExistingTattoo: input.isExistingTattoo,
         createdAt: /* @__PURE__ */ new Date()
@@ -6505,7 +6536,7 @@ init_logger();
 init_db();
 init_schema();
 init_logger();
-import { eq as eq7, and as and5, lte, inArray } from "drizzle-orm";
+import { eq as eq7, and as and5, lte, inArray as inArray2 } from "drizzle-orm";
 var RETRY_DELAYS = [
   1 * 60 * 1e3,
   // 1 minute
