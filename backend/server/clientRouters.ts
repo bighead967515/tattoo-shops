@@ -87,20 +87,20 @@ export async function cleanupExpiredReservations(db: any) {
     if (expired.length > 0) {
       const keysToDelete = expired.map((e: any) => e.imageKey);
       
-      // Delete files from Supabase Storage
+      // Delete files from Supabase Storage first; only delete database rows on success
       try {
         await deleteFiles(BUCKETS.REQUEST_IMAGES, keysToDelete);
-      } catch (err) {
-        console.error("[Cleanup Job] Failed to delete files from Supabase Storage:", err);
-      }
 
-      // Delete database rows
-      const idsToDelete = expired.map((e: any) => e.id);
-      await db
-        .delete(requestImages)
-        .where(inArray(requestImages.id, idsToDelete));
-      
-      console.log(`[Cleanup Job] Cleaned up ${idsToDelete.length} expired image reservations.`);
+        // Delete database rows ONLY after successful file deletion
+        const idsToDelete = expired.map((e: any) => e.id);
+        await db
+          .delete(requestImages)
+          .where(inArray(requestImages.id, idsToDelete));
+
+        console.log(`[Cleanup Job] Cleaned up ${idsToDelete.length} expired image reservations.`);
+      } catch (err) {
+        console.error("[Cleanup Job] Failed to delete files from Supabase Storage, preserving database rows for retry:", err);
+      }
     }
   } catch (error) {
     console.error("[Cleanup Job] Error running expired reservations cleanup:", error);
