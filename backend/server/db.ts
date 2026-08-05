@@ -298,6 +298,7 @@ export async function getArtistById(id: number) {
     .select({
       ...artistFields,
       subscriptionTier: users.subscriptionTier,
+      verificationStatus: users.verificationStatus,
     })
     .from(artists)
     .innerJoin(users, eq(artists.userId, users.id))
@@ -313,6 +314,7 @@ export async function getArtistById(id: number) {
     .select({
       ...artistFields,
       subscriptionTier: users.subscriptionTier,
+      verificationStatus: users.verificationStatus,
     })
     .from(artists)
     .innerJoin(users, eq(artists.userId, users.id))
