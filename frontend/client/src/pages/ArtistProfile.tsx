@@ -325,32 +325,29 @@ export default function ArtistProfile() {
                 </div>
               )}
 
-              {/* Pricing Tiers */}
+              {/* Pricing Tiers — only show industry averages when artist has no custom pricing set */}
               <div className="mb-6">
                 <h3 className="font-semibold mb-3">Pricing</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Small (2-4")</span>
-                    <span className="font-medium">$100 - $300</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Medium (4-6")</span>
-                    <span className="font-medium">$300 - $600</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Large (6-10")</span>
-                    <span className="font-medium">$600 - $1,200</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Extra Large (10"+)
-                    </span>
-                    <span className="font-medium">$1,200+</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    *Typical industry pricing. Actual prices vary based on
-                    complexity and detail. Contact artist for quote.
+                  <p className="text-xs text-muted-foreground rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+                    This artist has not published a custom price list. The ranges below are general industry averages for reference only — actual prices vary based on complexity, detail, and artist experience. Submit a request or contact the artist directly for an accurate quote.
                   </p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Small (2–4")</span>
+                    <span className="font-medium text-muted-foreground">~$100 – $300</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Medium (4–6")</span>
+                    <span className="font-medium text-muted-foreground">~$300 – $600</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Large (6–10")</span>
+                    <span className="font-medium text-muted-foreground">~$600 – $1,200</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Extra Large (10"+)</span>
+                    <span className="font-medium text-muted-foreground">~$1,200+</span>
+                  </div>
                 </div>
               </div>
 
