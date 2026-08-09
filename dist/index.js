@@ -3515,12 +3515,12 @@ async function cleanupExpiredReservations(db) {
       const keysToDelete = expired.map((e) => e.imageKey);
       try {
         await deleteFiles(BUCKETS.REQUEST_IMAGES, keysToDelete);
+        const idsToDelete = expired.map((e) => e.id);
+        await db.delete(requestImages).where(inArray(requestImages.id, idsToDelete));
+        console.log(`[Cleanup Job] Cleaned up ${idsToDelete.length} expired image reservations.`);
       } catch (err) {
-        console.error("[Cleanup Job] Failed to delete files from Supabase Storage:", err);
+        console.error("[Cleanup Job] Failed to delete files from Supabase Storage, preserving database rows for retry:", err);
       }
-      const idsToDelete = expired.map((e) => e.id);
-      await db.delete(requestImages).where(inArray(requestImages.id, idsToDelete));
-      console.log(`[Cleanup Job] Cleaned up ${idsToDelete.length} expired image reservations.`);
     }
   } catch (error) {
     console.error("[Cleanup Job] Error running expired reservations cleanup:", error);
@@ -5805,7 +5805,7 @@ var appRouter = router({
         throw new TRPCError6({ code: "NOT_FOUND", message: "Portfolio image not found" });
       }
       const artist = await getArtistById(image.artistId);
-      if (!artist || artist.userId !== ctx.user.id) {
+      if (!artist || artist.userId !== ctx.user.id && ctx.user.role !== "admin") {
         throw new TRPCError6({ code: "FORBIDDEN", message: "You can only delete your own portfolio images" });
       }
       try {

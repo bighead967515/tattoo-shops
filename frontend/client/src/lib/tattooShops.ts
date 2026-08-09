@@ -128,7 +128,8 @@ export function filterTattooShops(
   return shops.filter(
     (shop) =>
       shop.city.toLowerCase().includes(normalized) ||
-      shop.name.toLowerCase().includes(normalized),
+      shop.name.toLowerCase().includes(normalized) ||
+      shop.specialties.toLowerCase().includes(normalized),
   );
 }
 

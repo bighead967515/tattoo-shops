@@ -937,7 +937,7 @@ export const appRouter = router({
 
         // Get artist to verify ownership
         const artist = await db.getArtistById(image.artistId);
-        if (!artist || artist.userId !== ctx.user.id) {
+        if (!artist || (artist.userId !== ctx.user.id && ctx.user.role !== "admin")) {
           throw new TRPCError({ code: "FORBIDDEN", message: "You can only delete your own portfolio images" });
         }
 
