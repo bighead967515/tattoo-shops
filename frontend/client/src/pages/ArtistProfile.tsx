@@ -40,6 +40,7 @@ import ReviewCard from "@/components/ReviewCard";
 import ReviewFilters from "@/components/ReviewFilters";
 import BookingDialog from "@/components/BookingDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import TrustSummaryCard from "@/components/TrustSummaryCard";
 
 export default function ArtistProfile() {
   const { id } = useParams();
@@ -256,6 +257,10 @@ export default function ArtistProfile() {
     artist.subscriptionTier === "artist_pro" ||
     artist.subscriptionTier === "artist_elite";
 
+  const verifiedBookingReviewCount = reviews
+    ? reviews.filter((r: { verifiedBooking?: boolean }) => r.verifiedBooking).length
+    : 0;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -303,6 +308,17 @@ export default function ArtistProfile() {
                     {avgRating.toFixed(1)} ({artist.totalReviews} reviews)
                   </span>
                 </div>
+              </div>
+
+              {/* Trust Summary Card — Issue #29 */}
+              <div className="mb-6">
+                <TrustSummaryCard
+                  isVerified={isVerifiedArtist}
+                  averageRating={avgRating}
+                  totalReviews={artist.totalReviews ?? 0}
+                  verifiedBookingReviews={verifiedBookingReviewCount}
+                  acceptsDeposit={isPremium}
+                />
               </div>
 
               {artist.bio && (
