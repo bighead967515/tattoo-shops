@@ -38,7 +38,7 @@ jobs:
       PORT: "3000"
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fe02b74ab04b0346b9e454d30fac55e74e9e0dc6 # v4.0.0
